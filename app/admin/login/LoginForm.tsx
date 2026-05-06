@@ -23,9 +23,12 @@ export default function LoginForm() {
       return
     }
 
-    // Full navigation so /admin Server Components always see the refreshed cookies
-    // (proxy + browser client must stay in sync).
-    window.location.assign('/admin')
+    const { data: { user } } = await supabase.auth.getUser()
+    const dest =
+      user?.app_metadata?.role === 'super_admin' ? '/master-admin' : '/admin'
+
+    // Full navigation so Server Components always see refreshed cookies (proxy + client sync).
+    window.location.assign(dest)
   }
 
   return (

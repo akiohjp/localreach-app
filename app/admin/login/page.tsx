@@ -8,7 +8,9 @@ export const metadata: Metadata = { title: 'Sign in — LocalReach' }
 export default async function LoginPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (user) redirect('/admin')
+  if (user) {
+    redirect(user.app_metadata?.role === 'super_admin' ? '/master-admin' : '/admin')
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
