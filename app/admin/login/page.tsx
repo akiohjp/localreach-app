@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import LoginForm from './LoginForm'
+import { resolveAdminHomeHref } from '@/lib/master-admin-access'
 
 export const metadata: Metadata = { title: 'Sign in — LocalReach' }
 
@@ -12,7 +13,7 @@ export default async function LoginPage({ searchParams }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (user) {
-    redirect(user.app_metadata?.role === 'super_admin' ? '/master-admin' : '/admin')
+    redirect(resolveAdminHomeHref(user))
   }
 
   const q = await searchParams

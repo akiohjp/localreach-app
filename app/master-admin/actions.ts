@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { canUseMasterDashboard } from '@/lib/master-admin-access'
 
 export type NewStoreRow = {
   id: string
@@ -23,7 +24,7 @@ export async function createStore(payload: {
   // 1. Re-verify the caller is still a super_admin on every request
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.app_metadata?.role !== 'super_admin') {
+  if (!user || !canUseMasterDashboard(user)) {
     return { ok: false, error: 'Unauthorized.' }
   }
 

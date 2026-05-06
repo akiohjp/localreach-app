@@ -7,6 +7,7 @@ const required = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
   "NEXT_PUBLIC_APP_URL",
+  "MASTER_ADMIN_ALLOWED_EMAILS",
 ];
 
 function main() {

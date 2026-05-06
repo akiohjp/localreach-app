@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { resolvePostLoginPath } from './actions'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
@@ -23,11 +24,7 @@ export default function LoginForm() {
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const dest =
-      user?.app_metadata?.role === 'super_admin' ? '/master-admin' : '/admin'
-
-    // Full navigation so Server Components always see refreshed cookies (proxy + client sync).
+    const dest = await resolvePostLoginPath()
     window.location.assign(dest)
   }
 
