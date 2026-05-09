@@ -287,7 +287,7 @@ ${report.tips.map((t) => `<div class="tip"><div class="tip-title">${t.title}</di
 
 function AddStoreModal({ onClose, onCreated }: {
   onClose: () => void
-  onCreated: (store: NewStoreRow) => void
+  onCreated: (store: NewStoreRow, reusedAuthUser: boolean) => void
 }) {
   const [storeName, setStoreName] = useState('')
   const [email, setEmail]         = useState('')
@@ -309,7 +309,7 @@ function AddStoreModal({ onClose, onCreated }: {
       return
     }
 
-    onCreated(result.store)
+    onCreated(result.store, result.reusedAuthUser)
   }
 
   return (
@@ -326,7 +326,7 @@ function AddStoreModal({ onClose, onCreated }: {
           <div>
             <h2 className="text-base font-bold text-slate-900">Add New Store</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Creates a client account and store in one step.
+              New login is created if the email is unused. Same email adds another store for that client and updates the login password to the value below.
             </p>
           </div>
           <button
@@ -400,7 +400,7 @@ function AddStoreModal({ onClose, onCreated }: {
               </button>
             </div>
             <p className="text-[10px] text-slate-400">
-              Share this with the client for their first login.
+              For new accounts: share for first login. For an existing email: password is reset to this value.
             </p>
           </div>
 
@@ -452,16 +452,22 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
   const [pending, setPending]         = useState<string | null>(null)
   const [csvPending, setCsvPending]   = useState<string | null>(null)
   const [error, setError]             = useState<string | null>(null)
+  const [infoMsg, setInfoMsg]        = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isReportOpen, setIsReportOpen] = useState(false)
 
-  function openModal()    { setIsModalOpen(true) }
+  function openModal()    { setInfoMsg(null); setIsModalOpen(true) }
   function closeModal()   { setIsModalOpen(false) }
   function openReport()   { setIsReportOpen(true) }
   function closeReport()  { setIsReportOpen(false) }
 
-  function handleStoreCreated(store: NewStoreRow) {
+  function handleStoreCreated(store: NewStoreRow, reusedAuthUser: boolean) {
     closeModal()
+    setInfoMsg(
+      reusedAuthUser
+        ? 'このメールのログインアカウントは既にありました。新しい店舗のみ追加し、ログインパスワードを入力した値に更新しました。'
+        : null,
+    )
     // Prepend new store then refresh server data (for accurate customer counts etc.)
     setRows((prev) => [store, ...prev])
     router.refresh()
@@ -553,6 +559,12 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
             </form>
           </div>
         </div>
+
+        {infoMsg && (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            {infoMsg}
+          </div>
+        )}
 
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
