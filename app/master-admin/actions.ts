@@ -23,6 +23,18 @@ async function masterUnauthorized(): Promise<{ ok: false; error: string } | null
   return null
 }
 
+function formatSupabaseActionError(context: string, raw: string): string {
+  const lower = raw.toLowerCase()
+  if (lower.includes('fetch failed') || lower.includes('network') || lower.includes('econnrefused')) {
+    return (
+      `${context}: ${raw} — ` +
+      'Supabase にサーバーから届いていません。Vercel の Environment Variables で ' +
+      'Preview（および Development）にも `NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` を設定し、再デプロイしてください。'
+    )
+  }
+  return `${context}: ${raw}`
+}
+
 export async function createStore(payload: {
   storeName: string
   email: string
@@ -38,43 +50,53 @@ export async function createStore(payload: {
     return { ok: false, error: (e as Error).message }
   }
 
-  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
-    email: payload.email.trim(),
-    password: payload.password,
-    email_confirm: true,
-  })
-
-  if (authError || !authData.user) {
-    return { ok: false, error: authError?.message ?? 'Failed to create auth user.' }
-  }
-
-  const newUserId = authData.user.id
-
-  const { data: store, error: storeError } = await adminClient
-    .from('stores')
-    .insert({
-      owner_id: newUserId,
-      store_name: { en: payload.storeName.trim() },
-      google_review_url: '',
-      is_active: true,
+  try {
+    const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+      email: payload.email.trim(),
+      password: payload.password,
+      email_confirm: true,
     })
-    .select('id, store_name, default_language, is_active, created_at')
-    .single()
 
-  if (storeError || !store) {
-    await adminClient.auth.admin.deleteUser(newUserId)
-    return { ok: false, error: storeError?.message ?? 'Failed to create store record.' }
-  }
+    if (authError || !authData.user) {
+      const msg = authError?.message ?? 'Failed to create auth user.'
+      return { ok: false, error: formatSupabaseActionError('Auth', msg) }
+    }
 
-  return {
-    ok: true,
-    store: {
-      id: store.id,
-      name: (store.store_name as { en?: string })?.en ?? payload.storeName.trim(),
-      isActive: store.is_active,
-      createdAt: store.created_at,
-      customerCount: 0,
-    },
+    const newUserId = authData.user.id
+
+    const { data: store, error: storeError } = await adminClient
+      .from('stores')
+      .insert({
+        owner_id: newUserId,
+        store_name: { en: payload.storeName.trim() },
+        google_review_url: '',
+        is_active: true,
+      })
+      .select('id, store_name, default_language, is_active, created_at')
+      .single()
+
+    if (storeError || !store) {
+      await adminClient.auth.admin.deleteUser(newUserId)
+      const msg = storeError?.message ?? 'Failed to create store record.'
+      return { ok: false, error: formatSupabaseActionError('Database', msg) }
+    }
+
+    return {
+      ok: true,
+      store: {
+        id: store.id,
+        name: (store.store_name as { en?: string })?.en ?? payload.storeName.trim(),
+        isActive: store.is_active,
+        createdAt: store.created_at,
+        customerCount: 0,
+      },
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      error: formatSupabaseActionError('Request', msg),
+    }
   }
 }
 
