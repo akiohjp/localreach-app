@@ -29,3 +29,24 @@
 
 GitHub → **Settings → Applications → Installed GitHub Apps → Vercel → Configure** で、  
 **Repository access** に `localreach-app` を含める（または **All repositories**）。
+
+---
+
+## 既存の Vercel プロジェクトを `localreach-app` に載せ替える（リンクし直し）
+
+1. 上記と同様に GitHub で **Vercel アプリから `localreach-app` が見える**状態にしておく。
+2. Vercel → 対象プロジェクト → **Settings → Git**。
+3. 既存の別リポが繋がっている場合は **Disconnect**。
+4. **Connect Git Repository** → **`akiohjp/localreach-app`** を選択。
+5. **Production Branch:** `main`  
+   **Root Directory:** このリポはアプリがルートなので **`./` または未入力** のままでよい。
+6. **Deployments** が成功するまで待ち、環境変数（`NEXT_PUBLIC_*` / Supabase / `MASTER_ADMIN_*` など）は **Settings → Environment Variables** で旧プロジェクトと同様に設定。
+
+---
+
+## デプロイ後の確認 URL
+
+| 用途 | パス |
+|------|------|
+| マスター（親）ログイン | `/master-admin/login` |
+| 店オーナーログイン | `/admin/login` |
