@@ -1,21 +1,16 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getLocalizedText } from '@/types/database'
-import { canUseMasterDashboard } from '@/lib/master-admin-access'
+import { getMasterSessionEmail } from '@/lib/master-session-server'
 import MasterDashboard from './MasterDashboard'
 
 export const metadata: Metadata = { title: 'Master Admin — LocalReach' }
 
 export default async function MasterAdminPage() {
-  // Auth check via session client
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/admin/login')
-  if (!canUseMasterDashboard(user)) redirect('/admin')
+  const master = await getMasterSessionEmail()
+  if (!master) redirect('/master-admin/login')
 
-  // Data fetch via service-role client — bypasses RLS to get accurate counts
   const admin = createAdminClient()
   const { data: stores } = await admin
     .from('stores')

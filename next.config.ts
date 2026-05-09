@@ -1,5 +1,9 @@
 import path from "path";
 import type { NextConfig } from "next";
+import {
+  resolvedMasterAdminEmail,
+  resolvedMasterAdminPassword,
+} from "./lib/master-admin-env";
 
 /** Fail fast on Vercel (production + preview) if required env is missing. */
 const vercelBuild =
@@ -23,10 +27,22 @@ if (vercelBuild) {
       "[next.config] NEXT_PUBLIC_APP_URL must use https:// on Vercel",
     );
   }
-  const masterEmails = process.env.MASTER_ADMIN_ALLOWED_EMAILS?.trim();
-  if (!masterEmails) {
+  const masterEmail = resolvedMasterAdminEmail();
+  const masterPw = resolvedMasterAdminPassword();
+  const masterSecret = process.env.MASTER_SESSION_SECRET?.trim();
+  if (!masterEmail) {
     throw new Error(
-      "[next.config] MASTER_ADMIN_ALLOWED_EMAILS is required on Vercel — comma-separated emails allowed to access /master-admin.",
+      "[next.config] Set MASTER_ADMIN_EMAIL (legacy: MASTER_SUPER_ADMIN_EMAIL) on Vercel for /master-admin/login.",
+    );
+  }
+  if (!masterPw.trim().length) {
+    throw new Error(
+      "[next.config] Set MASTER_ADMIN_PASSWORD (legacy: MASTER_SUPER_ADMIN_PASSWORD) on Vercel — rotate via env only.",
+    );
+  }
+  if (!masterSecret || masterSecret.length < 32) {
+    throw new Error(
+      "[next.config] MASTER_SESSION_SECRET must be set on Vercel and at least 32 characters.",
     );
   }
 }

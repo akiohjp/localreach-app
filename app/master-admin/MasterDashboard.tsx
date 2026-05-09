@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, X, Eye, EyeOff, Loader2, Plus, BarChart2, Copy, Printer, Check } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
-import { createStore } from './actions'
+import { Download, X, Eye, EyeOff, Loader2, Plus, BarChart2, Copy, Printer, Check, LogOut } from 'lucide-react'
+import { createStore, masterSetStoreActive, masterExportCustomersCsv } from './actions'
+import { logoutMasterAction } from './login/actions'
 import type { NewStoreRow } from './actions'
 
 type StoreRow = {
@@ -470,14 +470,10 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
   async function toggleActive(id: string, current: boolean) {
     setPending(id)
     setError(null)
-    const supabase = createClient()
-    const { error: err } = await supabase
-      .from('stores')
-      .update({ is_active: !current })
-      .eq('id', id)
+    const res = await masterSetStoreActive(id, !current)
 
-    if (err) {
-      setError(`Failed to update store ${id.slice(0, 8)}: ${err.message}`)
+    if (!res.ok) {
+      setError(`Failed to update store ${id.slice(0, 8)}: ${res.error}`)
     } else {
       setRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, isActive: !current } : r)),
@@ -488,30 +484,15 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
 
   async function handleExportCSV(storeId: string, storeName: string) {
     setCsvPending(storeId)
-    const supabase = createClient()
-    const { data, error: err } = await supabase
-      .from('customers')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .select('customer_name, whatsapp_number, opt_in, selected_keywords, created_at' as any)
-      .eq('store_id', storeId)
-      .order('created_at', { ascending: false })
-
+    const res = await masterExportCustomersCsv(storeId)
     setCsvPending(null)
 
-    if (err || !data) {
-      setError(`CSV export failed for ${storeName}: ${err?.message ?? 'unknown error'}`)
+    if (!res.ok) {
+      setError(`CSV export failed for ${storeName}: ${res.error}`)
       return
     }
 
-    const header = 'customer_name,whatsapp_number,opt_in,selected_keywords,registered_at'
-    const rowLines = (data as unknown as Array<Record<string, unknown>>).map((c) => {
-      const name     = c.customer_name ? `"${String(c.customer_name).replace(/"/g, '""')}"` : ''
-      const keywords = Array.isArray(c.selected_keywords) ? c.selected_keywords.join('|') : ''
-      return `${name},${c.whatsapp_number},${c.opt_in},"${keywords}",${c.created_at}`
-    })
-    const csv = '﻿' + [header, ...rowLines].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -559,6 +540,17 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
               <Plus size={14} aria-hidden />
               Add Store
             </button>
+            <form action={logoutMasterAction} className="flex flex-1 sm:flex-initial">
+              <button
+                type="submit"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5
+                  text-sm font-semibold text-slate-600 shadow-sm hover:border-slate-400
+                  hover:text-slate-900 active:scale-[0.98] transition-all"
+              >
+                <LogOut size={14} aria-hidden />
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
 
@@ -668,7 +660,7 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
         </div>
 
         <p className="text-center text-[10px] text-slate-300 tracking-widest uppercase">
-          Super Admin Only
+          Env-based master session
         </p>
       </div>
 

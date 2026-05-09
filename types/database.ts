@@ -50,6 +50,7 @@ export type Database = {
           /** Always woven into generated reviews (admin “forced” GEO terms). */
           forced_keywords?: string[];
           brand_color: string;
+          /** Object path `{owner_uuid}/{filename}` in `store-logos` bucket; legacy HTTPS URLs normalized by migration. */
           logo_url: string | null;
           business_category: string | null;
           is_active: boolean;
@@ -146,7 +147,18 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      capture_store_customer_lead: {
+        Args: {
+          p_customer_name: string | null;
+          p_opt_in: boolean;
+          p_selected_keywords: string[] | null;
+          p_store_id: string;
+          p_whatsapp_number: string;
+        };
+        Returns: string;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

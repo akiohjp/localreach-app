@@ -2,7 +2,11 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { Upload, X, CheckCircle, Loader2, ImageIcon } from 'lucide-react'
-import { uploadStoreLogo, updateStoreLogo } from '@/utils/supabase/storage'
+import {
+  uploadStoreLogo,
+  updateStoreLogo,
+  createStoreLogoSignedUrl,
+} from '@/utils/supabase/storage'
 
 const MAX_BYTES = 2 * 1024 * 1024 // 2 MB
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -80,16 +84,17 @@ export default function LogoUploader({ storeId, currentLogoUrl, onSuccess }: Pro
     setErrorMsg('')
 
     try {
-      const publicUrl = await uploadStoreLogo(storeId, pendingFile)
-      await updateStoreLogo(storeId, publicUrl)
+      const path = await uploadStoreLogo(storeId, pendingFile)
+      await updateStoreLogo(storeId, path)
+      const signed = await createStoreLogoSignedUrl(path)
 
       // Revoke the blob URL now that the real URL is available
       if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
 
-      setPreviewUrl(publicUrl)
+      setPreviewUrl(signed)
       setPendingFile(null)
       setState('success')
-      onSuccess?.(publicUrl)
+      onSuccess?.(path)
     } catch (err) {
       setState('error')
       setErrorMsg(err instanceof Error ? err.message : 'Upload failed. Please try again.')

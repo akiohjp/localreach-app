@@ -1,8 +1,7 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { getMasterSessionEmail } from '@/lib/master-session-server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { canUseMasterDashboard } from '@/lib/master-admin-access'
 
 export type NewStoreRow = {
   id: string
@@ -16,19 +15,22 @@ export type CreateStoreResult =
   | { ok: true; store: NewStoreRow }
   | { ok: false; error: string }
 
+async function masterUnauthorized(): Promise<{ ok: false; error: string } | null> {
+  const email = await getMasterSessionEmail()
+  if (!email) {
+    return { ok: false, error: 'Unauthorized — sign in at /master-admin/login.' }
+  }
+  return null
+}
+
 export async function createStore(payload: {
   storeName: string
   email: string
   password: string
 }): Promise<CreateStoreResult> {
-  // 1. Re-verify the caller is still a super_admin on every request
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !canUseMasterDashboard(user)) {
-    return { ok: false, error: 'Unauthorized.' }
-  }
+  const denied = await masterUnauthorized()
+  if (denied) return denied
 
-  // 2. Create auth user via Service Role — current session is untouched
   let adminClient: ReturnType<typeof createAdminClient>
   try {
     adminClient = createAdminClient()
@@ -39,7 +41,7 @@ export async function createStore(payload: {
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email: payload.email.trim(),
     password: payload.password,
-    email_confirm: true, // skip email verification for admin-created accounts
+    email_confirm: true,
   })
 
   if (authError || !authData.user) {
@@ -48,7 +50,6 @@ export async function createStore(payload: {
 
   const newUserId = authData.user.id
 
-  // 3. Insert store record linked to the new user
   const { data: store, error: storeError } = await adminClient
     .from('stores')
     .insert({
@@ -61,7 +62,6 @@ export async function createStore(payload: {
     .single()
 
   if (storeError || !store) {
-    // Rollback: remove the orphaned auth user
     await adminClient.auth.admin.deleteUser(newUserId)
     return { ok: false, error: storeError?.message ?? 'Failed to create store record.' }
   }
@@ -75,5 +75,53 @@ export async function createStore(payload: {
       createdAt: store.created_at,
       customerCount: 0,
     },
+  }
+}
+
+export async function masterSetStoreActive(
+  storeId: string,
+  isActive: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const denied = await masterUnauthorized()
+  if (denied) return denied
+
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin.from('stores').update({ is_active: isActive }).eq('id', storeId)
+    if (error) return { ok: false, error: error.message }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+export async function masterExportCustomersCsv(
+  storeId: string,
+): Promise<{ ok: true; csv: string } | { ok: false; error: string }> {
+  const denied = await masterUnauthorized()
+  if (denied) return denied
+
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('customers')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .select('customer_name, whatsapp_number, opt_in, selected_keywords, created_at' as any)
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false })
+
+    if (error) return { ok: false, error: error.message }
+    if (!data) return { ok: false, error: 'No data.' }
+
+    const header = 'customer_name,whatsapp_number,opt_in,selected_keywords,registered_at'
+    const rowLines = (data as unknown as Array<Record<string, unknown>>).map((c) => {
+      const name = c.customer_name ? `"${String(c.customer_name).replace(/"/g, '""')}"` : ''
+      const keywords = Array.isArray(c.selected_keywords) ? c.selected_keywords.join('|') : ''
+      return `${name},${c.whatsapp_number},${c.opt_in},"${keywords}",${c.created_at}`
+    })
+    const csv = '\ufeff' + [header, ...rowLines].join('\n')
+    return { ok: true, csv }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
   }
 }

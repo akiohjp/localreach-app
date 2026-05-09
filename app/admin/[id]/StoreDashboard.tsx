@@ -30,6 +30,8 @@ type Props = {
   customerCount?: number
   recentCustomers?: RecentCustomer[]
   notificationEmail?: string
+  /** Signed URL when logo bucket is non-public. */
+  logoSignedUrl?: string | null
 }
 
 // ─────────────────────────────────────────────
@@ -863,6 +865,7 @@ export default function StoreDashboard({
   customerCount = 0,
   recentCustomers = [],
   notificationEmail = '',
+  logoSignedUrl,
 }: Props) {
   const router = useRouter()
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&format=png&data=${encodeURIComponent(storeUrl)}`
@@ -920,7 +923,7 @@ export default function StoreDashboard({
           <SectionCard label="Store Logo" icon={<span className="text-base leading-none">🖼</span>}>
             <LogoUploader
               storeId={store.id}
-              currentLogoUrl={store.logo_url}
+              currentLogoUrl={logoSignedUrl ?? store.logo_url}
             />
           </SectionCard>
 

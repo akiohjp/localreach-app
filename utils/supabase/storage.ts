@@ -3,11 +3,9 @@ import { createClient } from '@/utils/supabase/client'
 const BUCKET = 'store-logos'
 
 /**
- * Uploads an image file to the store-logos bucket and returns its public URL.
+ * Uploads store-logos bucket object — returns bucket-relative path (uuid/filename...).
  *
- * Storage path: {userId}/store_{storeId}_{timestamp}.{ext}
- * - The userId prefix satisfies the RLS policy (foldername[1] = auth.uid()).
- * - The timestamp suffix makes every upload unique so filenames never collide.
+ * Preview URLs come from signed URLs ({@link createStoreLogoSignedUrl}).
  */
 export async function uploadStoreLogo(
   storeId: string,
@@ -27,9 +25,21 @@ export async function uploadStoreLogo(
     .upload(path, file, { contentType: file.type })
 
   if (uploadError) throw uploadError
+  return path
+}
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
-  return data.publicUrl
+/** Readable URL for authenticated owner (bucket is private — no public CDN read). */
+export async function createStoreLogoSignedUrl(
+  bucketPath: string,
+  expiresSeconds = 3600,
+): Promise<string> {
+  const supabase = createClient()
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(bucketPath, expiresSeconds)
+
+  if (error || !data?.signedUrl) throw error ?? new Error('Could not create logo URL')
+  return data.signedUrl
 }
 
 /**
@@ -38,13 +48,13 @@ export async function uploadStoreLogo(
  */
 export async function updateStoreLogo(
   storeId: string,
-  publicUrl: string,
+  bucketPathOrLegacyUrl: string,
 ): Promise<void> {
   const supabase = createClient()
 
   const { error } = await supabase
     .from('stores')
-    .update({ logo_url: publicUrl })
+    .update({ logo_url: bucketPathOrLegacyUrl })
     .eq('id', storeId)
 
   if (error) throw error

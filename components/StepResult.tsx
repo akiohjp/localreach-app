@@ -66,13 +66,13 @@ export default function StepResult({
     setWaSavedWasPreview(false);
     setWaState("saving");
     const supabase = createClient();
-    const { error } = await supabase.from("customers").insert({
-      store_id: storeId,
-      whatsapp_number: `${cc}${digits}`,
-      opt_in: optIn,
-      selected_keywords: selectedKeywords.length > 0 ? selectedKeywords : null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ...(customerName.trim() ? { customer_name: customerName.trim() } as any : {}),
+    const { error } = await supabase.rpc("capture_store_customer_lead", {
+      p_store_id: storeId,
+      p_whatsapp_number: `${cc}${digits}`,
+      p_opt_in: optIn,
+      p_selected_keywords:
+        selectedKeywords.length > 0 ? selectedKeywords : null,
+      p_customer_name: customerName.trim() ? customerName.trim() : null,
     });
     if (error) {
       console.error("[WhatsApp save]", error.message, error);

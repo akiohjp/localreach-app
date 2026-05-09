@@ -133,7 +133,7 @@ export default function DemoPage() {
               rel="noopener noreferrer"
               className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:border-slate-400 transition-colors"
             >
-              Master admin（要 super_admin）
+              マスター管理（/master-admin/login・環境変数）
             </a>
           </div>
         </section>

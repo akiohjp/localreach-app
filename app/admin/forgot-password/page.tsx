@@ -16,6 +16,19 @@ export default function ForgotPasswordPage() {
           <p className="text-sm text-slate-500">
             We&apos;ll email you a link to choose a new password.
           </p>
+          <p className="text-[11px] text-slate-500 leading-relaxed mt-2 text-left px-1">
+            メールが一度も届かない場合は、アプリではなく&nbsp;
+            <strong className="font-semibold text-slate-700">Supabase の SMTP（カスタム SMTP）</strong>
+            が未設定のことが多いです。プロジェクト運用メンバーでも、Org メンバー以外へは送信制限になる場合があります。
+            <a
+              href="https://supabase.com/docs/guides/auth/auth-smtp"
+              target="_blank"
+              rel="noreferrer"
+              className="ml-1 text-slate-900 font-semibold underline underline-offset-2"
+            >
+              設定方法（公式）
+            </a>
+          </p>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <ForgotPasswordForm />

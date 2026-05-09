@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { getLocalizedText, isRtlLocale, type SupportedLocale } from '@/types/database'
+import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import ReviewFlow from './ReviewFlow'
 
 const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ja', 'ar']
@@ -60,6 +61,7 @@ export default async function StorePage({ params, searchParams }: Props) {
   const isRtl = isRtlLocale(locale)
   const storeName = getLocalizedText(store.store_name, locale, store.default_language)
   const greetingText = getLocalizedText(store.greeting_text, locale, store.default_language)
+  const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
 
   return (
     // dir is set here so the language switcher links also respect RTL
@@ -102,7 +104,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           googleReviewUrl={store.google_review_url}
           brandColor={store.brand_color}
           isRtl={isRtl}
-          logoUrl={store.logo_url}
+          logoUrl={logoSignedUrl}
           businessCategory={store.business_category}
         />
 

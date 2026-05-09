@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { getLocalizedText } from '@/types/database'
 import StoreDashboard from './StoreDashboard'
 
@@ -27,9 +28,8 @@ export default async function AdminStorePage({ params }: Props) {
 
   if (!store) notFound()
 
-  // Auth check: logged-in user must own this store (or be super_admin)
-  const isSuperAdmin = user.app_metadata?.role === 'super_admin'
-  if (!isSuperAdmin && store.owner_id !== user.id) redirect('/admin/login')
+  // Auth check: store owner only (マスターコンソールは /master-admin で運用し、JWT の super_admin とは別)
+  if (store.owner_id !== user.id) redirect('/admin/login')
 
   if (!store.is_active) redirect('/inactive')
 
@@ -55,6 +55,8 @@ export default async function AdminStorePage({ params }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const notificationEmail = (store as any).notification_email as string | undefined
 
+  const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
+
   return (
     <StoreDashboard
       store={store}
@@ -64,6 +66,7 @@ export default async function AdminStorePage({ params }: Props) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentCustomers={(recentCustomers ?? []) as any}
       notificationEmail={notificationEmail ?? ''}
+      logoSignedUrl={logoSignedUrl}
     />
   )
 }
