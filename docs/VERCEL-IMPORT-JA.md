@@ -18,8 +18,11 @@
 1. ブラウザで **`https://vercel.com/new`** を開く（**`/clone` は付けない**）。
 2. **Import Git Repository** で `localreach-app` を探すか、リポジトリ URL を貼る:  
    `https://github.com/akiohjp/localreach-app`
-3. **Framework:** Next.js、**Root Directory:** `./`
-4. 環境変数（Production）を入力して **Deploy**。
+3. **Framework:** Next.js  
+4. **Root Directory（重要）:**
+   - **`akiohjp/localreach-app` だけ** を import する場合: リポ直下に `package.json` と `app/` があるので **`./`（または空・未入力）**。
+   - もし **モノレポ**（例: `02_execution_squad` 全体が 1 リポジトリ）を import している場合のみ: **`review_app_nextjs`** にする。ここを誤ると別アプリ／空ビルドになり、個別パスだけ 404 になりやすい。
+5. 環境変数（Production）を入力して **Deploy**。
 
 これで「**すでにある GitHub の `localreach-app` を Vercel プロジェクトに紐づける**」だけになり、名前の衝突は起きません。
 
@@ -39,8 +42,30 @@ GitHub → **Settings → Applications → Installed GitHub Apps → Vercel → 
 3. 既存の別リポが繋がっている場合は **Disconnect**。
 4. **Connect Git Repository** → **`akiohjp/localreach-app`** を選択。
 5. **Production Branch:** `main`  
-   **Root Directory:** このリポはアプリがルートなので **`./` または未入力** のままでよい。
+   **Root Directory:** `localreach-app` 単体リポなら **`./` または未入力**。モノレポ全体を 1 リポで繋いでいる場合のみ **`review_app_nextjs`**。
 6. **Deployments** が成功するまで待ち、環境変数（`NEXT_PUBLIC_*` / Supabase / `MASTER_ADMIN_*` など）は **Settings → Environment Variables** で旧プロジェクトと同様に設定。
+
+---
+
+## `/master-admin/login` が本番だけ 404 のとき（切り分け）
+
+リポジトリの `main` にはパスがある（例: [app/master-admin/login](https://github.com/akiohjp/localreach-app/tree/main/app/master-admin/login)）のに、本番だけ 404 になる場合は **「どのビルド・どのプロジェクトがドメインに付いているか」**の問題です。
+
+1. **Vercel → プロジェクト → Settings → Domains**  
+   `localreach.miraireach.marketing` が **このプロジェクトに付いているか**（別プロジェクトに付いていると、古いアプリや別アプリが返る）。
+
+2. **Settings → Git**  
+   **Connected Repository** が **`akiohjp/localreach-app`** で、**Production Branch** が **`main`** か。
+
+3. **Settings → General → Root Directory**  
+   `localreach-app` のみなら **`./`**。モノレポ全体を import しているなら **`review_app_nextjs`**。誤っているとビルド成果物に `master-admin` が含まれず 404。
+
+4. **Deployments → Production の最新デプロイ**  
+   - **Ready（成功）**か。ずっと **Error** だと本番は **過去に成功した古いビルド**のまま止まっていることがあり、その版にルートが無いと 404。  
+   - デプロイ詳細の **Source** でコミットが GitHub の `main` と一致しているか（`master-admin` が入ったコミット以降か）。
+
+5. **`next.config.ts` のビルド時 env チェック**  
+   環境変数不足で **ビルドが失敗**すると、上記 4 のように古い成功版が残り続ける。Logs を確認し env を揃えて **Redeploy**。
 
 ---
 
