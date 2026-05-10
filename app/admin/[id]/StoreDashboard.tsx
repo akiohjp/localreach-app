@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
-  Globe, Link2, LogOut, Languages, Users, Bell, Lock,
+  Globe, Link2, LogOut, Languages, Users, Lock,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
@@ -29,7 +29,6 @@ type Props = {
   storeUrl: string
   customerCount?: number
   recentCustomers?: RecentCustomer[]
-  notificationEmail?: string
   /** Signed URL when logo bucket is non-public. */
   logoSignedUrl?: string | null
 }
@@ -799,62 +798,6 @@ function CrmSection({
 }
 
 // ─────────────────────────────────────────────
-// Notification WhatsApp Editor
-// ─────────────────────────────────────────────
-
-function NotificationEditor({ storeId, initial }: { storeId: string; initial: string }) {
-  const [email, setEmail] = useState(initial)
-  const [state, setState] = useState<SaveState>('idle')
-
-  const isDirty = email !== initial || state === 'error'
-
-  async function handleSave() {
-    setState('saving')
-    try {
-      const supabase = createClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase.from('stores').update({ notification_email: email.trim() } as any).eq('id', storeId)
-      if (error) throw error
-      setState('saved')
-      setTimeout(() => setState('idle'), 2500)
-    } catch {
-      setState('error')
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <p className="text-xs text-slate-500 leading-relaxed">
-        Enter your email address. You will receive an instant email alert — including the
-        reviewer&apos;s name and a preview of their review — every time a new 5-star review
-        is submitted via LocalReach.
-      </p>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => { setEmail(e.target.value); setState('idle') }}
-        placeholder="owner@yourbusiness.com"
-        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5
-          text-sm text-slate-900 placeholder:text-slate-400 outline-none
-          focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition"
-      />
-      <div className="flex items-center justify-between">
-        <SaveFeedback state={state} />
-        <button
-          onClick={handleSave}
-          disabled={!isDirty || state === 'saving'}
-          className="ms-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold
-            text-white shadow-sm hover:bg-slate-800 active:scale-[0.98] transition-all
-            disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Save Email
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────
 // Main export
 // ─────────────────────────────────────────────
 
@@ -864,7 +807,6 @@ export default function StoreDashboard({
   storeUrl,
   customerCount = 0,
   recentCustomers = [],
-  notificationEmail = '',
   logoSignedUrl,
 }: Props) {
   const router = useRouter()
@@ -984,11 +926,6 @@ export default function StoreDashboard({
         {/* Row 7: CRM Stats */}
         <SectionCard label="Customers" icon={<Users size={14} />}>
           <CrmSection count={customerCount} recent={recentCustomers} />
-        </SectionCard>
-
-        {/* Row 8: Review Notifications */}
-        <SectionCard label="Review Notifications" icon={<Bell size={14} />}>
-          <NotificationEditor storeId={store.id} initial={notificationEmail} />
         </SectionCard>
 
       </main>

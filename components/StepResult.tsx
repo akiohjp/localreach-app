@@ -78,17 +78,6 @@ export default function StepResult({
       console.error("[WhatsApp save]", error.message, error);
     }
     setWaState(error ? "error" : "saved");
-    if (!error) {
-      fetch("/api/notify-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          storeId,
-          customerName: customerName.trim() || null,
-          reviewSnippet: text.trim().slice(0, 250) || null,
-        }),
-      }).catch(() => {});
-    }
   }
 
   return (

@@ -52,9 +52,6 @@ export default async function AdminStorePage({ params }: Props) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const storeUrl = `${appUrl}/store/${store.id}`
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const notificationEmail = (store as any).notification_email as string | undefined
-
   const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
 
   return (
@@ -65,7 +62,6 @@ export default async function AdminStorePage({ params }: Props) {
       customerCount={customerCount ?? 0}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentCustomers={(recentCustomers ?? []) as any}
-      notificationEmail={notificationEmail ?? ''}
       logoSignedUrl={logoSignedUrl}
     />
   )

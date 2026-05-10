@@ -49,7 +49,7 @@ Auth の Users で **実際に登録されているメール** に送ってい�
 
 ## 推奨: Resend を Supabase の SMTP に接続する
 
-アプリの `RESEND_API_KEY`（`/api/notify-review` 用）とは **別の設定場所** です。**Supabase ダッシュボード**側に SMTP を入れます。同じ Resend アカウント・アプリの API キーを流用できます。
+**Supabase ダッシュボード**側の SMTP 設定のみで足ります。Resend を使っている場合は **同じ Resend アカウントの API キー** を Supabase SMTP の Password にも流用できます（アプリ用の環境変数は不要です）。
 
 1. **Resend** で API Key を用意し、[ドメインを verify](https://resend.com/docs/dashboard/domains/introduction)。
 2. Supabase → **Authentication** → （メールまわり）**SMTP を設定**
