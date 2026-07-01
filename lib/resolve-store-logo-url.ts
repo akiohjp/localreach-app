@@ -48,13 +48,19 @@ export async function resolveStoreLogoForViewer(
       .createSignedUrl(path, SIGNED_TTL_SEC);
 
     if (!error && data?.signedUrl) return data.signedUrl;
-  } catch {
-    /* missing env in broken dev setups */
+    if (error) console.error("[logo] createSignedUrl failed:", error.message);
+  } catch (e) {
+    // Typically a missing SUPABASE_SERVICE_ROLE_KEY — surface it server-side.
+    console.error("[logo] signing threw:", e instanceof Error ? e.message : e);
   }
+
+  // The bucket is private in production; a public URL would 400 (or, if the
+  // bucket were ever mis-set to public, leak the object). Fail closed in prod.
+  if (process.env.NODE_ENV === "production") return null;
 
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
   if (!base) return null;
 
-  /** Dev fallback — stops working once the bucket is private */
+  /** Dev-only fallback — stops working once the bucket is private. */
   return `${base}/storage/v1/object/public/${BUCKET}/${encodeURI(path)}`;
 }

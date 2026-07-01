@@ -19,6 +19,9 @@ type StoreRow = {
 // GBP Report Generator
 // ─────────────────────────────────────────────
 
+const GBP_REPORT_SAMPLE_NOTE =
+  'Sample template only — review counts and ratings below are illustrative placeholders, not live Google Business Profile data. Replace metrics with real figures before sending to clients.'
+
 const GBP_TIPS = [
   { title: "Respond to All Reviews Within 24 Hours", body: "Google's algorithm rewards engagement. Timely replies to every review — positive and negative — signal an active, trusted business and build confidence with new customers." },
   { title: "Upload 3–5 Fresh Photos Every Week", body: "Businesses with consistent photo uploads receive up to 42% more direction requests. Prioritise high-quality shots of food, ambiance, and team." },
@@ -85,6 +88,7 @@ function GbpReportModal({ stores, onClose }: {
       ...report.tips.map((t, i) => `${i + 1}. *${t.title}*\n   ${t.body}`),
       ``,
       `—`,
+      `⚠️ ${GBP_REPORT_SAMPLE_NOTE}`,
       `Powered by LocalReach · GAM Solutions L.L.C-FZ`,
     ].join('\n')
     navigator.clipboard.writeText(text).then(() => {
@@ -110,11 +114,13 @@ function GbpReportModal({ stores, onClose }: {
   .tip { border-left: 3px solid #D4AF37; padding: 10px 16px; margin-bottom: 12px; background: #fdfaf0; border-radius: 0 8px 8px 0; }
   .tip-title { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
   .tip-body  { font-size: 13px; color: #555; line-height: 1.6; }
+  .sample-note { font-size: 12px; color: #92400e; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 14px; margin-bottom: 24px; line-height: 1.5; }
   .footer { margin-top: 40px; font-size: 11px; color: #bbb; text-align: center; }
 </style>
 </head><body>
 <h1>${report.storeName}</h1>
 <p class="sub">Monthly GBP Performance Report · ${report.month}</p>
+<p class="sample-note">${GBP_REPORT_SAMPLE_NOTE}</p>
 <div class="metrics">
   <div class="metric"><div class="metric-val">+${report.newReviews}</div><div class="metric-label">New Reviews This Month</div></div>
   <div class="metric"><div class="metric-val">${report.totalReviews}</div><div class="metric-label">Total Reviews</div></div>
@@ -145,7 +151,9 @@ ${report.tips.map((t) => `<div class="tip"><div class="tip-title">${t.title}</di
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <div>
             <h2 className="text-base font-bold text-slate-900">Monthly GBP Report</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Generate and send to client in one click.</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Client update template — tips are real; metrics are sample placeholders.
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -179,6 +187,11 @@ ${report.tips.map((t) => `<div class="tip"><div class="tip-title">${t.title}</di
               Generate
             </button>
           </div>
+
+          <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200/80 rounded-xl px-4 py-3 leading-relaxed">
+            <span className="font-semibold">Sample metrics.</span>{' '}
+            {GBP_REPORT_SAMPLE_NOTE}
+          </p>
 
           {/* Report preview */}
           {report && (

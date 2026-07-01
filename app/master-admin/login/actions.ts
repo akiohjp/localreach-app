@@ -11,12 +11,14 @@ import {
   setMasterSessionCookie,
 } from "@/lib/master-session-server";
 
+export type MasterLoginState = { error?: string };
+
 const sleep = () => new Promise((r) => setTimeout(r, 400));
 
 export async function loginMasterAction(
-  _prev: unknown,
+  _prev: MasterLoginState,
   formData: FormData,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<MasterLoginState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -26,7 +28,7 @@ export async function loginMasterAction(
 
   if (!expectedEmail || !expectedPw.trim() || !secret) {
     await sleep();
-    return { ok: false, error: "Master login is not configured on the server." };
+    return { error: "Master login is not configured on the server." };
   }
 
   if (
@@ -34,11 +36,11 @@ export async function loginMasterAction(
     !masterPasswordMatches(password, expectedPw)
   ) {
     await sleep();
-    return { ok: false, error: "Invalid email or password." };
+    return { error: "Invalid email or password." };
   }
 
   await setMasterSessionCookie(expectedEmail);
-  return { ok: true };
+  redirect("/master-admin");
 }
 
 export async function logoutMasterAction() {

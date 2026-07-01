@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:deploy": "node scripts/check-deploy-env.cjs"
+    "check:deploy": "node scripts/check-deploy-env.cjs",
+    "test:generation": "tsx scripts/test-generation-uniqueness.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

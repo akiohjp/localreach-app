@@ -4,10 +4,10 @@ import {
   Star, Utensils, Coffee, Wine, Building2,
   ShoppingBag, Scissors, Dumbbell, Car, BookOpen, Plus,
 } from "lucide-react";
-
-const LABELS = ["", "Poor", "Fair", "Good", "Great", "Excellent"];
+import type { UiStrings } from "@/lib/ui-strings";
 
 type Props = {
+  t: UiStrings;
   storeName: string;
   greetingText: string;
   onSelect: (rating: number) => void;
@@ -40,7 +40,7 @@ function getCategoryIcon(category: string | null | undefined) {
   return <Star size={24} strokeWidth={1.5} />;
 }
 
-export default function StepRating({ storeName, greetingText, onSelect, logoUrl, businessCategory }: Props) {
+export default function StepRating({ t, storeName, greetingText, onSelect, logoUrl, businessCategory }: Props) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
   const active = hovered || selected;
@@ -75,7 +75,7 @@ export default function StepRating({ storeName, greetingText, onSelect, logoUrl,
       {/* Stars */}
       <div className="space-y-5 w-full">
         <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-slate-400">
-          Rate your experience
+          {t.rating.rateExperience}
         </p>
 
         <div
@@ -120,7 +120,7 @@ export default function StepRating({ storeName, greetingText, onSelect, logoUrl,
             selected > 0 ? "text-amber-500" : "text-transparent"
           }`}
         >
-          {LABELS[selected]}
+          {t.rating.labels[selected]}
         </p>
       </div>
 
@@ -134,7 +134,7 @@ export default function StepRating({ storeName, greetingText, onSelect, logoUrl,
           disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed
           disabled:shadow-none disabled:translate-y-0"
       >
-        Continue
+        {t.rating.continue}
       </button>
     </div>
   );

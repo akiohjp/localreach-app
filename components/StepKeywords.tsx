@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import { Check } from "lucide-react";
+import type { UiStrings } from "@/lib/ui-strings";
 
 type Props = {
+  t: UiStrings;
   keywords: readonly string[];
   onConfirm: (selected: string[]) => void;
   /** No guest pills — only admin forced terms; button generates without taps. */
@@ -10,6 +12,7 @@ type Props = {
 };
 
 export default function StepKeywords({
+  t,
   keywords,
   onConfirm,
   allowGuestSkip = false,
@@ -32,22 +35,15 @@ export default function StepKeywords({
       {/* Header */}
       <div className="space-y-1">
         <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-slate-400">
-          Step 2 — Keywords
+          {t.keywords.stepLabel}
         </p>
         <h2 className="text-base font-bold text-slate-900 tracking-tight">
-          What stood out?
+          {t.keywords.title}
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed">
-          {allowGuestSkip && keywords.length === 0 ? (
-            <>
-              Keywords for your review are preset. Tap continue — you can still edit the
-              generated text before posting.
-            </>
-          ) : (
-            <>
-              Select all that apply. We&apos;ll craft your review automatically.
-            </>
-          )}
+          {allowGuestSkip && keywords.length === 0
+            ? t.keywords.presetIntro
+            : t.keywords.selectIntro}
         </p>
       </div>
 
@@ -55,7 +51,7 @@ export default function StepKeywords({
       <div className="flex flex-wrap gap-2">
         {keywords.length === 0 ? (
           <p className="text-xs text-slate-500 italic w-full py-2">
-            No optional tags — your review will use the venue&apos;s preset phrases.
+            {t.keywords.noOptionalTags}
           </p>
         ) : (
           keywords.map((kw) => {
@@ -63,9 +59,12 @@ export default function StepKeywords({
             return (
               <button
                 key={kw}
+                type="button"
                 onClick={() => toggle(kw)}
+                aria-pressed={on}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
                   border transition-all duration-150 active:scale-95
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1
                   ${
                   on
                     ? "bg-slate-900 border-slate-900 text-white shadow-sm"
@@ -86,11 +85,11 @@ export default function StepKeywords({
         <span className="text-[10px] text-slate-400 shrink-0 font-semibold">
           {keywords.length === 0
             ? allowGuestSkip
-              ? "Preset highlights"
-              : "none selected"
+              ? t.keywords.presetHighlights
+              : t.keywords.noneSelected
             : selected.length > 0
-              ? `${selected.length} selected`
-              : "none selected"}
+              ? t.keywords.selectedCount.replace("{n}", String(selected.length))
+              : t.keywords.noneSelected}
         </span>
         <div className="h-px flex-1 bg-gray-200" />
       </div>
@@ -104,7 +103,7 @@ export default function StepKeywords({
           disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed
           disabled:shadow-none disabled:translate-y-0"
       >
-        Generate Review
+        {t.keywords.generate}
       </button>
     </div>
   );

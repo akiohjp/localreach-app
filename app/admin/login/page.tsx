@@ -29,11 +29,22 @@ export default async function LoginPage({ searchParams }: Props) {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
+        <div className="mb-8 text-center space-y-2">
           <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-slate-400">
             LocalReach
           </p>
-          <h1 className="mt-1 text-xl font-bold text-slate-900">Admin Sign In</h1>
+          <div>
+            <h1 className="mt-1 text-xl font-bold text-slate-900">Admin Sign In</h1>
+            <p className="mt-1.5 text-xs text-slate-500 leading-snug px-2">
+              店舗オーナー用（発行済みの Supabase アカウント）。親・マスター管理は別URLです。
+            </p>
+            <Link
+              href="/master-admin/login"
+              className="mt-2 inline-block text-xs font-semibold text-slate-700 underline underline-offset-2 hover:text-slate-900"
+            >
+              マスター（親コンソール）のログインはこちら → /master-admin/login
+            </Link>
+          </div>
         </div>
         {flash && (
           <div

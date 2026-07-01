@@ -1,7 +1,8 @@
 /**
- * Review text generation — zero API.
+ * Review text generation (zero API).
  * Assembler: full business name + all keywords verbatim + ~100 words, human-style phrasing.
- * Do not add AIO / GEO / SEO product language into generated review text — only natural guest wording.
+ * Do not add AIO / GEO / SEO product language into generated review text; only natural guest wording.
+ * Guest-facing output must not use typographic long dashes (em/en); enforced in `review-full-templates.ts`.
  * Seeded RNG + per-run nonce so outputs vary strongly across runs.
  */
 
@@ -9,6 +10,11 @@ import { buildFullTemplateReview } from "@/lib/review-full-templates";
 
 export type GenerateReviewOptions = {
   nonce?: string;
+  /**
+   * Per-outlet entropy (store UUID + optional hints). Same keywords + different IDs
+   * produce visibly different arcs; same ID + new nonce still rotates phrasing each run.
+   */
+  outletKey?: string;
 };
 
 function hashString(input: string): number {
@@ -20,29 +26,28 @@ function hashString(input: string): number {
   return h >>> 0;
 }
 
-function createRng(seed: number): () => number {
-  return function next() {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+/** Mix bits so small nonce changes flip many template slots. */
+function avalanche32(x: number): number {
+  let v = x >>> 0;
+  v ^= v >>> 16;
+  v = Math.imul(v, 0x7feb352d);
+  v ^= v >>> 15;
+  v = Math.imul(v, 0x846ca68b);
+  return (v ^ (v >>> 16)) >>> 0;
 }
 
-function shuffle<T>(arr: T[], rng: () => number): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    const tmp = a[i]!;
-    a[i] = a[j]!;
-    a[j] = tmp;
-  }
-  return a;
-}
-
-function takeKeywordsRaw(keywords: string[], rng: () => number): string[] {
-  const cleaned = keywords.map((k) => k.trim()).filter(Boolean);
-  return shuffle(cleaned, rng);
+function computeReviewSeed(
+  store: string,
+  keywordsOrdered: string[],
+  nonce: string,
+  outlet: string,
+): number {
+  const sorted = [...keywordsOrdered].sort().join("\0");
+  const ordered = keywordsOrdered.join("\0");
+  const meta = `${keywordsOrdered.length}\0${keywordsOrdered.reduce((n, k) => n + k.length, 0)}`;
+  const hStable = hashString(`${sorted}\0${store}\0${outlet}\0${meta}`);
+  const hEntropy = hashString(`${nonce}\0${ordered}\0${store}`);
+  return avalanche32(hStable ^ avalanche32(hEntropy));
 }
 
 export function generateReview(
@@ -57,19 +62,22 @@ export function generateReview(
       ? `${Date.now()}-${Math.random().toString(16).slice(2)}`
       : `${Date.now()}-ssr`);
 
-  const seed = hashString(
-    [...keywords].sort().join("\0") + "\0" + store + "\0" + nonce,
-  );
-  const rng = createRng(seed);
-  const kws = takeKeywordsRaw(keywords, rng);
-  return buildFullTemplateReview(store, kws, rng);
+  const outlet = options?.outletKey?.trim() ?? "";
+  const cleaned = keywords.map((k) => k.trim()).filter(Boolean);
+  const seed = computeReviewSeed(store, cleaned, nonce, outlet);
+  return buildFullTemplateReview(store, cleaned, seed);
 }
 
-/** Call once per generated review (client). Strengthens variance vs. keyword set alone. */
+/** Call once per generated review (client). Each call must be unique for visible shuffle in demos. */
 export function createReviewNonce(): string {
   if (typeof globalThis !== "undefined" && "crypto" in globalThis) {
     const c = globalThis.crypto as Crypto | undefined;
+    if (c?.randomUUID && c?.getRandomValues) {
+      const extra = new Uint32Array(2);
+      c.getRandomValues(extra);
+      return `${c.randomUUID()}:${extra[0].toString(16)}:${extra[1].toString(16)}`;
+    }
     if (c?.randomUUID) return c.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 14)}-${Math.random().toString(36).slice(2, 14)}`;
 }

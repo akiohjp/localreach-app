@@ -10,9 +10,12 @@ export default async function AdminIndexPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/admin/login')
 
+  // Scope explicitly to the signed-in owner — never rely on RLS alone to avoid
+  // enumerating other tenants' stores.
   const { data: stores } = await supabase
     .from('stores')
     .select('id, store_name, default_language, brand_color')
+    .eq('owner_id', user.id)
     .order('created_at', { ascending: true })
 
   if (!stores || stores.length === 0) {

@@ -63,6 +63,36 @@ function formatSupabaseActionError(context: string, raw: string): string {
   return `${context}: ${raw}`
 }
 
+type SupabaseColumnError = { code?: string; message?: string; details?: string; hint?: string }
+type CustomerExportRow = {
+  customer_name?: string | null
+  whatsapp_number: string
+  opt_in: boolean
+  selected_keywords: string[] | null
+  created_at: string
+}
+
+function isMissingCustomerNameColumn(error: SupabaseColumnError | null): boolean {
+  if (!error) return false
+  const text = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`.toLowerCase()
+  return (
+    (error.code === '42703' || error.code === 'PGRST204' || text.includes('column')) &&
+    text.includes('customer_name')
+  )
+}
+
+/**
+ * CSV-safe cell. Neutralises spreadsheet formula injection (values starting with
+ * = + - @ tab or CR, e.g. a customer name like `=HYPERLINK(...)`) by prefixing a
+ * single quote, then quotes + escapes uniformly. Also keeps `+`-prefixed phone
+ * numbers as text so Excel doesn't strip the leading plus.
+ */
+function csvCell(value: unknown): string {
+  let s = value === null || value === undefined ? '' : String(value)
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+  return `"${s.replace(/"/g, '""')}"`
+}
+
 export async function createStore(payload: {
   storeName: string
   email: string
@@ -182,23 +212,39 @@ export async function masterExportCustomersCsv(
 
   try {
     const admin = createAdminClient()
-    const { data, error } = await admin
+    const customersWithName = await admin
       .from('customers')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .select('customer_name, whatsapp_number, opt_in, selected_keywords, created_at' as any)
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
+    let data = customersWithName.data as unknown as CustomerExportRow[] | null
+    let error = customersWithName.error
+    if (isMissingCustomerNameColumn(error)) {
+      const customersWithoutName = await admin
+        .from('customers')
+        .select('whatsapp_number, opt_in, selected_keywords, created_at')
+        .eq('store_id', storeId)
+        .order('created_at', { ascending: false })
+      data = customersWithoutName.data as CustomerExportRow[] | null
+      error = customersWithoutName.error
+    }
 
     if (error) return { ok: false, error: error.message }
     if (!data) return { ok: false, error: 'No data.' }
 
     const header = 'customer_name,whatsapp_number,opt_in,selected_keywords,registered_at'
     const rowLines = (data as unknown as Array<Record<string, unknown>>).map((c) => {
-      const name = c.customer_name ? `"${String(c.customer_name).replace(/"/g, '""')}"` : ''
       const keywords = Array.isArray(c.selected_keywords) ? c.selected_keywords.join('|') : ''
-      return `${name},${c.whatsapp_number},${c.opt_in},"${keywords}",${c.created_at}`
+      return [
+        csvCell(c.customer_name ?? ''),
+        csvCell(c.whatsapp_number),
+        csvCell(c.opt_in),
+        csvCell(keywords),
+        csvCell(c.created_at),
+      ].join(',')
     })
-    const csv = '\ufeff' + [header, ...rowLines].join('\n')
+    const csv = '\ufeff' + [header, ...rowLines].join('\r\n')
     return { ok: true, csv }
   } catch (e) {
     return { ok: false, error: (e as Error).message }

@@ -1,12 +1,17 @@
 import { Sparkles } from "lucide-react";
+import type { UiStrings } from "@/lib/ui-strings";
 
-export default function StepGenerating() {
+export default function StepGenerating({ t }: { t: UiStrings }) {
   return (
-    <div className="flex flex-col items-center gap-8 text-center py-8">
+    <div
+      className="flex flex-col items-center gap-8 text-center py-8"
+      role="status"
+      aria-live="polite"
+    >
 
       {/* Icon */}
       <div className="relative size-16">
-        <div className="absolute inset-0 rounded-full bg-slate-100 animate-ping opacity-60" />
+        <div className="absolute inset-0 rounded-full bg-slate-100 animate-ping opacity-60" aria-hidden="true" />
         <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-lg relative">
           <Sparkles size={24} className="text-amber-400" strokeWidth={1.5} />
         </div>
@@ -14,13 +19,13 @@ export default function StepGenerating() {
 
       <div className="space-y-2">
         <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-slate-400">
-          Step 3 — Generating
+          {t.generating.stepLabel}
         </p>
         <h2 className="text-base font-bold text-slate-900 tracking-tight">
-          Crafting your review
+          {t.generating.title}
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed max-w-[15rem]">
-          Assembling a unique review from your keywords.
+          {t.generating.subtitle}
         </p>
       </div>
 

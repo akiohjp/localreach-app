@@ -1,15 +1,18 @@
 "use client";
 import { useState } from "react";
-import { Copy, Globe, ExternalLink, RotateCcw, Check } from "lucide-react";
-import { createClient } from "@/utils/supabase/client";
+import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
+import type { UiStrings } from "@/lib/ui-strings";
 
 type Props = {
+  t: UiStrings;
   reviewText: string;
   gbpReviewUrl: string;
   storeId: string;
   selectedKeywords: string[];
   onRetry: () => void;
+  /** Fresh nonce + new wording; same merged keywords. For client demos. */
+  onRegenerate?: () => string;
 };
 
 type WaState = "idle" | "saving" | "saved" | "error";
@@ -19,11 +22,13 @@ function buildTranslateUrl(text: string) {
 }
 
 export default function StepResult({
+  t,
   reviewText,
   gbpReviewUrl,
   storeId,
   selectedKeywords,
   onRetry,
+  onRegenerate,
 }: Props) {
   const [text, setText] = useState(reviewText);
   const [copied, setCopied] = useState(false);
@@ -39,15 +44,34 @@ export default function StepResult({
 
   const canSaveWhatsApp = isValidUuid(storeId);
 
+  async function copyToClipboard(value: string): Promise<boolean> {
+    // clipboard.writeText can reject in iOS WebViews / non-secure contexts.
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async function handleCopy() {
-    await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard(text);
+    if (!ok) return; // leave the textarea for manual select rather than a false toast
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
   function handlePostOnGoogle() {
-    navigator.clipboard.writeText(text);
-    window.open(gbpReviewUrl, "_blank");
+    // Fire-and-forget copy (can't throw), and keep window.open in the same user
+    // gesture tick so the popup isn't blocked.
+    void copyToClipboard(text);
+    window.open(gbpReviewUrl, "_blank", "noopener,noreferrer");
+  }
+
+  function handleRegenerateWording() {
+    if (!onRegenerate) return;
+    setCopied(false);
+    setText(onRegenerate());
   }
 
   async function handleWhatsAppSave() {
@@ -56,6 +80,7 @@ export default function StepResult({
     if (digits.length < 7 || cc.length < 2) return;
 
     if (!canSaveWhatsApp) {
+      // Preview pages (non-UUID store) simulate the save without a DB write.
       setWaState("saving");
       await new Promise((r) => setTimeout(r, 450));
       setWaSavedWasPreview(true);
@@ -63,21 +88,35 @@ export default function StepResult({
       return;
     }
 
+    // Single validated write path — the server (service role) inserts the lead.
     setWaSavedWasPreview(false);
     setWaState("saving");
-    const supabase = createClient();
-    const { error } = await supabase.rpc("capture_store_customer_lead", {
-      p_store_id: storeId,
-      p_whatsapp_number: `${cc}${digits}`,
-      p_opt_in: optIn,
-      p_selected_keywords:
-        selectedKeywords.length > 0 ? selectedKeywords : null,
-      p_customer_name: customerName.trim() ? customerName.trim() : null,
-    });
-    if (error) {
-      console.error("[WhatsApp save]", error.message, error);
+    try {
+      const res = await fetch("/api/customer-leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          store_id: storeId,
+          whatsapp_number: `${cc}${digits}`,
+          opt_in: optIn,
+          selected_keywords: selectedKeywords.length > 0 ? selectedKeywords : null,
+          customer_name: customerName.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setWaState("saved");
+        return;
+      }
+      console.error(
+        "[WhatsApp save] API error",
+        res.status,
+        await res.text().catch(() => ""),
+      );
+      setWaState("error");
+    } catch (err) {
+      console.error("[WhatsApp save] network error", err);
+      setWaState("error");
     }
-    setWaState(error ? "error" : "saved");
   }
 
   return (
@@ -86,12 +125,12 @@ export default function StepResult({
       {/* Header */}
       <div className="space-y-1">
         <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-slate-400">
-          Step 4 — Your Review
+          {t.result.stepLabel}
         </p>
         <h2 className="text-base font-bold text-slate-900 tracking-tight">
-          Ready to post
+          {t.result.title}
         </h2>
-        <p className="text-sm text-slate-600">Edit freely before submitting.</p>
+        <p className="text-sm text-slate-600">{t.result.subtitle}</p>
       </div>
 
       {/* Textarea */}
@@ -100,7 +139,8 @@ export default function StepResult({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={6}
-          className="w-full p-4 text-sm text-slate-800 leading-relaxed bg-gray-50
+          aria-label={t.result.reviewAria}
+          className="w-full p-4 text-base text-slate-800 leading-relaxed bg-gray-50
             border border-gray-300 rounded-xl resize-none
             focus:outline-none focus:border-slate-500 transition-colors"
         />
@@ -115,14 +155,11 @@ export default function StepResult({
           <Check size={13} className="text-green-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="text-xs font-semibold text-green-800">
-              {waSavedWasPreview
-                ? "Thanks — this is how save looks on the live page."
-                : "WhatsApp registered. Thank you!"}
+              {waSavedWasPreview ? t.result.savedPreview : t.result.savedLive}
             </p>
             {waSavedWasPreview && (
               <p className="text-[11px] text-green-800/85 leading-relaxed">
-                Preview only: your number was not stored. On your store&apos;s real review link
-                (QR from the dashboard), the same button saves to the owner&apos;s list.
+                {t.result.savedPreviewDetail}
               </p>
             )}
           </div>
@@ -130,14 +167,12 @@ export default function StepResult({
       ) : (
         <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
           <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500">
-            WhatsApp&nbsp;&nbsp;(Optional)
+            {t.result.whatsappOptional}
           </p>
 
           {!canSaveWhatsApp && (
             <p className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2 leading-relaxed">
-              <span className="font-semibold">Preview mode.</span> The form below matches your
-              live review page. Save here is a demo — use your venue&apos;s link from the dashboard
-              to capture contacts in the database.
+              {t.result.previewBanner}
             </p>
           )}
 
@@ -146,36 +181,41 @@ export default function StepResult({
             type="text"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Your name (optional)"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white
+            placeholder={t.result.namePlaceholder}
+            aria-label={t.result.namePlaceholder}
+            className="w-full px-3 py-2 text-base border border-gray-300 rounded-lg bg-white
               focus:outline-none focus:border-slate-500 transition-colors placeholder:text-slate-400"
           />
 
-          {/* Number input row */}
-          <div className="flex gap-2">
+          {/* Number input row — force LTR so the country code + digits keep phone
+              order even when the page locale is RTL (Arabic). */}
+          <div className="flex gap-2" dir="ltr">
             <input
               type="text"
+              inputMode="tel"
               value={countryCode}
+              aria-label={t.result.countryCodeAria}
               onChange={(e) => {
                 setWaState("idle");
                 const raw = e.target.value.replace(/[^\d+]/g, "");
                 setCountryCode(raw.startsWith("+") ? raw : `+${raw.replace(/\+/g, "")}`);
               }}
               maxLength={5}
-              className="w-16 px-2 py-2 text-sm font-semibold text-center border border-gray-300
+              className="w-16 px-2 py-2 text-base font-semibold text-center border border-gray-300
                 rounded-lg bg-white text-slate-700 focus:outline-none focus:border-slate-500
                 transition-colors shrink-0"
             />
             <input
               type="tel"
               value={phone}
+              aria-label={t.result.phoneAria}
               onChange={(e) => {
                 setWaState("idle");
                 setPhone(e.target.value.replace(/\D/g, ""));
               }}
-              placeholder="50 123 4567"
+              placeholder={t.result.phonePlaceholder}
               maxLength={12}
-              className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white
+              className="flex-1 min-w-0 px-3 py-2 text-base border border-gray-300 rounded-lg bg-white
                 focus:outline-none focus:border-slate-500 transition-colors"
             />
             <button
@@ -186,7 +226,7 @@ export default function StepResult({
                 hover:bg-slate-800 active:scale-[0.98] transition-all
                 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             >
-              {waState === "saving" ? "…" : "Save"}
+              {waState === "saving" ? "…" : t.result.save}
             </button>
           </div>
 
@@ -200,17 +240,13 @@ export default function StepResult({
                 accent-slate-900 cursor-pointer"
             />
             <span className="text-xs text-slate-600 leading-relaxed">
-              I agree to receive exclusive offers and campaign info via WhatsApp.
+              {t.result.optIn}
             </span>
           </label>
 
           {waState === "error" && (
-            <div className="space-y-1">
-              <p className="text-xs text-red-500">Could not save — please try again.</p>
-              <p className="text-[11px] text-slate-500">
-                If it keeps failing, the review page may be paused or misconfigured. Ask the store to
-                check their dashboard.
-              </p>
+            <div className="space-y-1" role="alert">
+              <p className="text-xs text-red-500">{t.result.saveError}</p>
             </div>
           )}
         </div>
@@ -221,12 +257,25 @@ export default function StepResult({
         <div className="flex items-center justify-center gap-2 bg-slate-50 border border-gray-300
           rounded-xl py-2.5 text-xs font-semibold text-slate-700">
           <Check size={12} className="text-amber-500" />
-          Copied to clipboard
+          {t.result.copiedToast}
         </div>
       </div>
 
       {/* Action buttons */}
       <div className="flex flex-col gap-2.5">
+        {onRegenerate && (
+          <button
+            type="button"
+            onClick={handleRegenerateWording}
+            className="w-full py-3 rounded-xl font-semibold text-sm border border-dashed border-slate-300 bg-slate-50/80
+              text-slate-700 hover:bg-slate-100 hover:border-slate-400 active:scale-[0.98]
+              transition-all flex items-center justify-center gap-2"
+          >
+            <RefreshCw size={13} />
+            {t.result.tryAnotherWording}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={handleCopy}
@@ -235,7 +284,7 @@ export default function StepResult({
             transition-all flex items-center justify-center gap-2"
         >
           <Copy size={13} />
-          Copy Review
+          {t.result.copyReview}
         </button>
 
         <a
@@ -247,7 +296,7 @@ export default function StepResult({
             transition-all flex items-center justify-center gap-2 text-center block"
         >
           <Globe size={13} />
-          Translate via Google
+          {t.result.translate}
         </a>
 
         <button
@@ -258,19 +307,19 @@ export default function StepResult({
             flex items-center justify-center gap-2"
         >
           <ExternalLink size={13} />
-          Post on Google
+          {t.result.postOnGoogle}
         </button>
       </div>
 
       {/* How-to guide */}
       <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-2">
         <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500">
-          How to post
+          {t.result.howToTitle}
         </p>
         <ol className="text-xs text-slate-600 space-y-1 list-decimal list-inside leading-relaxed">
-          <li>Tap <span className="font-semibold text-slate-800">Copy Review</span></li>
-          <li>Tap <span className="font-semibold text-slate-800">Post on Google</span> — Maps opens</li>
-          <li>Paste and hit <span className="font-semibold text-slate-800">Post</span></li>
+          {t.result.howToSteps.map((stepText, i) => (
+            <li key={i} className="font-medium text-slate-700">{stepText}</li>
+          ))}
         </ol>
       </div>
 
@@ -281,7 +330,7 @@ export default function StepResult({
           hover:text-slate-600 transition-colors mx-auto"
       >
         <RotateCcw size={11} />
-        Start over
+        {t.result.startOver}
       </button>
     </div>
   );

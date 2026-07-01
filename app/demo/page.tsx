@@ -17,7 +17,7 @@ export default function DemoPage() {
   const demoStoreId = process.env.NEXT_PUBLIC_DEMO_STORE_ID?.trim() ?? "";
   const customerUrl = demoStoreId ? `${base}/store/${demoStoreId}` : `${base}/`;
   const adminUrl = `${base}/admin/login`;
-  const masterUrl = `${base}/master-admin`;
+  const masterUrl = `${base}/master-admin/login`;
   const lpUrl = `${base}/local-reach-lp`;
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&format=png&data=${encodeURIComponent(customerUrl)}`;
 

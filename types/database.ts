@@ -117,6 +117,7 @@ export type Database = {
           whatsapp_number: string;
           opt_in: boolean;
           selected_keywords: string[] | null;
+          customer_name?: string | null;
           created_at: string;
         };
         Insert: {
@@ -125,6 +126,7 @@ export type Database = {
           whatsapp_number: string;
           opt_in?: boolean;
           selected_keywords?: string[] | null;
+          customer_name?: string | null;
           created_at?: string;
         };
         Update: {
@@ -133,6 +135,7 @@ export type Database = {
           whatsapp_number?: string;
           opt_in?: boolean;
           selected_keywords?: string[] | null;
+          customer_name?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -145,8 +148,62 @@ export type Database = {
           },
         ];
       };
+      feedback: {
+        Row: {
+          id: string;
+          store_id: string;
+          rating: number;
+          message: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          rating: number;
+          message: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          rating?: number;
+          message?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "feedback_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      /**
+       * Anon-safe projection of `stores` for the public QR review page.
+       * Deliberately excludes owner_id, notification_email, description and
+       * timestamps so the anon key cannot read cross-tenant PII.
+       * Backed by migration 20260701120000_stores_public_review_view.sql.
+       */
+      public_store_review: {
+        Row: {
+          id: string;
+          store_name: LocalizedText;
+          greeting_text: LocalizedText;
+          keywords: string[];
+          forced_keywords: string[];
+          google_review_url: string;
+          brand_color: string;
+          default_language: SupportedLocale;
+          is_active: boolean;
+          logo_url: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       capture_store_customer_lead: {
         Args: {

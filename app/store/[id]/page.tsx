@@ -9,10 +9,19 @@ import ReviewFlow from './ReviewFlow'
 const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ja', 'ar']
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
 
-// React cache deduplicates the Supabase query between generateMetadata and Page
+// React cache deduplicates the Supabase query between generateMetadata and Page.
+// Reads the anon-safe VIEW (not the base table) so the public anon key can never
+// pull owner_id / notification_email of any store. See migration
+// 20260701120000_stores_public_review_view.sql.
 const getStore = cache(async (id: string) => {
   const supabase = await createClient()
-  const { data } = await supabase.from('stores').select('*').eq('id', id).single()
+  const { data } = await supabase
+    .from('public_store_review')
+    .select(
+      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url',
+    )
+    .eq('id', id)
+    .single()
   return data ?? null
 })
 
@@ -67,7 +76,9 @@ export default async function StorePage({ params, searchParams }: Props) {
     // dir is set here so the language switcher links also respect RTL
     <main
       dir={isRtl ? 'rtl' : 'ltr'}
-      className="min-h-screen bg-slate-50 flex items-start justify-center py-12 px-4"
+      className="min-h-[100dvh] bg-slate-50 flex items-start justify-center
+        px-4 pt-[max(3rem,env(safe-area-inset-top))]
+        pb-[calc(3rem+env(safe-area-inset-bottom))]"
     >
       <div className="w-full max-w-sm">
 
@@ -104,8 +115,8 @@ export default async function StorePage({ params, searchParams }: Props) {
           googleReviewUrl={store.google_review_url}
           brandColor={store.brand_color}
           isRtl={isRtl}
+          locale={locale}
           logoUrl={logoSignedUrl}
-          businessCategory={store.business_category}
         />
 
         <p className="text-center text-[10px] text-slate-400 mt-5 tracking-widest uppercase">

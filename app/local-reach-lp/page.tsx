@@ -379,7 +379,7 @@ const LocalReachLP = () => {
             <a href="#" className="hover:text-white transition-colors">Contact</a>
           </div>
           <div className="text-sm font-bold text-gray-500">
-            © 2024 AI Company Core. Powered by AIO.
+            © {new Date().getFullYear()} AI Company Core. Powered by AIO.
           </div>
         </div>
       </footer>

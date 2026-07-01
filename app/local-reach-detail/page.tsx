@@ -1,9 +1,17 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'LocalReach — AI-Powered Review Growth for Dubai Businesses',
+  // Absolute so the root "%s — LocalReach" template doesn't append a 2nd "LocalReach".
+  title: { absolute: 'LocalReach — AI-Powered Review Growth for Dubai Businesses' },
   description:
     'Turn every customer visit into a unique Google review and a WhatsApp contact. 100% Google policy compliant.',
+  alternates: { canonical: '/local-reach-detail' },
+  openGraph: {
+    title: 'LocalReach — AI-Powered Review Growth for Dubai Businesses',
+    description:
+      'Turn every customer visit into a unique Google review and a WhatsApp contact. 100% Google policy compliant.',
+    url: '/local-reach-detail',
+  },
 }
 
 const GOLD = '#C9A84C'

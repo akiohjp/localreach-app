@@ -1,13 +1,71 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ *
+ * Design tokens (Tailwind v4 @theme)
+ * ------------------------------------------------------------------ */
+@theme {
+  /* Wire next/font (loaded in layout.tsx) into Tailwind's font utilities so
+     `font-sans` / `font-mono` use the optimized, self-hosted Geist faces. */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Brand gold scale — referenced across the marketing LP (gold-100, shadow-gold-*).
+     Centred on #D4AF37, which the LP also uses as an arbitrary value. */
+  --color-gold-50: #fbf6e6;
+  --color-gold-100: #f5e6c0;
+  --color-gold-200: #ecd48f;
+  --color-gold-300: #e0c05e;
+  --color-gold-400: #d9b544;
+  --color-gold-500: #d4af37;
+  --color-gold-600: #b8962e;
+  --color-gold-700: #a07820;
+  --color-gold-800: #7c5c18;
+  --color-gold-900: #5c4412;
+
+  /* Custom entrance animation used on the LP hero. */
+  --animate-fade-in: fade-in 0.5s ease-out both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Base
+ * ------------------------------------------------------------------ */
 :root {
   --background: #f9fafb; /* gray-50 */
   --foreground: #111827; /* gray-900 */
 }
 
+html {
+  /* Consistent scrollbar gutter + no rubber-band overscroll flash on mobile. */
+  overscroll-behavior-y: none;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: "Geist", "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Respect users who prefer reduced motion (LP animations, pulses, pings). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

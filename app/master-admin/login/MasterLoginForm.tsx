@@ -1,30 +1,22 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useState } from "react";
+import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
-import { loginMasterAction } from "./actions";
+import {
+  loginMasterAction,
+  type MasterLoginState,
+} from "./actions";
+
+const INITIAL: MasterLoginState = {};
 
 export default function MasterLoginForm() {
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    const fd = new FormData(e.currentTarget);
-    const r = await loginMasterAction(null, fd);
-    setLoading(false);
-    if (!r.ok) {
-      setError(r.error);
-      return;
-    }
-    window.location.assign("/master-admin");
-  }
+  const [state, formAction, pending] = useActionState(
+    loginMasterAction,
+    INITIAL,
+  );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form action={formAction} className="space-y-4">
       <div className="space-y-1.5">
         <label
           htmlFor="master-email"
@@ -65,17 +57,19 @@ export default function MasterLoginForm() {
         />
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {state.error && (
+        <p className="text-xs text-red-600">{state.error}</p>
+      )}
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={pending}
         className="w-full flex items-center justify-center gap-2 rounded-xl
           bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm
           hover:bg-slate-800 active:scale-[0.98] transition-all
           disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? (
+        {pending ? (
           <>
             <Loader2 size={14} className="animate-spin" />
             Signing in…
