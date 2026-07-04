@@ -200,6 +200,7 @@ export type Database = {
           default_language: SupportedLocale;
           is_active: boolean;
           logo_url: string | null;
+          business_category: string | null;
         };
         Relationships: [];
       };

@@ -98,6 +98,8 @@ export default function ReviewFlow({
       generateReview(storeName, merged, {
         nonce: createReviewNonce(),
         outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
+        locale,
+        category: businessCategory,
       }),
     )
     setStep('result')
@@ -215,6 +217,8 @@ export default function ReviewFlow({
                 generateReview(storeName, selectedKeywords, {
                   nonce: createReviewNonce(),
                   outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
+                  locale,
+                  category: businessCategory,
                 })}
             />
           )}

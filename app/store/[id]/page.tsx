@@ -18,7 +18,7 @@ const getStore = cache(async (id: string) => {
   const { data } = await supabase
     .from('public_store_review')
     .select(
-      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url',
+      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category',
     )
     .eq('id', id)
     .single()
@@ -117,6 +117,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           isRtl={isRtl}
           locale={locale}
           logoUrl={logoSignedUrl}
+          businessCategory={store.business_category}
         />
 
         <p className="text-center text-[10px] text-slate-400 mt-5 tracking-widest uppercase">

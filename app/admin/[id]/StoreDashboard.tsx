@@ -611,6 +611,72 @@ function LanguageSelectorSection({
   )
 }
 
+const BUSINESS_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: '一般 / General (default)' },
+  { value: 'restaurant', label: '飲食店 / Restaurant' },
+  { value: 'cafe', label: 'カフェ / Cafe' },
+  { value: 'beauty', label: '美容室・サロン / Beauty & Salon' },
+  { value: 'clinic', label: 'クリニック・医療 / Clinic & Medical' },
+  { value: 'retail', label: '小売・ショップ / Retail & Shop' },
+  { value: 'fitness', label: 'ジム・フィットネス / Fitness' },
+  { value: 'hotel', label: 'ホテル・宿泊 / Hotel' },
+  { value: 'auto', label: '自動車 / Automotive' },
+  { value: 'services', label: 'その他サービス / Other services' },
+]
+
+function BusinessCategorySelectorSection({
+  storeId,
+  initial,
+}: {
+  storeId: string
+  initial: string | null
+}) {
+  const [cat, setCat] = useState<string>(initial ?? '')
+  const [state, setState] = useState<SaveState>('idle')
+
+  async function handleSave() {
+    setState('saving')
+    try {
+      await saveField(storeId, { business_category: cat || null })
+      setState('saved')
+      setTimeout(() => setState('idle'), 2500)
+    } catch {
+      setState('error')
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <select
+        value={cat}
+        onChange={(e) => { setCat(e.target.value); setState('idle') }}
+        className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5
+          text-sm text-slate-900 outline-none focus:border-slate-400
+          focus:ring-2 focus:ring-slate-100 transition cursor-pointer"
+      >
+        {BUSINESS_CATEGORY_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <p className="text-[10px] text-slate-400">
+        Tailors the generated review wording to your industry. &quot;General&quot; is safe for any business.
+      </p>
+      <div className="flex items-center justify-between">
+        <SaveFeedback state={state} />
+        <button
+          onClick={handleSave}
+          disabled={(cat || null) === initial || state === 'saving'}
+          className="ms-auto rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold
+            text-white shadow-sm hover:bg-slate-800 active:scale-[0.98] transition-all
+            disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Save Category
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────
 // Google Review URL Editor
 // ─────────────────────────────────────────────
@@ -919,6 +985,14 @@ export default function StoreDashboard({
           <LanguageSelectorSection
             storeId={store.id}
             initial={store.default_language}
+          />
+        </SectionCard>
+
+        {/* Row 4b: Business Category */}
+        <SectionCard label="Business Category" icon={<Tag size={14} />}>
+          <BusinessCategorySelectorSection
+            storeId={store.id}
+            initial={store.business_category}
           />
         </SectionCard>
 

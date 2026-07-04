@@ -60,6 +60,8 @@ export default function ReviewPage() {
       generateReview(STORE_CONFIG.storeName, selected, {
         nonce: createReviewNonce(),
         outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
+        locale: "en",
+        category: "restaurant",
       }),
     );
     setStep("result");
@@ -153,6 +155,8 @@ export default function ReviewPage() {
                   generateReview(STORE_CONFIG.storeName, selectedKeywords, {
                     nonce: createReviewNonce(),
                     outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
+                    locale: "en",
+                    category: "restaurant",
                   })}
               />
             )}
