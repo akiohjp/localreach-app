@@ -27,6 +27,8 @@ type Props = {
   store: Store
   storeName: string
   storeUrl: string
+  /** PNG data URL of the store QR, generated server-side (no third-party call). */
+  qrDataUrl: string
   customerCount?: number
   recentCustomers?: RecentCustomer[]
   /** Signed URL when logo bucket is non-public. */
@@ -87,8 +89,18 @@ async function saveField(
   patch: StoreUpdate,
 ): Promise<void> {
   const supabase = createClient()
-  const { error } = await supabase.from('stores').update(patch).eq('id', storeId)
+  const { data, error } = await supabase
+    .from('stores')
+    .update(patch)
+    .eq('id', storeId)
+    .select('id')
   if (error) throw error
+  // A 0-row update means RLS silently blocked the write (or the row is gone):
+  // Postgres accepts the statement but changes nothing. Without .select() this
+  // resolves and the UI shows a false "Saved". Surface it as an error instead.
+  if (!data || data.length === 0) {
+    throw new Error('No rows updated — you may not have permission to edit this store.')
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -660,13 +672,13 @@ function ReviewUrlEditor({
 // QR Code Panel
 // ─────────────────────────────────────────────
 
-function QRCodePanel({ storeUrl, qrApiUrl }: { storeUrl: string; qrApiUrl: string }) {
+function QRCodePanel({ storeUrl, qrDataUrl }: { storeUrl: string; qrDataUrl: string }) {
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
       <div className="shrink-0 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={qrApiUrl}
+          src={qrDataUrl}
           alt="Customer-facing QR code"
           width={160}
           height={160}
@@ -684,7 +696,7 @@ function QRCodePanel({ storeUrl, qrApiUrl }: { storeUrl: string; qrApiUrl: strin
 
         <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
           <a
-            href={qrApiUrl}
+            href={qrDataUrl}
             download="qr-code.png"
             className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2
               text-xs font-semibold text-white shadow-sm hover:bg-slate-800
@@ -805,12 +817,12 @@ export default function StoreDashboard({
   store,
   storeName,
   storeUrl,
+  qrDataUrl,
   customerCount = 0,
   recentCustomers = [],
   logoSignedUrl,
 }: Props) {
   const router = useRouter()
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&format=png&data=${encodeURIComponent(storeUrl)}`
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -920,7 +932,7 @@ export default function StoreDashboard({
 
         {/* Row 6: QR Code */}
         <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
-          <QRCodePanel storeUrl={storeUrl} qrApiUrl={qrApiUrl} />
+          <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
         </SectionCard>
 
         {/* Row 7: CRM Stats */}

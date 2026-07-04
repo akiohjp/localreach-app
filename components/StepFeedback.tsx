@@ -16,24 +16,40 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }
   const [helpBefore, helpAfter = ""] = t.feedback.help.split("{store}");
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
     const message = text.trim();
     if (!message || submitting) return;
     setSubmitting(true);
+    setError(null);
 
     // Preview pages have no real store row — skip the write, keep the UX.
-    if (isValidUuid(storeId)) {
-      try {
-        await fetch("/api/feedback", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ store_id: storeId, rating, message }),
-        });
-      } catch (err) {
-        // Never block the thank-you on a network hiccup; just log it.
-        console.error("[feedback] submit failed", err);
+    if (!isValidUuid(storeId)) {
+      setSubmitting(false);
+      onSubmit();
+      return;
+    }
+
+    // Only advance on a confirmed save — otherwise keep the guest on the form
+    // so their feedback isn't silently discarded (store paused / server error).
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ store_id: storeId, rating, message }),
+      });
+      if (!res.ok) {
+        console.error("[feedback] submit failed", res.status);
+        setError(t.feedback.sendError);
+        setSubmitting(false);
+        return;
       }
+    } catch (err) {
+      console.error("[feedback] submit failed", err);
+      setError(t.feedback.sendError);
+      setSubmitting(false);
+      return;
     }
 
     setSubmitting(false);
@@ -54,7 +70,7 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }
           </h2>
           <p className="text-sm text-slate-600 leading-relaxed">
             {/* dir=ltr keeps filled→empty star order correct under RTL locales */}
-            <span dir="ltr" className="text-amber-500" aria-label={`${rating} out of 5 stars`}>
+            <span dir="ltr" className="text-amber-500" aria-label={t.feedback.ratingAria.replace("{n}", String(rating))}>
               {"★".repeat(rating)}{"☆".repeat(5 - rating)}
             </span>
             &nbsp;·&nbsp;
@@ -91,6 +107,12 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }
           border border-gray-300 rounded-xl resize-none
           focus:outline-none focus:border-slate-500 transition-colors placeholder:text-slate-400"
       />
+
+      {error && (
+        <p className="text-xs text-red-500" role="alert">
+          {error}
+        </p>
+      )}
 
       {/* CTA */}
       <button

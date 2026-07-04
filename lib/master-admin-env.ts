@@ -18,3 +18,12 @@ export function resolvedMasterAdminPassword(): string {
     ""
   )
 }
+
+/**
+ * Optional: lowercase hex SHA-256 of the master password. When set, the plaintext
+ * password need not live in env at all — the login path compares hashes only.
+ * Takes precedence over the plaintext MASTER_ADMIN_PASSWORD when present.
+ */
+export function resolvedMasterAdminPasswordSha256(): string {
+  return (process.env.MASTER_ADMIN_PASSWORD_SHA256 ?? "").trim().toLowerCase()
+}

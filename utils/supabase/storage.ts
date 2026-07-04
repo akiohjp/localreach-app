@@ -52,10 +52,17 @@ export async function updateStoreLogo(
 ): Promise<void> {
   const supabase = createClient()
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('stores')
     .update({ logo_url: bucketPathOrLegacyUrl })
     .eq('id', storeId)
+    .select('id')
 
   if (error) throw error
+  // A 0-row update means RLS silently blocked the write (or the row is gone):
+  // Postgres accepts the statement but changes nothing. Without .select() this
+  // resolves successfully and the UI shows a false "success". Fail loudly instead.
+  if (!data || data.length === 0) {
+    throw new Error('Logo update did not persist — you may not have permission to edit this store.')
+  }
 }

@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { getLocalizedText } from '@/types/database'
+import { qrPngDataUrl } from '@/lib/qr'
 import StoreDashboard from './StoreDashboard'
 
 export const metadata: Metadata = { title: 'Store Dashboard — LocalReach' }
@@ -77,18 +78,25 @@ export default async function AdminStorePage({ params }: Props) {
       .limit(5)
     recentCustomers = customersWithoutName.data as RecentCustomerRow[] | null
     customerCount = customersWithoutName.count
+  } else if (customersWithName.error) {
+    // Any other error (transient network, rotated service key) would otherwise
+    // render as a misleading "0 customers" with no trace — surface it in logs.
+    console.error('[admin] customers query failed for store', id, customersWithName.error)
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const storeUrl = `${appUrl}/store/${store.id}`
 
   const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
+  // Generated on the server so the store URL is never sent to a third-party QR API.
+  const qrDataUrl = await qrPngDataUrl(storeUrl, 320)
 
   return (
     <StoreDashboard
       store={store}
       storeName={storeName}
       storeUrl={storeUrl}
+      qrDataUrl={qrDataUrl}
       customerCount={customerCount ?? 0}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentCustomers={(recentCustomers ?? []) as any}

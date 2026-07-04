@@ -32,8 +32,10 @@ export default function ReviewPage() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
 
   // Survive an accidental reload so a generated review isn't lost back to rating.
+  // Namespaced with "demo:" so the home-page demo never shares a sessionStorage
+  // key with /store/<uuid> when NEXT_PUBLIC_DEMO_STORE_ID is a real store UUID.
   useFlowPersistence(
-    RESULT_STORE_ID,
+    `demo:${RESULT_STORE_ID}`,
     { step, rating, reviewText, selectedKeywords },
     (s) => {
       setStep(s.step as Step);
@@ -146,6 +148,7 @@ export default function ReviewPage() {
                 storeId={RESULT_STORE_ID}
                 selectedKeywords={selectedKeywords}
                 onRetry={reset}
+                onReviewTextChange={setReviewText}
                 onRegenerate={() =>
                   generateReview(STORE_CONFIG.storeName, selectedKeywords, {
                     nonce: createReviewNonce(),

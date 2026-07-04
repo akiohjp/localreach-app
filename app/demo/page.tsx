@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { qrPngDataUrl } from "@/lib/qr";
 
 export const metadata: Metadata = {
   title: "Demo — LocalReach",
@@ -12,14 +13,15 @@ function baseUrl(): string {
   );
 }
 
-export default function DemoPage() {
+export default async function DemoPage() {
   const base = baseUrl();
   const demoStoreId = process.env.NEXT_PUBLIC_DEMO_STORE_ID?.trim() ?? "";
   const customerUrl = demoStoreId ? `${base}/store/${demoStoreId}` : `${base}/`;
   const adminUrl = `${base}/admin/login`;
   const masterUrl = `${base}/master-admin/login`;
   const lpUrl = `${base}/local-reach-lp`;
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&format=png&data=${encodeURIComponent(customerUrl)}`;
+  // Generated server-side — the demo store URL is never sent to a third-party QR API.
+  const qrDataUrl = await qrPngDataUrl(customerUrl, 220);
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -82,7 +84,7 @@ export default function DemoPage() {
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={qrApiUrl}
+                src={qrDataUrl}
                 alt="QR code to guest review flow"
                 width={220}
                 height={220}

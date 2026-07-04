@@ -210,6 +210,7 @@ export default function ReviewFlow({
               storeId={storeId}
               selectedKeywords={selectedKeywords}
               onRetry={reset}
+              onReviewTextChange={setReviewText}
               onRegenerate={() =>
                 generateReview(storeName, selectedKeywords, {
                   nonce: createReviewNonce(),

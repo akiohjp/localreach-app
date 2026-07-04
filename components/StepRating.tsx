@@ -98,7 +98,7 @@ export default function StepRating({ t, storeName, greetingText, onSelect, logoU
                 className="focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2
                   flex h-12 w-12 shrink-0 items-center justify-center rounded-xl
                   transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                aria-label={`${star} star`}
+                aria-label={t.rating.starAria.replace("{n}", String(star))}
                 aria-pressed={selected === star}
               >
                 <Star

@@ -10,7 +10,7 @@
  * never see another's cached data. Bump CACHE_VERSION to invalidate old caches.
  */
 
-const CACHE_VERSION = "localreach-v1";
+const CACHE_VERSION = "localreach-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const OFFLINE_URL = "/offline";
 

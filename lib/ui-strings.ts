@@ -16,6 +16,8 @@ export interface UiStrings {
     /** Index by star count 0–5 (index 0 unused). */
     labels: string[];
     continue: string;
+    /** aria per star button, "{n} star". */
+    starAria: string;
   };
   keywords: {
     stepLabel: string;
@@ -70,6 +72,10 @@ export interface UiStrings {
     describeAria: string;
     send: string;
     sending: string;
+    /** aria on the star summary, "{n} out of 5 stars". */
+    ratingAria: string;
+    /** shown when the feedback POST fails; keep the guest on the form to retry. */
+    sendError: string;
   };
   feedbackSent: {
     title: string;
@@ -86,6 +92,7 @@ const en: UiStrings = {
     rateExperience: "Rate your experience",
     labels: ["", "Poor", "Fair", "Good", "Great", "Excellent"],
     continue: "Continue",
+    starAria: "{n} star",
   },
   keywords: {
     stepLabel: "Step 2 — Keywords",
@@ -153,6 +160,8 @@ const en: UiStrings = {
     describeAria: "Describe your experience",
     send: "Send Feedback",
     sending: "Sending…",
+    ratingAria: "{n} out of 5 stars",
+    sendError: "Couldn't send. Please check your connection and try again.",
   },
   feedbackSent: {
     title: "Thank you for your feedback.",
@@ -168,6 +177,7 @@ const ja: UiStrings = {
     rateExperience: "評価してください",
     labels: ["", "不満", "まあまあ", "良い", "とても良い", "最高"],
     continue: "次へ",
+    starAria: "星{n}つ",
   },
   keywords: {
     stepLabel: "ステップ 2 — キーワード",
@@ -230,6 +240,8 @@ const ja: UiStrings = {
     describeAria: "ご体験の内容",
     send: "フィードバックを送信",
     sending: "送信中…",
+    ratingAria: "5つ星中{n}つ",
+    sendError: "送信できませんでした。接続を確認してもう一度お試しください。",
   },
   feedbackSent: {
     title: "フィードバックをありがとうございます。",
@@ -246,6 +258,7 @@ const ar: UiStrings = {
     rateExperience: "قيّم تجربتك",
     labels: ["", "ضعيف", "مقبول", "جيد", "جيد جدًا", "ممتاز"],
     continue: "متابعة",
+    starAria: "{n} نجمة",
   },
   keywords: {
     stepLabel: "الخطوة 2 — الكلمات المفتاحية",
@@ -312,6 +325,8 @@ const ar: UiStrings = {
     describeAria: "صف تجربتك",
     send: "إرسال الملاحظات",
     sending: "جارٍ الإرسال…",
+    ratingAria: "{n} من 5 نجوم",
+    sendError: "تعذّر الإرسال. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
   },
   feedbackSent: {
     title: "شكرًا على ملاحظاتك.",

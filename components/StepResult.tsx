@@ -13,6 +13,8 @@ type Props = {
   onRetry: () => void;
   /** Fresh nonce + new wording; same merged keywords. For client demos. */
   onRegenerate?: () => string;
+  /** Lift edited/regenerated text so reload-persistence keeps the latest wording. */
+  onReviewTextChange?: (text: string) => void;
 };
 
 type WaState = "idle" | "saving" | "saved" | "error";
@@ -29,6 +31,7 @@ export default function StepResult({
   selectedKeywords,
   onRetry,
   onRegenerate,
+  onReviewTextChange,
 }: Props) {
   const [text, setText] = useState(reviewText);
   const [copied, setCopied] = useState(false);
@@ -71,12 +74,16 @@ export default function StepResult({
   function handleRegenerateWording() {
     if (!onRegenerate) return;
     setCopied(false);
-    setText(onRegenerate());
+    const next = onRegenerate();
+    setText(next);
+    onReviewTextChange?.(next);
   }
 
   async function handleWhatsAppSave() {
-    const digits = phone.trim();
     const cc = countryCode.trim();
+    // Drop a local trunk-zero (e.g. UAE "050…" typed after "+971") so the
+    // number is stored in deliverable E.164 form, not "+9710…".
+    const digits = phone.trim().replace(/^0+/, "");
     if (digits.length < 7 || cc.length < 2) return;
 
     if (!canSaveWhatsApp) {
@@ -137,7 +144,10 @@ export default function StepResult({
       <div className="relative">
         <textarea
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            onReviewTextChange?.(e.target.value);
+          }}
           rows={6}
           aria-label={t.result.reviewAria}
           className="w-full p-4 text-base text-slate-800 leading-relaxed bg-gray-50
