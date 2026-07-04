@@ -207,6 +207,9 @@ function KeywordManager({
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    // While a Japanese/CJK IME is composing, Enter/"," confirm the conversion —
+    // do not treat them as "add keyword" or the word gets committed half-typed.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add() }
     if (e.key === 'Backspace' && !input && keywords.length) {
       remove(keywords[keywords.length - 1])
@@ -325,6 +328,8 @@ function ForcedKeywordManager({
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    // Ignore Enter/"," while a CJK IME is mid-composition (conversion confirm).
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault()
       add()
@@ -616,7 +621,14 @@ const BUSINESS_CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'restaurant', label: '飲食店 / Restaurant' },
   { value: 'cafe', label: 'カフェ / Cafe' },
   { value: 'beauty', label: '美容室・サロン / Beauty & Salon' },
+  { value: 'aesthetic', label: '美容医療・皮膚科・脱毛 / Aesthetic & Derma' },
+  { value: 'dental', label: '歯科 / Dental' },
   { value: 'clinic', label: 'クリニック・医療 / Clinic & Medical' },
+  { value: 'realestate', label: '不動産 / Real Estate' },
+  { value: 'legal', label: '法律・会計・士業 / Legal & Professional' },
+  { value: 'home', label: 'リフォーム・内装・工務店 / Home & Renovation' },
+  { value: 'education', label: 'スクール・塾・教室 / Education' },
+  { value: 'pet', label: '動物病院・ペット / Pet Care' },
   { value: 'retail', label: '小売・ショップ / Retail & Shop' },
   { value: 'fitness', label: 'ジム・フィットネス / Fitness' },
   { value: 'hotel', label: 'ホテル・宿泊 / Hotel' },
