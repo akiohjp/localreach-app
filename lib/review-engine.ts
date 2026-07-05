@@ -179,6 +179,19 @@ function trimTailSentence(multiline: string, sentenceEnd: RegExp): string {
   return paras.join(PARAGRAPH_GAP);
 }
 
+/**
+ * A filler that already appears in the text (fillers overlap with closers, and
+ * the padding loop samples with replacement) reads as an obvious bot tell.
+ * Retry a few times for one the review doesn't contain yet; '' = none fresh.
+ */
+function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => number): string {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const cand = fill(pick(pool.fillers, rng), { store });
+    if (!t.includes(cand)) return cand;
+  }
+  return "";
+}
+
 function tuneLength(text: string, store: string, pool: PoolSet, cfg: LocaleCfg, seed: number, salt: number): string {
   const rng = forkRng(seed, salt);
   let t = text;
@@ -191,12 +204,15 @@ function tuneLength(text: string, store: string, pool: PoolSet, cfg: LocaleCfg, 
   }
   guard = 0;
   while (n < cfg.min && guard < 6 && pool.fillers.length > 0) {
-    t = appendToLast(t, fill(pick(pool.fillers, rng), { store }), cfg.glue);
+    const filler = pickFreshFiller(t, store, pool, rng);
+    if (!filler) break;
+    t = appendToLast(t, filler, cfg.glue);
     n = cfg.measure(t);
     guard++;
   }
   if (n < cfg.target - Math.round(cfg.target * 0.06) && pool.fillers.length > 0) {
-    t = appendToLast(t, fill(pick(pool.fillers, rng), { store }), cfg.glue);
+    const filler = pickFreshFiller(t, store, pool, rng);
+    if (filler) t = appendToLast(t, filler, cfg.glue);
   }
   if (cfg.measure(t) > cfg.max) t = trimTailSentence(t, cfg.sentenceEnd);
   return normalizeParagraphFormatting(t);

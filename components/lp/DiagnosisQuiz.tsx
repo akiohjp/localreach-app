@@ -96,7 +96,7 @@ export default function DiagnosisQuiz() {
         </div>
       ) : (
         <div className="text-center">
-          <div className="w-20 h-20 bg-[#D4AF37]/10 rounded-full flex items-center justify-center mx-auto mb-6 text-[#D4AF37]">
+          <div className="w-20 h-20 bg-[#D4AF37]/10 rounded-full flex items-center justify-center mx-auto mb-6 text-[#D4AF37]" aria-hidden="true">
             <BarChart3 size={40} />
           </div>
           <h3 className="text-sm font-bold uppercase tracking-widest text-[#D4AF37] mb-2">Step Completed</h3>
@@ -117,9 +117,17 @@ export default function DiagnosisQuiz() {
             </ul>
           </div>
 
-          <button className="w-full bg-[#D4AF37] text-white px-8 py-5 rounded-full text-lg font-bold hover:bg-[#B8962E] transition-all transform hover:scale-105 flex items-center justify-center gap-3">
-            Book a Free Consultation <ArrowRight size={20} />
-          </button>
+          <a
+            href={
+              'https://wa.me/971545519786?text=' +
+              encodeURIComponent("Hi! I finished the LocalReach self-assessment and I'd like a free consultation.")
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-[#D4AF37] text-black px-8 py-5 rounded-full text-lg font-bold hover:bg-[#B8962E] transition-all transform hover:scale-105 flex items-center justify-center gap-3"
+          >
+            Book a Free Consultation <ArrowRight size={20} aria-hidden="true" />
+          </a>
           
           <p className="mt-6 text-xs text-gray-400">
             Our expert will contact you via WhatsApp or Email to confirm the schedule.

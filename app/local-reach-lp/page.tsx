@@ -14,6 +14,10 @@ import {
   Search
 } from 'lucide-react';
 
+const WA_DEMO_LINK =
+  'https://wa.me/971545519786?text=' +
+  encodeURIComponent("Hi! I'd like to book a free LocalReach demo.");
+
 const LocalReachLP = () => {
   return (
     <div className="min-h-screen bg-[#FDFDFD] text-gray-900 font-sans selection:bg-gold-100 overflow-x-hidden">
@@ -30,9 +34,9 @@ const LocalReachLP = () => {
             <a href="#diagnosis" className="hover:text-[#D4AF37] transition-colors">Consultation</a>
             <a href="#features" className="hover:text-[#D4AF37] transition-colors">Features</a>
             <a href="#pricing" className="hover:text-[#D4AF37] transition-colors">Pricing</a>
-            <button className="bg-[#D4AF37] text-white px-8 py-3 rounded-full font-bold hover:bg-[#B8962E] transition-all transform hover:scale-105 shadow-lg shadow-gold-400/20">
+            <a href={WA_DEMO_LINK} target="_blank" rel="noopener noreferrer" className="bg-[#D4AF37] text-black px-8 py-3 rounded-full font-bold hover:bg-[#B8962E] transition-all transform hover:scale-105 shadow-lg shadow-gold-400/20">
               Book a Demo
-            </button>
+            </a>
           </div>
         </div>
       </nav>
@@ -56,19 +60,19 @@ const LocalReachLP = () => {
               Automated Google Reviews & Private Customer List Building.
             </p>
             <p className="text-lg font-medium text-gray-600 max-w-xl mt-4 leading-relaxed">
-              Transform your restaurant&apos;s digital presence in Dubai. Start for 500 AED/month. The ultimate Local SEO & GEO strategy.
+              Transform your restaurant&apos;s digital presence in Dubai. Start for 298 AED/month. The ultimate Local SEO & GEO strategy.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-6 pt-4">
-              <button className="w-full sm:w-auto bg-[#D4AF37] text-white px-12 py-6 rounded-2xl text-xl font-black shadow-2xl shadow-gold-600/40 hover:bg-[#B8962E] transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3">
-                Book a Free Demo <ArrowRight size={24} />
-              </button>
+              <a href={WA_DEMO_LINK} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto bg-[#D4AF37] text-black px-12 py-6 rounded-2xl text-xl font-black shadow-2xl shadow-gold-600/40 hover:bg-[#B8962E] transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3">
+                Book a Free Demo <ArrowRight size={24} aria-hidden="true" />
+              </a>
               <div className="flex items-center gap-4">
                 <div className="flex -space-x-3">
                   {[1,2,3,4].map(i => (
                     <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-gray-200" />
                   ))}
                 </div>
-                <p className="text-sm font-bold text-gray-600 uppercase tracking-tight">Trusted by 500+ outlets in UAE</p>
+                <p className="text-sm font-bold text-gray-600 uppercase tracking-tight">Built for restaurants & local businesses in UAE</p>
               </div>
             </div>
           </div>
@@ -96,7 +100,7 @@ const LocalReachLP = () => {
                            <p className="text-[10px] text-gray-400">Local Guide • 12 reviews</p>
                         </div>
                      </div>
-                     <div className="flex text-[#D4AF37]">
+                     <div className="flex text-[#D4AF37]" aria-hidden="true">
                         {[1,2,3,4,5].map(i => <Star key={i} size={16} fill="currentColor" />)}
                      </div>
                      <p className="text-sm font-medium leading-relaxed text-gray-800">
@@ -109,7 +113,7 @@ const LocalReachLP = () => {
 
                      <div className="mt-8 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-2xl">
                         <div className="flex items-center gap-2 mb-1">
-                           <Zap size={12} className="text-[#D4AF37]" />
+                           <Zap size={12} className="text-[#D4AF37]" aria-hidden="true" />
                            <span className="text-[10px] font-bold text-[#D4AF37] uppercase">LocalReach AI</span>
                         </div>
                         <p className="text-[10px] font-bold text-gray-500 uppercase">GEO Search Optimization Active</p>
@@ -138,7 +142,7 @@ const LocalReachLP = () => {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {["4つの質問に答えるだけ", "現在のスコアを算出", "具体的な改善点を提示", "100% 無料診断"].map((text, i) => (
                    <li key={i} className="flex items-center gap-3 font-bold text-gray-700 bg-white p-4 rounded-xl shadow-sm">
-                     <div className="bg-[#D4AF37] rounded-full p-1 flex-shrink-0"><CheckCircle2 size={16} className="text-white" /></div>
+                     <div className="bg-[#D4AF37] rounded-full p-1 flex-shrink-0" aria-hidden="true"><CheckCircle2 size={16} className="text-white" /></div>
                      <span className="text-sm">{text}</span>
                    </li>
                 ))}
@@ -177,7 +181,7 @@ const LocalReachLP = () => {
             </div>
             <div className="flex-1 w-full">
               <div className="bg-black rounded-[40px] p-12 text-white relative">
-                 <Search size={48} className="text-[#D4AF37] mb-8" />
+                 <Search size={48} className="text-[#D4AF37] mb-8" aria-hidden="true" />
                  <h4 className="text-3xl font-black mb-6 italic">&ldquo;Where is the best burger in Dubai?&rdquo;</h4>
                  <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-white/10 rounded-2xl border border-[#D4AF37]/50 shadow-lg shadow-gold-500/20 transform -translate-x-4">
@@ -185,7 +189,7 @@ const LocalReachLP = () => {
                          <div className="w-10 h-10 bg-[#D4AF37] rounded-lg" />
                          <span className="font-bold">Your Restaurant</span>
                        </div>
-                       <div className="flex text-[#D4AF37]"><Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /></div>
+                       <div className="flex text-[#D4AF37]" aria-hidden="true"><Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /></div>
                     </div>
                     {[1,2].map(i => (
                       <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl opacity-40">
@@ -193,7 +197,7 @@ const LocalReachLP = () => {
                            <div className="w-10 h-10 bg-gray-500 rounded-lg" />
                            <span className="font-bold text-gray-400">Competitor {i}</span>
                          </div>
-                         <div className="flex text-gray-600"><Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /></div>
+                         <div className="flex text-gray-600" aria-hidden="true"><Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /> <Star size={12} fill="currentColor" /></div>
                       </div>
                     ))}
                  </div>
@@ -239,7 +243,7 @@ const LocalReachLP = () => {
               }
             ].map((item, i) => (
               <div key={i} className="group bg-white/5 border border-white/10 p-12 rounded-[50px] hover:bg-white/10 hover:border-[#D4AF37]/50 transition-all duration-500 flex flex-col items-center text-center">
-                <div className="mb-10 transform group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 inline-block">
+                <div className="mb-10 transform group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-500 inline-block" aria-hidden="true">
                   {item.icon}
                 </div>
                 <div className="inline-block px-4 py-1 rounded-full border border-[#D4AF37]/30 text-[#D4AF37] text-xs font-black uppercase tracking-widest mb-6">
@@ -279,7 +283,7 @@ const LocalReachLP = () => {
               }
             ].map((item, i) => (
               <div key={i} className="flex flex-col items-center group">
-                <div className="w-[170px] h-[170px] bg-white border-[8px] border-gray-50 shadow-2xl rounded-[60px] flex items-center justify-center text-[#D4AF37] mb-8 group-hover:border-[#D4AF37] transition-all duration-500 group-hover:shadow-gold-200/50">
+                <div className="w-[170px] h-[170px] bg-white border-[8px] border-gray-50 shadow-2xl rounded-[60px] flex items-center justify-center text-[#D4AF37] mb-8 group-hover:border-[#D4AF37] transition-all duration-500 group-hover:shadow-gold-200/50" aria-hidden="true">
                   <div className="transform group-hover:scale-125 transition-transform duration-500">
                     {item.icon}
                   </div>
@@ -305,7 +309,7 @@ const LocalReachLP = () => {
           
           <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-[60px] border border-white/10 shadow-[0_0_100px_rgba(212,175,55,0.1)] p-10 md:p-20 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-12">
-               <div className="bg-[#D4AF37] text-white text-sm font-black px-6 py-2 rounded-full uppercase shadow-lg shadow-gold-500/50 animate-pulse">
+               <div className="bg-[#D4AF37] text-black text-sm font-black px-6 py-2 rounded-full uppercase shadow-lg shadow-gold-500/50 animate-pulse">
                  No Commitment
                </div>
             </div>
@@ -315,22 +319,22 @@ const LocalReachLP = () => {
                   <div>
                     <h3 className="text-4xl font-black mb-4 tracking-tight">LocalReach All-in-One</h3>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-8xl font-black tracking-tighter text-[#D4AF37]">500</span>
+                      <span className="text-8xl font-black tracking-tighter text-[#D4AF37]">298</span>
                       <span className="text-2xl font-bold text-gray-500 uppercase tracking-widest">AED / Mo</span>
                     </div>
                   </div>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 font-black text-gray-300">
                     {["初期費用 0 AED", "AIレビュー無制限", "WhatsApp CRM", "多言語対応", "MEO分析レポート", "24/7 サポート"].map((f, i) => (
                       <li key={i} className="flex items-center gap-3">
-                        <CheckCircle2 size={20} className="text-[#D4AF37] flex-shrink-0" /> <span className="text-sm">{f}</span>
+                        <CheckCircle2 size={20} className="text-[#D4AF37] flex-shrink-0" aria-hidden="true" /> <span className="text-sm">{f}</span>
                       </li>
                     ))}
                   </ul>
                </div>
                <div className="flex flex-col gap-6">
-                  <button className="w-full bg-white text-black px-10 py-8 rounded-[30px] text-2xl font-black hover:bg-[#D4AF37] hover:text-white transition-all transform hover:-translate-y-2 shadow-2xl group-hover:scale-105 duration-500">
+                  <a href={WA_DEMO_LINK} target="_blank" rel="noopener noreferrer" className="w-full bg-white text-black px-10 py-8 rounded-[30px] text-2xl font-black text-center hover:bg-[#D4AF37] transition-all transform hover:-translate-y-2 shadow-2xl group-hover:scale-105 duration-500">
                     Get Started Now
-                  </button>
+                  </a>
                   <p className="text-center text-sm text-gray-500 font-bold px-8">
                     従業員を一人雇うコストの1/10で、<br />最強のマーケティングアシスタントを。
                   </p>
@@ -348,9 +352,9 @@ const LocalReachLP = () => {
             <span className="text-[#D4AF37]">DOMINATE.</span>
           </h2>
           <div className="flex flex-col items-center gap-12">
-            <button className="bg-black text-white px-20 py-10 rounded-full text-3xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:bg-[#D4AF37] transition-all transform hover:scale-110 flex items-center gap-6">
-              Book a Free Demo <ArrowRight size={40} />
-            </button>
+            <a href={WA_DEMO_LINK} target="_blank" rel="noopener noreferrer" className="bg-black text-white px-20 py-10 rounded-full text-3xl font-black shadow-[0_20px_50px_rgba(0,0,0,0.3)] hover:bg-[#D4AF37] hover:text-black transition-all transform hover:scale-110 flex items-center gap-6">
+              Book a Free Demo <ArrowRight size={40} aria-hidden="true" />
+            </a>
             <div className="flex flex-wrap justify-center gap-12 text-sm font-black text-gray-200 uppercase tracking-[0.5em]">
               <span>Powerful</span>
               <span>Proven</span>
@@ -369,14 +373,14 @@ const LocalReachLP = () => {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-12 border-t border-white/10 pt-20">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-[#D4AF37] flex items-center justify-center rounded-2xl shadow-lg shadow-gold-500/20">
-              <span className="text-white font-black text-2xl">L</span>
+              <span className="text-black font-black text-2xl">L</span>
             </div>
             <span className="text-3xl font-black tracking-tighter">LocalReach</span>
           </div>
           <div className="flex gap-8 text-sm font-bold text-gray-500 uppercase tracking-widest">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
-            <a href="#" className="hover:text-white transition-colors">Contact</a>
+            <a href="https://miraireach.marketing/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Privacy</a>
+            <a href="https://miraireach.marketing/terms" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Terms</a>
+            <a href="mailto:info.ae@miraireach.marketing" className="hover:text-white transition-colors">Contact</a>
           </div>
           <div className="text-sm font-bold text-gray-500">
             © {new Date().getFullYear()} AI Company Core. Powered by AIO.
