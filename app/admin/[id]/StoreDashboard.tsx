@@ -6,9 +6,11 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
+  MessageCircle, Send, Copy,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
+import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
 import type { Store, LocalizedText, SupportedLocale, StoreUpdate } from '@/types/database'
 
 // ─────────────────────────────────────────────
@@ -802,15 +804,153 @@ function QRCodePanel({ storeUrl, qrDataUrl }: { storeUrl: string; qrDataUrl: str
 }
 
 // ─────────────────────────────────────────────
+// WhatsApp review requests (Phase 1 — click-to-chat, no Meta API/fees)
+// ─────────────────────────────────────────────
+
+function WhatsAppRequestSection({
+  storeName,
+  storeUrl,
+  locale,
+  message,
+  onLocale,
+  onMessage,
+}: {
+  storeName: string
+  storeUrl: string
+  locale: WaLocale
+  message: string
+  onLocale: (l: WaLocale) => void
+  onMessage: (m: string) => void
+}) {
+  const [number, setNumber] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const dialable = normalizeWaNumber(number).length >= 7
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* clipboard blocked — owner can select the text manually */
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-600 leading-relaxed">
+        Send your review link over WhatsApp — from <span className="font-semibold text-slate-800">your own number</span>,
+        no extra fees. Message <span className="font-semibold text-slate-800">only customers who gave you their number</span>.
+      </p>
+
+      {/* Message language */}
+      <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+        {(['en', 'ja', 'ar'] as WaLocale[]).map((code) => (
+          <button
+            key={code}
+            onClick={() => { onLocale(code); onMessage(waTemplate(code, storeName, storeUrl)) }}
+            className={[
+              'flex-1 rounded-lg py-1.5 text-xs font-bold uppercase transition-all',
+              locale === code
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-400 hover:text-slate-600',
+            ].join(' ')}
+          >
+            {code}
+          </button>
+        ))}
+      </div>
+
+      {/* Editable message */}
+      <div className="space-y-1">
+        <textarea
+          value={message}
+          onChange={(e) => onMessage(e.target.value)}
+          dir={locale === 'ar' ? 'rtl' : 'ltr'}
+          rows={4}
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
+            text-sm text-slate-900 outline-none focus:border-slate-400
+            focus:ring-2 focus:ring-slate-100 transition resize-none"
+        />
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] text-slate-400">Link to your review page is included.</p>
+          <button
+            onClick={copyMessage}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300
+              bg-white px-3 py-1.5 text-xs font-semibold text-slate-600
+              hover:border-slate-500 hover:text-slate-900 active:scale-[0.98] transition-all"
+          >
+            {copied ? <CheckCircle size={12} className="text-green-600" /> : <Copy size={12} />}
+            {copied ? 'Copied' : 'Copy message'}
+          </button>
+        </div>
+      </div>
+
+      {/* Send to a single number */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
+        <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
+          Send to one customer
+        </label>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="tel"
+            inputMode="tel"
+            value={number}
+            onChange={(e) => setNumber(e.target.value)}
+            placeholder="+971 50 123 4567"
+            dir="ltr"
+            className="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5
+              text-sm text-slate-900 placeholder:text-slate-400 outline-none
+              focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition"
+          />
+          <a
+            href={dialable ? buildWaLink(number, message) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!dialable}
+            onClick={(e) => { if (!dialable) e.preventDefault() }}
+            className={[
+              'flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm transition-all',
+              dialable
+                ? 'bg-[#25D366] text-white hover:brightness-95 active:scale-[0.98]'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed',
+            ].join(' ')}
+          >
+            <Send size={12} />
+            Open in WhatsApp
+          </a>
+        </div>
+      </div>
+
+      {/* Broadcast helper */}
+      <a
+        href={buildWaLink('', message)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex w-full items-center justify-center gap-1.5 rounded-xl border
+          border-[#25D366]/40 bg-[#25D366]/10 px-4 py-2.5 text-xs font-semibold
+          text-[#128C7E] hover:bg-[#25D366]/20 active:scale-[0.98] transition-all"
+      >
+        <MessageCircle size={13} />
+        Open WhatsApp to pick a contact / broadcast
+      </a>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // CRM Stats (read-only — no CSV export for store owners)
 // ─────────────────────────────────────────────
 
 function CrmSection({
   count,
   recent,
+  waMessage,
 }: {
   count: number
   recent: RecentCustomer[]
+  waMessage: string
 }) {
   return (
     <div className="space-y-4">
@@ -857,7 +997,7 @@ function CrmSection({
                     </div>
                   )}
                 </div>
-                <div className="text-right shrink-0 space-y-1">
+                <div className="flex flex-col items-end shrink-0 gap-1.5">
                   <p className="text-[11px] text-slate-400 tabular-nums">
                     {new Date(c.created_at).toLocaleDateString('en-US', {
                       month: 'short',
@@ -873,6 +1013,20 @@ function CrmSection({
                   >
                     {c.opt_in ? 'opted in' : 'opted out'}
                   </span>
+                  {/* Only offer a send button for customers who opted in. */}
+                  {c.opt_in && (
+                    <a
+                      href={buildWaLink(c.whatsapp_number, waMessage)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 rounded-lg bg-[#25D366] px-2 py-1
+                        text-[10px] font-semibold text-white shadow-sm
+                        hover:brightness-95 active:scale-[0.98] transition-all"
+                    >
+                      <Send size={10} />
+                      Ask
+                    </a>
+                  )}
                 </div>
               </div>
             ))}
@@ -901,6 +1055,13 @@ export default function StoreDashboard({
   logoSignedUrl,
 }: Props) {
   const router = useRouter()
+
+  // WhatsApp review-request message — seeded from the store's default language
+  // and the customer-facing review page, editable in its own section below.
+  const [waLocale, setWaLocale] = useState<WaLocale>((store.default_language as WaLocale) || 'en')
+  const [waMessage, setWaMessage] = useState(() =>
+    waTemplate((store.default_language as WaLocale) || 'en', storeName, storeUrl),
+  )
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -1021,9 +1182,21 @@ export default function StoreDashboard({
           <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
         </SectionCard>
 
+        {/* Row 6b: WhatsApp review requests */}
+        <SectionCard label="WhatsApp review requests" icon={<MessageCircle size={14} />}>
+          <WhatsAppRequestSection
+            storeName={storeName}
+            storeUrl={storeUrl}
+            locale={waLocale}
+            message={waMessage}
+            onLocale={setWaLocale}
+            onMessage={setWaMessage}
+          />
+        </SectionCard>
+
         {/* Row 7: CRM Stats */}
         <SectionCard label="Customers" icon={<Users size={14} />}>
-          <CrmSection count={customerCount} recent={recentCustomers} />
+          <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} />
         </SectionCard>
 
       </main>
