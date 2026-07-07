@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, X, Eye, EyeOff, Loader2, Plus, BarChart2, Copy, Printer, Check, LogOut } from 'lucide-react'
-import { createStore, masterSetStoreActive, masterExportCustomersCsv } from './actions'
+import { createStore, masterSetStoreActive, masterSetStoreExpiry, masterExportCustomersCsv } from './actions'
 import { logoutMasterAction } from './login/actions'
 import type { NewStoreRow } from './actions'
 
@@ -11,8 +11,27 @@ type StoreRow = {
   id: string
   name: string
   isActive: boolean
+  expiresAt: string | null
   createdAt: string
   customerCount: number
+}
+
+// Contract end is stored as UTC but entered/shown as a Dubai calendar date —
+// access lasts until the end of that day in the client's market (UAE).
+function expiryToDubaiDateInput(expiresAt: string | null): string {
+  if (!expiresAt) return ''
+  const t = Date.parse(expiresAt)
+  if (Number.isNaN(t)) return ''
+  return new Date(t).toLocaleDateString('en-CA', { timeZone: 'Asia/Dubai' })
+}
+
+function dubaiDateInputToExpiry(dateInput: string): string | null {
+  if (!dateInput) return null
+  return new Date(`${dateInput}T23:59:59+04:00`).toISOString()
+}
+
+function isExpired(expiresAt: string | null): boolean {
+  return !!expiresAt && Date.parse(expiresAt) <= Date.now()
 }
 
 // ─────────────────────────────────────────────
@@ -501,6 +520,22 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
     setPending(null)
   }
 
+  async function setExpiry(id: string, dateInput: string) {
+    const expiresAt = dubaiDateInputToExpiry(dateInput)
+    setPending(id)
+    setError(null)
+    const res = await masterSetStoreExpiry(id, expiresAt)
+
+    if (!res.ok) {
+      setError(`Failed to update contract end for ${id.slice(0, 8)}: ${res.error}`)
+    } else {
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, expiresAt } : r)),
+      )
+    }
+    setPending(null)
+  }
+
   async function handleExportCSV(storeId: string, storeName: string) {
     setCsvPending(storeId)
     const res = await masterExportCustomersCsv(storeId)
@@ -535,7 +570,9 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
             <h1 className="text-xl font-bold text-slate-900 mt-0.5">Store Control</h1>
             <p className="text-sm text-slate-500 mt-1 max-w-2xl">
               Toggle <span className="font-semibold">is_active</span> to enable or disable any store.
-              Inactive stores redirect all visitors to the Service Inactive page.
+              Set <span className="font-semibold">Contract End</span> to auto-lock a store when its
+              subscription lapses (access lasts through that day, Dubai time). Inactive or expired
+              stores redirect all visitors to the Service Inactive page.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-start sm:pt-0.5 relative z-10">
@@ -600,6 +637,9 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
                   Contacts
                 </th>
                 <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
+                  Contract End
+                </th>
+                <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
                   Status
                 </th>
               </tr>
@@ -645,13 +685,43 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
                     )}
                   </td>
                   <td className="px-5 py-4">
+                    <div className="flex flex-col items-center gap-1">
+                      <input
+                        type="date"
+                        value={expiryToDubaiDateInput(row.expiresAt)}
+                        onChange={(e) => setExpiry(row.id, e.target.value)}
+                        disabled={pending === row.id}
+                        aria-label={`Contract end date for ${row.name}`}
+                        className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs
+                          text-slate-700 outline-none focus:border-slate-400
+                          disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      {row.expiresAt ? (
+                        <button
+                          onClick={() => setExpiry(row.id, '')}
+                          disabled={pending === row.id}
+                          className="text-[10px] font-semibold text-slate-400 hover:text-slate-700
+                            transition-colors disabled:opacity-40"
+                        >
+                          Clear (no expiry)
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-300">No expiry</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
                     <div className="flex items-center justify-center gap-3">
                       <span
                         className={`text-xs font-semibold w-14 text-center ${
-                          row.isActive ? 'text-green-600' : 'text-slate-400'
+                          !row.isActive
+                            ? 'text-slate-400'
+                            : isExpired(row.expiresAt)
+                              ? 'text-red-600'
+                              : 'text-green-600'
                         }`}
                       >
-                        {row.isActive ? 'Active' : 'Inactive'}
+                        {!row.isActive ? 'Inactive' : isExpired(row.expiresAt) ? 'Expired' : 'Active'}
                       </span>
                       <button
                         onClick={() => toggleActive(row.id, row.isActive)}
@@ -675,7 +745,7 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
                     No stores found.
                   </td>
                 </tr>

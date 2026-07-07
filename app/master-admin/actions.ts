@@ -7,6 +7,7 @@ export type NewStoreRow = {
   id: string
   name: string
   isActive: boolean
+  expiresAt: string | null
   createdAt: string
   customerCount: number
 }
@@ -174,6 +175,7 @@ export async function createStore(payload: {
         id: store.id,
         name: (store.store_name as { en?: string })?.en ?? payload.storeName.trim(),
         isActive: store.is_active,
+        expiresAt: null,
         createdAt: store.created_at,
         customerCount: 0,
       },
@@ -197,6 +199,35 @@ export async function masterSetStoreActive(
   try {
     const admin = createAdminClient()
     const { error } = await admin.from('stores').update({ is_active: isActive }).eq('id', storeId)
+    if (error) return { ok: false, error: error.message }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Sets or clears the contract end date. Expired stores are locked out
+ * everywhere (view computes effective is_active; server gates use
+ * lib/subscription.ts) without touching the manual is_active switch.
+ */
+export async function masterSetStoreExpiry(
+  storeId: string,
+  expiresAt: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const denied = await masterUnauthorized()
+  if (denied) return denied
+
+  if (expiresAt !== null && Number.isNaN(Date.parse(expiresAt))) {
+    return { ok: false, error: 'Invalid expiry date.' }
+  }
+
+  try {
+    const admin = createAdminClient()
+    const { error } = await admin
+      .from('stores')
+      .update({ subscription_expires_at: expiresAt })
+      .eq('id', storeId)
     if (error) return { ok: false, error: error.message }
     return { ok: true }
   } catch (e) {

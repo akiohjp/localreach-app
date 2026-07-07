@@ -54,6 +54,8 @@ export type Database = {
           logo_url: string | null;
           business_category: string | null;
           is_active: boolean;
+          /** Contract end (UTC). NULL = no expiry. Effective active = is_active AND not expired. */
+          subscription_expires_at: string | null;
 
           created_at: string;
           updated_at: string;
@@ -75,6 +77,7 @@ export type Database = {
           logo_url?: string | null;
           business_category?: string | null;
           is_active?: boolean;
+          subscription_expires_at?: string | null;
 
           created_at?: string;
           updated_at?: string;
@@ -96,6 +99,7 @@ export type Database = {
           logo_url?: string | null;
           business_category?: string | null;
           is_active?: boolean;
+          subscription_expires_at?: string | null;
 
           created_at?: string;
           updated_at?: string;
@@ -198,6 +202,7 @@ export type Database = {
           google_review_url: string;
           brand_color: string;
           default_language: SupportedLocale;
+          /** EFFECTIVE active: is_active AND subscription not expired (computed in the view). */
           is_active: boolean;
           logo_url: string | null;
           business_category: string | null;

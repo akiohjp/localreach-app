@@ -14,7 +14,7 @@ export default async function MasterAdminPage() {
   const admin = createAdminClient()
   const { data: stores } = await admin
     .from('stores')
-    .select('id, store_name, default_language, is_active, created_at, customers(count)')
+    .select('id, store_name, default_language, is_active, subscription_expires_at, created_at, customers(count)')
     .order('created_at', { ascending: false })
 
   const rows = (stores ?? []).map((s) => {
@@ -25,6 +25,7 @@ export default async function MasterAdminPage() {
         getLocalizedText(s.store_name, s.default_language, s.default_language) ||
         '(unnamed)',
       isActive: s.is_active,
+      expiresAt: s.subscription_expires_at,
       createdAt: s.created_at,
       customerCount: Number(countArr?.[0]?.count ?? 0),
     }
