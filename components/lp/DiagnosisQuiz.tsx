@@ -119,7 +119,7 @@ export default function DiagnosisQuiz() {
 
           <a
             href={
-              'https://wa.me/971545519786?text=' +
+              'https://wa.me/971557810053?text=' +
               encodeURIComponent("Hi! I finished the LocalReach self-assessment and I'd like a free consultation.")
             }
             target="_blank"

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const WA_DEMO_LINK =
-  'https://wa.me/971545519786?text=' +
+  'https://wa.me/971557810053?text=' +
   encodeURIComponent("Hi! I'd like to book a free LocalReach demo.");
 
 const LocalReachLP = () => {
