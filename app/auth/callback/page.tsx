@@ -32,6 +32,14 @@ function RecoverSession() {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (cancelled) return;
         if (error) {
+          // The exchange can lose a race against another tab/instance that
+          // already consumed the code — if a session exists, sign-in succeeded.
+          const { data } = await supabase.auth.getSession();
+          if (cancelled) return;
+          if (data.session) {
+            await goAfterSession();
+            return;
+          }
           window.location.replace(
             `/admin/login?error=${encodeURIComponent(error.message)}`,
           );
