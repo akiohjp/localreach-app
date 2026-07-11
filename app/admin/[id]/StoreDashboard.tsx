@@ -6,10 +6,11 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
-  MessageCircle, Send, Copy, Star, MessageSquareWarning,
+  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
+import ReplyGenerator from '@/components/ReplyGenerator'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
 import type { Store, LocalizedText, SupportedLocale, StoreUpdate } from '@/types/database'
 
@@ -1261,6 +1262,15 @@ export default function StoreDashboard({
         {/* Row 6d: Private feedback (under 4★) */}
         <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
           <FeedbackSection count={feedbackCount} recent={feedback} />
+        </SectionCard>
+
+        {/* Row 6c: AI review replies */}
+        <SectionCard label="Review replies" icon={<Reply size={14} />}>
+          <ReplyGenerator
+            storeName={storeName}
+            defaultLocale={store.default_language}
+            forcedKeywords={store.forced_keywords ?? []}
+          />
         </SectionCard>
 
         {/* Row 7: CRM Stats */}
