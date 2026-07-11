@@ -84,6 +84,24 @@ export default async function AdminStorePage({ params }: Props) {
     console.error('[admin] customers query failed for store', id, customersWithName.error)
   }
 
+  // Private low-rating (<4★) feedback — service-role read, scoped to this store.
+  const feedbackRes = await admin
+    .from('feedback')
+    .select('id, rating, message, created_at', { count: 'exact' })
+    .eq('store_id', id)
+    .order('created_at', { ascending: false })
+    .limit(30)
+  if (feedbackRes.error) {
+    console.error('[admin] feedback query failed for store', id, feedbackRes.error)
+  }
+  const feedback = (feedbackRes.data ?? []) as {
+    id: string
+    rating: number
+    message: string
+    created_at: string
+  }[]
+  const feedbackCount = feedbackRes.count ?? 0
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const storeUrl = `${appUrl}/store/${store.id}`
 
@@ -100,6 +118,8 @@ export default async function AdminStorePage({ params }: Props) {
       customerCount={customerCount ?? 0}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentCustomers={(recentCustomers ?? []) as any}
+      feedback={feedback}
+      feedbackCount={feedbackCount}
       logoSignedUrl={logoSignedUrl}
     />
   )

@@ -6,7 +6,7 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
-  MessageCircle, Send, Copy,
+  MessageCircle, Send, Copy, Star, MessageSquareWarning,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
@@ -25,6 +25,13 @@ type RecentCustomer = {
   created_at: string
 }
 
+type FeedbackEntry = {
+  id: string
+  rating: number
+  message: string
+  created_at: string
+}
+
 type Props = {
   store: Store
   storeName: string
@@ -33,6 +40,9 @@ type Props = {
   qrDataUrl: string
   customerCount?: number
   recentCustomers?: RecentCustomer[]
+  /** Private low-rating (<4★) guest feedback — owner-only. */
+  feedback?: FeedbackEntry[]
+  feedbackCount?: number
   /** Signed URL when logo bucket is non-public. */
   logoSignedUrl?: string | null
 }
@@ -1045,6 +1055,58 @@ function CrmSection({
 // Main export
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// Private feedback (guests who rated under 4★) — read-only, owner only
+// ─────────────────────────────────────────────
+
+function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEntry[] }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="text-center px-6 py-3 bg-slate-50 rounded-xl border border-gray-200">
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{count}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mt-0.5">
+            received
+          </p>
+        </div>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          Private feedback from guests who rated under 4 stars. Never shown on Google —
+          only you see it here, so you can fix issues before they go public.
+        </p>
+      </div>
+
+      {recent.length > 0 ? (
+        <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+          {recent.map((f) => (
+            <div key={f.id} className="flex items-start justify-between gap-3 px-4 py-3 bg-white">
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center gap-0.5" aria-label={`${f.rating} stars`}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star
+                      key={n}
+                      size={13}
+                      className={n <= f.rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}
+                    />
+                  ))}
+                </div>
+                <p className="text-sm text-slate-700 break-words">{f.message}</p>
+              </div>
+              <p className="text-[11px] text-slate-400 tabular-nums shrink-0">
+                {new Date(f.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400 py-4 text-center">No private feedback yet.</p>
+      )}
+    </div>
+  )
+}
+
 export default function StoreDashboard({
   store,
   storeName,
@@ -1052,6 +1114,8 @@ export default function StoreDashboard({
   qrDataUrl,
   customerCount = 0,
   recentCustomers = [],
+  feedback = [],
+  feedbackCount = 0,
   logoSignedUrl,
 }: Props) {
   const router = useRouter()
@@ -1192,6 +1256,11 @@ export default function StoreDashboard({
             onLocale={setWaLocale}
             onMessage={setWaMessage}
           />
+        </SectionCard>
+
+        {/* Row 6d: Private feedback (under 4★) */}
+        <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
+          <FeedbackSection count={feedbackCount} recent={feedback} />
         </SectionCard>
 
         {/* Row 7: CRM Stats */}
