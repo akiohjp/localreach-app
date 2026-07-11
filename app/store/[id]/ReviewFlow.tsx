@@ -89,6 +89,10 @@ export default function ReviewFlow({
     )
   }
 
+  const forcedCount = new Set(
+    forcedKeywords.map((k) => k.trim()).filter(Boolean),
+  ).size
+
   async function proceedToGenerate(guestSelected: string[]) {
     const merged = mergeGuestAndForced(forcedKeywords, guestSelected)
     setSelectedKeywords(merged)
@@ -100,6 +104,7 @@ export default function ReviewFlow({
         outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
         locale,
         category: businessCategory,
+        forcedCount,
       }),
     )
     setStep('result')
@@ -219,6 +224,7 @@ export default function ReviewFlow({
                   outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
                   locale,
                   category: businessCategory,
+                  forcedCount,
                 })}
             />
           )}

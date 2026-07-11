@@ -280,22 +280,56 @@ function normalizeDashes(text: string): string {
   );
 }
 
+/**
+ * Max keyword phrases woven into a single review. A real guest names a few
+ * things, not a list of ten. Above this the review reads as a keyword dump and
+ * every review looks the same — so we weave the forced/core phrases plus only a
+ * seed-rotated handful of the guest's picks, and let the rest surface in other
+ * generations (which also keeps 100s of reviews unique and human-sounding).
+ */
+const WOVEN_KEYWORD_CAP = 6;
+
+/**
+ * Pick the phrases to actually weave: always keep the forced/core ones, then top
+ * up with a seed-rotated subset of the guest picks up to the cap. Different seed
+ * (i.e. different run) rotates the guest subset, so many selections still yield
+ * varied, natural reviews instead of one long list.
+ */
+function selectWovenKeywords(keywords: string[], forcedCount: number, seed: number): string[] {
+  if (keywords.length <= WOVEN_KEYWORD_CAP) return keywords;
+  const fc = Math.max(0, Math.min(forcedCount, keywords.length));
+  const forced = keywords.slice(0, fc);
+  const guest = keywords.slice(fc);
+  const room = Math.max(0, WOVEN_KEYWORD_CAP - forced.length);
+  if (room === 0 || guest.length === 0) {
+    // Forced alone meets/exceeds the cap; rotate which forced ones show if it overflows.
+    return forced.length <= WOVEN_KEYWORD_CAP
+      ? forced
+      : shuffle(forced, forkRng(seed, 0xc0ffe1)).slice(0, WOVEN_KEYWORD_CAP);
+  }
+  const take = 1 + Math.floor(forkRng(seed, 0xc0ffee)() * room); // 1..room
+  const guestWoven = shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, Math.min(take, guest.length));
+  return [...forced, ...guestWoven];
+}
+
 export function buildLocalizedReview(
   store: string,
   kws: string[],
   seed: number,
   locale: ReviewLocale,
   vertical: Vertical,
+  forcedCount = 0,
 ): string {
   const cfg = LOCALE_CFG[locale];
   const pool = resolvePoolSet(locale, vertical);
   const name = store.trim() || (locale === "ja" ? "こちらのお店" : "this establishment");
-  const keywords = kws.map((k) => k.trim()).filter(Boolean);
+  const allKeywords = kws.map((k) => k.trim()).filter(Boolean);
 
-  if (keywords.length === 0) {
+  if (allKeywords.length === 0) {
     return normalizeDashes(reviewNoKeywords(name, pool, cfg, seed));
   }
 
+  const keywords = selectWovenKeywords(allKeywords, forcedCount, seed);
   const shuffled = shuffle(keywords, forkRng(seed, 0xb8b26351));
   const many = shuffled.length > 8;
   const longPhrases =
