@@ -10,8 +10,8 @@ type Props = {
   storeName: string
   /** Store default language — seeds the reply language selector. */
   defaultLocale: SupportedLocale
-  /** Store forced GEO phrases — the first seeds the locality woven for Local SEO. */
-  forcedKeywords?: string[]
+  /** Neighbourhood/area to weave for Local SEO (a real place, e.g. "Al Barsha, Dubai"). */
+  locality?: string
 }
 
 const LOCALES: { code: SupportedLocale; label: string }[] = [
@@ -25,12 +25,12 @@ const TONES: { code: ReplyTone; label: string }[] = [
   { code: 'professional', label: 'Professional' },
 ]
 
-export default function ReplyGenerator({ storeName, defaultLocale, forcedKeywords = [] }: Props) {
+export default function ReplyGenerator({ storeName, defaultLocale, locality = '' }: Props) {
   const [rating, setRating] = useState<number>(5)
   const [reviewText, setReviewText] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>(defaultLocale)
   const [tone, setTone] = useState<ReplyTone>('warm')
-  const [geoPhrase, setGeoPhrase] = useState<string>(forcedKeywords[0] ?? '')
+  const [geoPhrase, setGeoPhrase] = useState<string>(locality)
   const [weaveGeo, setWeaveGeo] = useState<boolean>(true)
   const [draft, setDraft] = useState('')
   const [copied, setCopied] = useState(false)
@@ -164,13 +164,13 @@ export default function ReplyGenerator({ storeName, defaultLocale, forcedKeyword
       <div className="space-y-2 rounded-xl border border-emerald-200/70 bg-emerald-50/40 p-3">
         <label className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.12em] uppercase text-emerald-700">
           <MapPin size={12} />
-          Local area to mention
+          Neighbourhood / area (a real place)
         </label>
         <input
           type="text"
           value={geoPhrase}
           onChange={(e) => setGeoPhrase(e.target.value)}
-          placeholder="e.g. Dubai Marina"
+          placeholder="e.g. Dubai Marina, JLT, Al Barsha"
           dir={isRtl ? 'rtl' : 'ltr'}
           className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2
             text-sm text-slate-900 placeholder:text-slate-400 outline-none

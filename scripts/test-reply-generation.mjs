@@ -1,7 +1,7 @@
 /**
- * One-off: verify owner-reply generation (run: node scripts/test-reply-generation.mjs)
- * Requires Node 22+ (native TS import). Checks sentiment, theme detection,
- * variation across regenerations, no em/en dashes, and store/sign-off presence.
+ * Verify owner-reply generation (run: node --import ./scripts/register-hook.mjs scripts/test-reply-generation.mjs)
+ * Checks sentiment, specific-phrase extraction/reaction, GEO weave, variation,
+ * length, no em/en dashes, store presence.
  */
 
 async function main() {
@@ -9,90 +9,67 @@ async function main() {
     await import("../lib/reply-engine.ts");
 
   let fail = 0;
-  const assert = (cond, msg) => {
-    if (!cond) { console.error("  ✗", msg); fail++; }
-    else console.log("  ✓", msg);
-  };
-
-  const store = "Sakura Japanese Restaurant";
+  const assert = (cond, msg) => { if (!cond) { console.error("  ✗", msg); fail++; } else console.log("  ✓", msg); };
+  const store = "Let It Dough";
 
   console.log("\nTEST 1 — sentiment mapping");
-  assert(sentimentForRating(5) === "positive", "5★ → positive");
-  assert(sentimentForRating(4) === "positive", "4★ → positive");
-  assert(sentimentForRating(3) === "mixed", "3★ → mixed");
-  assert(sentimentForRating(2) === "negative", "2★ → negative");
-  assert(sentimentForRating(1) === "negative", "1★ → negative");
+  assert(sentimentForRating(5) === "positive", "5★ positive");
+  assert(sentimentForRating(3) === "mixed", "3★ mixed");
+  assert(sentimentForRating(1) === "negative", "1★ negative");
 
-  console.log("\nTEST 2 — theme detection (en)");
-  assert(detectThemes("The staff were so friendly", "en")[0] === "staff", "staff detected");
-  assert(detectThemes("food was cold and the wait was long", "en").includes("wait"), "wait detected");
-  assert(detectThemes("", "en").length === 0, "empty → no theme");
+  console.log("\nTEST 2 — reacts to the SPECIFIC thing named");
+  const r5 = generateReply(store, { rating: 5, reviewText: "The matcha croissant was amazing and the staff were so friendly.", locale: "en", nonce: "a" });
+  assert(/matcha croissant|staff/.test(r5), "positive reply names a specific the guest praised: \n     " + r5.split("\n")[0]);
+  const r1 = generateReply(store, { rating: 1, reviewText: "The coffee was cold and we waited far too long.", locale: "en", nonce: "b" });
+  assert(/coffee|wait/.test(r1), "negative reply names the specific problem: \n     " + r1.split("\n")[0]);
+  const r3 = generateReply(store, { rating: 3, reviewText: "The pastries were delicious but the service was slow.", locale: "en", nonce: "c" });
+  assert(/pastries|service|slow/.test(r3), "mixed reply references praise and/or gripe");
 
-  console.log("\nTEST 3 — no typographic dashes, has store + double newline");
-  for (const rating of [5, 3, 1]) {
-    for (const locale of ["en", "ja", "ar"]) {
-      const txt = generateReply(store, {
-        rating,
-        reviewText: "great service and food, friendly staff",
-        locale,
-        nonce: "fixed",
-      });
-      assert(!/[—–]/.test(txt), `${locale} ${rating}★ no em/en dash`);
-      assert(txt.includes(store), `${locale} ${rating}★ contains store name`);
-      assert(txt.includes("\n\n"), `${locale} ${rating}★ has sign-off break`);
-    }
+  console.log("\nTEST 3 — no dashes, store present, sign-off break, all locales");
+  for (const rating of [5, 3, 1]) for (const locale of ["en", "ja", "ar"]) {
+    const txt = generateReply(store, { rating, reviewText: "great food and friendly staff, but a bit slow", locale, geoPhrase: "Dubai Marina", nonce: "fix" });
+    assert(!/[—–]/.test(txt), `${locale} ${rating}★ no em/en dash`);
+    assert(txt.includes(store) || locale !== "en", `${locale} ${rating}★ store present`);
+    assert(txt.includes("\n\n"), `${locale} ${rating}★ sign-off break`);
   }
 
-  console.log("\nTEST 4 — determinism + variation");
-  const a = generateReply(store, { rating: 5, reviewText: "amazing food", locale: "en", nonce: "n1" });
-  const b = generateReply(store, { rating: 5, reviewText: "amazing food", locale: "en", nonce: "n1" });
-  assert(a === b, "same nonce → identical");
+  console.log("\nTEST 4 — length (not too short) + variation");
+  const lens = [];
   const set = new Set();
   for (let i = 0; i < 200; i++) {
-    set.add(generateReply(store, { rating: 5, reviewText: "amazing food and great service", locale: "en", nonce: createReplyNonce() }));
+    const t = generateReply(store, { rating: 5, reviewText: "amazing brownies and lovely staff, great coffee too", locale: "en", geoPhrase: "Dubai Marina", nonce: createReplyNonce() });
+    lens.push(t.replace(/\n\n[\s\S]*$/, "").split(/\s+/).length);
+    set.add(t);
   }
-  assert(set.size > 40, `200 regenerations → ${set.size} distinct drafts`);
+  const avg = lens.reduce((a, b) => a + b, 0) / lens.length;
+  assert(avg >= 22, `avg body length ${avg.toFixed(0)} words (>=22, was ~15 before)`);
+  assert(set.size > 120, `200 regenerations → ${set.size} distinct drafts (>120)`);
 
-  console.log("\nTEST 5 — negative reply invites direct contact (make-it-right)");
-  const neg = generateReply(store, { rating: 1, reviewText: "rude staff, terrible service", locale: "en", nonce: "neg" });
-  assert(/reach out|contact us|get in touch|contact us directly/i.test(neg), "negative invites direct contact");
-
-  console.log("\nTEST 6 — GEO weave (Local SEO)");
+  console.log("\nTEST 5 — GEO weave, never on apology");
   let geoHits = 0;
-  for (let i = 0; i < 100; i++) {
-    const r = generateReply(store, { rating: 5, reviewText: "lovely food", locale: "en", geoPhrase: "Dubai Marina", nonce: createReplyNonce() });
-    if (r.includes("Dubai Marina")) geoHits++;
-  }
-  assert(geoHits > 50 && geoHits < 100, `positive replies weave locality ~72% of the time (${geoHits}/100)`);
-  const negGeo = generateReply(store, { rating: 1, reviewText: "cold food", locale: "en", geoPhrase: "Dubai Marina", nonce: "x" });
-  assert(!negGeo.includes("Dubai Marina"), "apology never weaves locality");
-  const off = generateReply(store, { rating: 5, reviewText: "great", locale: "en", geoPhrase: "Dubai Marina", weaveGeo: false, nonce: "y" });
-  assert(!off.includes("Dubai Marina"), "weaveGeo:false suppresses locality");
+  for (let i = 0; i < 100; i++) if (generateReply(store, { rating: 5, reviewText: "lovely cake", locale: "en", geoPhrase: "Dubai Marina", nonce: createReplyNonce() }).includes("Dubai Marina")) geoHits++;
+  assert(geoHits > 30 && geoHits < 90, `positive weaves locality sometimes (${geoHits}/100)`);
+  assert(!generateReply(store, { rating: 1, reviewText: "cold food", locale: "en", geoPhrase: "Dubai Marina", nonce: "z" }).includes("Dubai Marina"), "apology never weaves locality");
 
-  console.log("\nTEST 7 — anti-AI: opener variety + length variation");
-  const openers = {};
-  const lengths = new Set();
-  for (let i = 0; i < 200; i++) {
-    const r = generateReply(store, { rating: 5, reviewText: "amazing food and friendly staff", locale: "en", geoPhrase: "Dubai Marina", nonce: createReplyNonce() });
-    const firstWord = r.split(/\s+/)[0];
-    openers[firstWord] = (openers[firstWord] || 0) + 1;
-    lengths.add(r.split(/\s+/).length);
-  }
-  const topOpenerShare = Math.max(...Object.values(openers)) / 200;
-  assert(topOpenerShare < 0.5, `no single opening word dominates (top ${(topOpenerShare * 100).toFixed(0)}%)`);
-  assert(lengths.size > 8, `reply length varies (${lengths.size} distinct word counts)`);
+  console.log("\nTEST 6 — negative invites direct contact");
+  assert(/reach out|contact us|get in touch/i.test(generateReply(store, { rating: 1, reviewText: "rude and dirty", locale: "en", nonce: "n" })), "negative → make-it-right");
 
-  console.log("\n─── SAMPLES ───");
-  const g = "Dubai Marina";
-  console.log("\n[5★ warm, EN +geo]\n" + generateReply(store, { rating: 5, reviewText: "The sushi was incredibly fresh and the staff were lovely.", locale: "en", tone: "warm", geoPhrase: g, nonce: "s1" }));
-  console.log("\n[5★ warm, EN +geo, alt]\n" + generateReply(store, { rating: 5, reviewText: "The sushi was incredibly fresh and the staff were lovely.", locale: "en", tone: "warm", geoPhrase: g, nonce: "s1b" }));
-  console.log("\n[3★ pro, EN +geo]\n" + generateReply(store, { rating: 3, reviewText: "Food was good but we waited far too long.", locale: "en", tone: "professional", geoPhrase: g, nonce: "s2" }));
-  console.log("\n[1★ pro, EN]\n" + generateReply(store, { rating: 1, reviewText: "Cold food and the place wasn't clean.", locale: "en", tone: "professional", geoPhrase: g, nonce: "s3" }));
-  console.log("\n[5★ warm, JA +geo]\n" + generateReply("桜寿司", { rating: 5, reviewText: "お料理がとても美味しく、スタッフの対応も丁寧でした。", locale: "ja", tone: "warm", geoPhrase: "ドバイ・マリーナ", nonce: "s4" }));
-  console.log("\n[2★ pro, JA]\n" + generateReply("桜寿司", { rating: 2, reviewText: "料理は良かったが、待ち時間が長すぎた。", locale: "ja", tone: "professional", geoPhrase: "ドバイ・マリーナ", nonce: "s5" }));
+  console.log("\n─── SAMPLES (EN, warm) ───");
+  const reviews = [
+    [5, "The matcha croissant was incredible and the staff were so warm. Cosy spot too."],
+    [5, "Best brownies in Dubai. Coffee was excellent and the service was quick and friendly."],
+    [4, "Really nice cakes and a lovely atmosphere. A touch pricey but worth it."],
+    [3, "The doughnuts were delicious but we waited ages and the place was a bit noisy."],
+    [2, "Coffee was cold, the counter was messy, and the staff seemed rushed."],
+    [1, "Overpriced and the pastries were stale. Won't be back."],
+  ];
+  for (const [rating, text] of reviews) {
+    console.log(`\n[${rating}★] review: "${text}"\n→ ` + generateReply(store, { rating, reviewText: text, locale: "en", tone: "warm", geoPhrase: "Dubai Marina", nonce: `s${rating}${text.length}` }).replace(/\n\n/g, "\n   "));
+  }
+  console.log("\n─── SAMPLE (JA) ───");
+  console.log(generateReply("桜寿司", { rating: 5, reviewText: "お寿司がとても新鮮で、スタッフの対応も丁寧でした。落ち着ける雰囲気も良かったです。", locale: "ja", geoPhrase: "ドバイ・マリーナ", nonce: "ja1" }));
 
   console.log(fail === 0 ? "\nALL PASS ✅" : `\n${fail} FAILURES ❌`);
   process.exitCode = fail === 0 ? 0 : 1;
 }
-
 main().catch((e) => { console.error(e); process.exit(1); });

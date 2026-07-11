@@ -1269,7 +1269,6 @@ export default function StoreDashboard({
           <ReplyGenerator
             storeName={storeName}
             defaultLocale={store.default_language}
-            forcedKeywords={store.forced_keywords ?? []}
           />
         </SectionCard>
 
