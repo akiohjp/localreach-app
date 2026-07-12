@@ -44,8 +44,20 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
   const [draft, setDraft] = useState('')
   const [copied, setCopied] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [generating, setGenerating] = useState(false)
+  /** 'ai' = Gemini read the review; 'instant' = offline template fallback. */
+  const [mode, setMode] = useState<'ai' | 'instant' | null>(null)
 
-  function run() {
+  function defaultSignoff(): string {
+    const sig = signature.trim()
+    if (sig) return sig.replace(/\{store\}/g, storeName)
+    if (locale === 'ja') return `${storeName} スタッフ一同`
+    if (locale === 'ar') return `فريق ${storeName}`
+    return `The team at ${storeName}`
+  }
+
+  /** Instant offline draft from the template engine (also the AI fallback). */
+  function runLocal() {
     setDraft(
       generateReply(storeName, {
         rating,
@@ -59,7 +71,47 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         nonce: createReplyNonce(),
       }),
     )
+    setMode('instant')
     setCopied(false)
+  }
+
+  /**
+   * Primary path: the AI actually reads the review and answers its specifics.
+   * Falls back to the instant template engine if the AI is unavailable, so the
+   * button always produces a draft.
+   */
+  async function run() {
+    setGenerating(true)
+    setCopied(false)
+    try {
+      const res = await fetch('/api/generate-reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeName,
+          rating,
+          reviewText,
+          locale,
+          tone,
+          geoPhrase: weaveGeo ? geoPhrase : '',
+          geoKeywords: weaveKw ? forcedKeywords : [],
+          signature,
+        }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { reply?: string }
+        if (data.reply) {
+          setDraft(`${data.reply.trim()}\n\n${defaultSignoff()}`)
+          setMode('ai')
+          return
+        }
+      }
+      runLocal()
+    } catch {
+      runLocal()
+    } finally {
+      setGenerating(false)
+    }
   }
 
   /** Persist tone / locality / weave / signature as this store's defaults. */
@@ -295,20 +347,28 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
       <button
         type="button"
         onClick={run}
+        disabled={generating}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900
           px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800
-          active:scale-[0.99] transition-all"
+          active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-wait"
       >
-        <Sparkles size={14} />
-        {draft ? 'Generate another' : 'Generate reply'}
+        {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+        {generating ? 'Reading the review…' : draft ? 'Generate another' : 'Generate reply'}
       </button>
 
       {/* Draft */}
       {draft && (
         <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
-            Draft reply — edit before posting
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
+              Draft reply — edit before posting
+            </label>
+            {mode === 'instant' && (
+              <span className="text-[10px] font-semibold text-amber-600">
+                Instant draft (AI unavailable)
+              </span>
+            )}
+          </div>
           <textarea
             value={draft}
             onChange={(e) => { setDraft(e.target.value); setCopied(false) }}
