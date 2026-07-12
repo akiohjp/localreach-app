@@ -1273,8 +1273,10 @@ export default function StoreDashboard({
 
             <SectionCard label="Review replies" icon={<Reply size={14} />}>
               <ReplyGenerator
+                storeId={store.id}
                 storeName={storeName}
                 defaultLocale={store.default_language}
+                initialSettings={store.reply_settings ?? null}
               />
             </SectionCard>
         </div>

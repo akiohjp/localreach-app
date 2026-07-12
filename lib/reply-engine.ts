@@ -32,6 +32,8 @@ export type GenerateReplyOptions = {
   geoPhrase?: string;
   /** Set false to suppress geo weaving. Default true. */
   weaveGeo?: boolean;
+  /** Custom sign-off (verbatim; "{store}" is replaced). Empty = pool sign-offs. */
+  signature?: string;
   /** Per-run entropy so each "Regenerate" yields a different draft. */
   nonce?: string;
 };
@@ -104,14 +106,46 @@ function extractGripeEn(text: string): string[] {
   return out.slice(0, 2);
 }
 
+// ── JA extraction ───────────────────────────────────────────────────────────
+// Particle-anchored, LAZY capture: the noun phrase directly before は/が/も with
+// only a known adverb allowed between particle and the sentiment word. A greedy
+// span here bleeds into the adverb (「お寿司がとて…」), which is why the earlier
+// free-form version was disabled. AR stays theme-based (morphology is harder).
+
+const JA_ADVERB = "(?:、)?(?:とても|すごく|本当に|とっても|一番|特に|かなり|めっちゃ|非常に|想像以上に|期待以上に)?";
+const JA_PRAISE = "美味し|おいし|よかった|良かった|良く|最高|素晴らし|丁寧|親切|優し|新鮮|清潔|きれい|綺麗|落ち着|居心地|好き|気に入|嬉し|感動|早|速|安|充実";
+const JA_GRIPE = "遅|長すぎ|長かった|冷め|冷た|汚|ひど|残念|まず|不味|不快|雑|高すぎ|高かった|待たされ|少な|狭|うるさ|騒がし|悪";
+
+/** Words too generic to echo back by name. */
+const JA_SPEC_STOP = new Set([
+  "お店", "こちら", "ここ", "全体", "全部", "すべて", "全て", "何もかも",
+  "こと", "もの", "感じ", "とき", "時間帯", "今回", "前回", "本当", "最初", "最後",
+]);
+
+function extractJa(text: string, markers: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(
+    `([\\u4e00-\\u9faf\\u3041-\\u3096\\u30a1-\\u30f6\\u30fcA-Za-z0-9]{2,12}?(?:の[\\u4e00-\\u9faf\\u3041-\\u3096\\u30a1-\\u30f6\\u30fc]{2,8})?)(?:は|が|も)${JA_ADVERB}(?:${markers})`,
+    "g",
+  );
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const cand = (m[1] ?? "").trim();
+    if (cand.length >= 2 && !JA_SPEC_STOP.has(cand) && !out.includes(cand)) out.push(cand);
+    if (m.index === re.lastIndex) re.lastIndex++;
+  }
+  return out.slice(0, 2);
+}
+
 /**
- * Only EN gets free-text specific extraction. JA/AR particle-and-clause structure
- * makes naive noun capture unreliable (it grabs particles), so they fall back to
- * the clean, correct theme phrases (お料理 / スタッフの対応 / الطعام …) instead.
+ * EN and JA get free-text specific extraction; AR falls back to the clean theme
+ * phrases (الطعام …) — Arabic morphology makes naive capture unreliable.
  */
 function extractSpecifics(text: string, locale: ReplyLocale): { praise: string[]; gripe: string[] } {
   const t = (text ?? "").trim();
-  if (t && locale === "en") return { praise: extractPraiseEn(t), gripe: extractGripeEn(t) };
+  if (!t) return { praise: [], gripe: [] };
+  if (locale === "en") return { praise: extractPraiseEn(t), gripe: extractGripeEn(t) };
+  if (locale === "ja") return { praise: extractJa(t, JA_PRAISE), gripe: extractJa(t, JA_GRIPE) };
   return { praise: [], gripe: [] };
 }
 
@@ -186,7 +220,8 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   const reaction = buildReaction(pool, locale, sentiment, praise, gripe, primaryTheme, seed);
   const body = pick(pool.body, r(0x104));
   const close = pick(pool.close, r(0x105));
-  const signoff = pick(pool.signoff, r(0x106)).replace(/\{store\}/g, store);
+  const customSig = (options.signature ?? "").trim();
+  const signoff = (customSig || pick(pool.signoff, r(0x106))).replace(/\{store\}/g, store);
 
   // Optional human beat (pos/mixed), ~40%.
   const warm = pool.warm.length && (sentiment !== "negative") && r(0x140)() < 0.4 ? pick(pool.warm, r(0x141)) : "";

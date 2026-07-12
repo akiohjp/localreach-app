@@ -54,6 +54,17 @@ async function main() {
   console.log("\nTEST 6 — negative invites direct contact");
   assert(/reach out|contact us|get in touch/i.test(generateReply(store, { rating: 1, reviewText: "rude and dirty", locale: "en", nonce: "n" })), "negative → make-it-right");
 
+  console.log("\nTEST 7 — JA specific extraction (particle-safe)");
+  const ja5 = generateReply("桜寿司", { rating: 5, reviewText: "お寿司がとても美味しく、スタッフの対応も丁寧でした。", locale: "ja", nonce: "j1" });
+  assert(/お寿司|スタッフの対応/.test(ja5), "JA positive names the praised specific: \n     " + ja5.split("\n")[0]);
+  assert(!/お寿司がとて[^も]/.test(ja5), "no particle bleed (お寿司がとて…)");
+  const ja1 = generateReply("桜寿司", { rating: 1, reviewText: "待ち時間が長すぎたし、店内が汚かった。", locale: "ja", nonce: "j2" });
+  assert(/待ち時間|店内/.test(ja1), "JA negative names the problem: \n     " + ja1.split("\n")[0]);
+
+  console.log("\nTEST 8 — custom signature");
+  const sig = generateReply(store, { rating: 5, reviewText: "great cakes", locale: "en", signature: "Akio, Owner of {store}", nonce: "sg" });
+  assert(sig.trim().endsWith("Akio, Owner of Let It Dough"), "custom signature used verbatim with {store} replaced");
+
   console.log("\n─── SAMPLES (EN, warm) ───");
   const reviews = [
     [5, "The matcha croissant was incredible and the staff were so warm. Cosy spot too."],

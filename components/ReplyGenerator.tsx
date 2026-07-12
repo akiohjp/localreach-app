@@ -1,18 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { Star, Sparkles, Copy, RefreshCw, CheckCircle, MapPin } from 'lucide-react'
+import { Star, Sparkles, Copy, RefreshCw, CheckCircle, MapPin, Loader2, PenLine } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 import { generateReply, createReplyNonce } from '@/lib/reply-engine'
 import type { ReplyTone } from '@/lib/reply-pools'
-import type { SupportedLocale } from '@/types/database'
+import type { SupportedLocale, ReplySettings } from '@/types/database'
 
 type Props = {
+  /** Store row id — used to persist reply defaults to stores.reply_settings. */
+  storeId: string
   storeName: string
   /** Store default language — seeds the reply language selector. */
   defaultLocale: SupportedLocale
-  /** Neighbourhood/area to weave for Local SEO (a real place, e.g. "Al Barsha, Dubai"). */
-  locality?: string
+  /** Saved per-store defaults (stores.reply_settings). NULL = built-in defaults. */
+  initialSettings?: ReplySettings | null
 }
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 const LOCALES: { code: SupportedLocale; label: string }[] = [
   { code: 'en', label: 'EN' },
@@ -25,15 +30,17 @@ const TONES: { code: ReplyTone; label: string }[] = [
   { code: 'professional', label: 'Professional' },
 ]
 
-export default function ReplyGenerator({ storeName, defaultLocale, locality = '' }: Props) {
+export default function ReplyGenerator({ storeId, storeName, defaultLocale, initialSettings }: Props) {
   const [rating, setRating] = useState<number>(5)
   const [reviewText, setReviewText] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>(defaultLocale)
-  const [tone, setTone] = useState<ReplyTone>('warm')
-  const [geoPhrase, setGeoPhrase] = useState<string>(locality)
-  const [weaveGeo, setWeaveGeo] = useState<boolean>(true)
+  const [tone, setTone] = useState<ReplyTone>(initialSettings?.tone === 'professional' ? 'professional' : 'warm')
+  const [geoPhrase, setGeoPhrase] = useState<string>(initialSettings?.locality ?? '')
+  const [weaveGeo, setWeaveGeo] = useState<boolean>(initialSettings?.weaveGeo !== false)
+  const [signature, setSignature] = useState<string>(initialSettings?.signature ?? '')
   const [draft, setDraft] = useState('')
   const [copied, setCopied] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
 
   function run() {
     setDraft(
@@ -44,10 +51,37 @@ export default function ReplyGenerator({ storeName, defaultLocale, locality = ''
         tone,
         geoPhrase,
         weaveGeo,
+        signature,
         nonce: createReplyNonce(),
       }),
     )
     setCopied(false)
+  }
+
+  /** Persist tone / locality / weave / signature as this store's defaults. */
+  async function saveDefaults() {
+    setSaveState('saving')
+    try {
+      const reply_settings: ReplySettings = {
+        tone,
+        locality: geoPhrase.trim(),
+        weaveGeo,
+        signature: signature.trim(),
+      }
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('stores')
+        .update({ reply_settings })
+        .eq('id', storeId)
+        .select('id')
+      if (error) throw error
+      // 0 rows = RLS silently blocked the write; surface it (no false "Saved").
+      if (!data || data.length === 0) throw new Error('No rows updated')
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 2500)
+    } catch {
+      setSaveState('error')
+    }
   }
 
   async function copyDraft() {
@@ -190,6 +224,49 @@ export default function ReplyGenerator({ storeName, defaultLocale, locality = ''
           Google local search and AI Overviews connect you to the area. Only used
           on positive and mixed replies, not apologies.
         </p>
+      </div>
+
+      {/* Signature */}
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
+          <PenLine size={12} />
+          Sign-off <span className="font-medium text-slate-300 normal-case">(optional — blank rotates natural sign-offs)</span>
+        </label>
+        <input
+          type="text"
+          value={signature}
+          onChange={(e) => setSignature(e.target.value)}
+          placeholder={`e.g. Akio, Owner of ${storeName}`}
+          dir={isRtl ? 'rtl' : 'ltr'}
+          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
+            text-sm text-slate-900 placeholder:text-slate-400 outline-none
+            focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition"
+        />
+      </div>
+
+      {/* Save defaults */}
+      <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+        <p className="text-[10px] text-slate-500 leading-relaxed pe-2">
+          Save tone, area and sign-off as this store&apos;s defaults — they&apos;ll be
+          pre-filled every time you open this page.
+        </p>
+        <button
+          type="button"
+          onClick={saveDefaults}
+          disabled={saveState === 'saving'}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-300
+            bg-white px-3 py-1.5 text-xs font-semibold text-slate-600
+            hover:border-slate-500 hover:text-slate-900 active:scale-[0.98] transition-all
+            disabled:opacity-50"
+        >
+          {saveState === 'saving' && <Loader2 size={12} className="animate-spin" />}
+          {saveState === 'saved' && <CheckCircle size={12} className="text-green-600" />}
+          {saveState === 'error'
+            ? 'Save failed — retry'
+            : saveState === 'saved'
+              ? 'Saved'
+              : 'Save as defaults'}
+        </button>
       </div>
 
       {/* Generate */}

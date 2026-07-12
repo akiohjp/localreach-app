@@ -23,6 +23,19 @@ export type SupportedLocale = "en" | "ja" | "ar";
  */
 export type LocalizedText = Partial<Record<SupportedLocale, string>>;
 
+/**
+ * Owner defaults for the review-reply generator (stores.reply_settings JSONB).
+ * All fields optional; NULL/missing = the generator's built-in defaults.
+ */
+export type ReplySettings = {
+  tone?: "warm" | "professional";
+  /** Real neighbourhood/area woven into replies for Local SEO (e.g. "Dubai Marina"). */
+  locality?: string;
+  weaveGeo?: boolean;
+  /** Custom sign-off (verbatim; "{store}" is replaced with the store name). */
+  signature?: string;
+};
+
 // ----------------------------------------------------------------
 // Database schema
 // ----------------------------------------------------------------
@@ -56,6 +69,8 @@ export type Database = {
           is_active: boolean;
           /** Contract end (UTC). NULL = no expiry. Effective active = is_active AND not expired. */
           subscription_expires_at: string | null;
+          /** Review-reply generator defaults. NULL = built-in defaults. */
+          reply_settings?: ReplySettings | null;
 
           created_at: string;
           updated_at: string;
@@ -78,6 +93,7 @@ export type Database = {
           business_category?: string | null;
           is_active?: boolean;
           subscription_expires_at?: string | null;
+          reply_settings?: ReplySettings | null;
 
           created_at?: string;
           updated_at?: string;
@@ -100,6 +116,7 @@ export type Database = {
           business_category?: string | null;
           is_active?: boolean;
           subscription_expires_at?: string | null;
+          reply_settings?: ReplySettings | null;
 
           created_at?: string;
           updated_at?: string;
