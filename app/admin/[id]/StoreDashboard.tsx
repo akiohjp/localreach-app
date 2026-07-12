@@ -6,7 +6,7 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
-  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply,
+  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
@@ -1128,6 +1128,19 @@ export default function StoreDashboard({
     waTemplate((store.default_language as WaLocale) || 'en', storeName, storeUrl),
   )
 
+  // Dashboard is split into three focused workspaces instead of one long scroll.
+  const [tab, setTab] = useState<'grow' | 'customers' | 'settings'>('grow')
+  const TABS = [
+    { id: 'grow' as const, label: 'Grow', icon: Megaphone, blurb: 'Collect and answer reviews' },
+    { id: 'customers' as const, label: 'Customers', icon: Users, blurb: 'Who came in, and private feedback' },
+    { id: 'settings' as const, label: 'Settings', icon: Settings, blurb: 'Brand, content and review setup' },
+  ]
+
+  // Header avatar: real logo if we have a usable URL, otherwise a brand-colour monogram.
+  const logoSrc =
+    logoSignedUrl ??
+    (store.logo_url && /^(https?:|\/)/.test(store.logo_url) ? store.logo_url : null)
+
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -1137,145 +1150,187 @@ export default function StoreDashboard({
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* ── Header ──────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
-        <div className="mx-auto max-w-2xl px-6 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-slate-400">
-              LocalReach · Dashboard
-            </p>
-            <h1 className="text-base font-bold text-slate-900 tracking-tight">
-              {storeName}
-            </h1>
+      {/* ── Header + tabs ───────────────────────────── */}
+      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
+        <div className="mx-auto max-w-2xl px-6 pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              {logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoSrc}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-xl object-cover border border-gray-200"
+                />
+              ) : (
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+                    text-sm font-bold text-white shadow-sm"
+                  style={{ backgroundColor: store.brand_color || '#0f172a' }}
+                >
+                  {storeName.trim().charAt(0).toUpperCase() || 'L'}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-slate-400">
+                  LocalReach
+                </p>
+                <h1 className="truncate text-base font-bold text-slate-900 tracking-tight">
+                  {storeName}
+                </h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200
+                  bg-white px-3 py-1.5 text-xs font-semibold text-slate-500
+                  hover:border-slate-400 hover:text-slate-900 transition-all"
+              >
+                <ExternalLink size={12} />
+                <span className="hidden sm:inline">Preview</span>
+              </a>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200
+                  bg-white px-3 py-1.5 text-xs font-semibold text-slate-500
+                  hover:border-slate-400 hover:text-slate-900 transition-all"
+              >
+                <LogOut size={12} />
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200
-                bg-white px-3 py-1.5 text-xs font-semibold text-slate-500
-                hover:border-slate-400 hover:text-slate-900 transition-all"
-            >
-              <ExternalLink size={12} />
-              Preview
-            </a>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200
-                bg-white px-3 py-1.5 text-xs font-semibold text-slate-500
-                hover:border-slate-400 hover:text-slate-900 transition-all"
-            >
-              <LogOut size={12} />
-              Sign out
-            </button>
-          </div>
+
+          {/* Segmented tab bar */}
+          <nav className="mt-3 flex gap-1 rounded-xl bg-slate-100 p-1">
+            {TABS.map((t) => {
+              const active = tab === t.id
+              const Icon = t.icon
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={[
+                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2',
+                    'text-xs font-bold transition-all',
+                    active
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800',
+                  ].join(' ')}
+                >
+                  <Icon size={14} />
+                  {t.label}
+                </button>
+              )
+            })}
+          </nav>
+          <div className="h-3" />
         </div>
       </header>
 
       {/* ── Content ─────────────────────────────────── */}
-      <main className="mx-auto max-w-2xl px-6 py-8 space-y-6">
+      <main className="mx-auto max-w-2xl px-6 py-8">
+        <p className="mb-5 text-xs text-slate-500">
+          {TABS.find((t) => t.id === tab)?.blurb}
+        </p>
 
-        {/* Row 1: Logo + Color */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <SectionCard label="Store Logo" icon={<span className="text-base leading-none">🖼</span>}>
-            <LogoUploader
-              storeId={store.id}
-              currentLogoUrl={logoSignedUrl ?? store.logo_url}
-            />
-          </SectionCard>
+        {/* ── GROW ── */}
+        {tab === 'grow' && (
+          <div className="space-y-6">
+            <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
+              <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
+            </SectionCard>
 
-          <SectionCard label="Brand Color" icon={<Palette size={14} />}>
-            <BrandColorEditor storeId={store.id} initial={store.brand_color} />
-          </SectionCard>
-        </div>
+            <SectionCard label="WhatsApp review requests" icon={<MessageCircle size={14} />}>
+              <WhatsAppRequestSection
+                storeName={storeName}
+                storeUrl={storeUrl}
+                locale={waLocale}
+                message={waMessage}
+                onLocale={setWaLocale}
+                onMessage={setWaMessage}
+              />
+            </SectionCard>
 
-        {/* Row 2: Forced + optional GEO keywords */}
-        <SectionCard label="Forced GEO keywords" icon={<Lock size={14} />}>
-          <ForcedKeywordManager
-            storeId={store.id}
-            initial={store.forced_keywords ?? []}
-          />
-        </SectionCard>
+            <SectionCard label="Review replies" icon={<Reply size={14} />}>
+              <ReplyGenerator
+                storeName={storeName}
+                defaultLocale={store.default_language}
+              />
+            </SectionCard>
+          </div>
+        )}
 
-        <SectionCard label="Guest keyword pills" icon={<Tag size={14} />}>
-          <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-            Shown as tappable tags on the customer review page. Combined with forced phrases
-            above when generating text (duplicates removed automatically).
-          </p>
-          <KeywordManager storeId={store.id} initial={store.keywords} />
-        </SectionCard>
+        {/* ── CUSTOMERS ── */}
+        {tab === 'customers' && (
+          <div className="space-y-6">
+            <SectionCard label="Customers" icon={<Users size={14} />}>
+              <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} />
+            </SectionCard>
 
-        {/* Row 3: Store Content (multilingual) */}
-        <SectionCard label="Store Content" icon={<Globe size={14} />}>
-          <ContentEditor
-            storeId={store.id}
-            initial={{
-              store_name: store.store_name,
-              greeting_text: store.greeting_text,
-              description: store.description,
-            }}
-          />
-        </SectionCard>
+            <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
+              <FeedbackSection count={feedbackCount} recent={feedback} />
+            </SectionCard>
+          </div>
+        )}
 
-        {/* Row 4: Default Language */}
-        <SectionCard label="Default Language" icon={<Languages size={14} />}>
-          <LanguageSelectorSection
-            storeId={store.id}
-            initial={store.default_language}
-          />
-        </SectionCard>
+        {/* ── SETTINGS ── */}
+        {tab === 'settings' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <SectionCard label="Store Logo" icon={<span className="text-base leading-none">🖼</span>}>
+                <LogoUploader
+                  storeId={store.id}
+                  currentLogoUrl={logoSignedUrl ?? store.logo_url}
+                />
+              </SectionCard>
 
-        {/* Row 4b: Business Category */}
-        <SectionCard label="Business Category" icon={<Tag size={14} />}>
-          <BusinessCategorySelectorSection
-            storeId={store.id}
-            initial={store.business_category}
-          />
-        </SectionCard>
+              <SectionCard label="Brand Color" icon={<Palette size={14} />}>
+                <BrandColorEditor storeId={store.id} initial={store.brand_color} />
+              </SectionCard>
+            </div>
 
-        {/* Row 5: Google Review Link */}
-        <SectionCard label="Google Review Link" icon={<Link2 size={14} />}>
-          <ReviewUrlEditor
-            storeId={store.id}
-            initial={store.google_review_url}
-          />
-        </SectionCard>
+            <SectionCard label="Store Content" icon={<Globe size={14} />}>
+              <ContentEditor
+                storeId={store.id}
+                initial={{
+                  store_name: store.store_name,
+                  greeting_text: store.greeting_text,
+                  description: store.description,
+                }}
+              />
+            </SectionCard>
 
-        {/* Row 6: QR Code */}
-        <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
-          <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
-        </SectionCard>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <SectionCard label="Default Language" icon={<Languages size={14} />}>
+                <LanguageSelectorSection storeId={store.id} initial={store.default_language} />
+              </SectionCard>
 
-        {/* Row 6b: WhatsApp review requests */}
-        <SectionCard label="WhatsApp review requests" icon={<MessageCircle size={14} />}>
-          <WhatsAppRequestSection
-            storeName={storeName}
-            storeUrl={storeUrl}
-            locale={waLocale}
-            message={waMessage}
-            onLocale={setWaLocale}
-            onMessage={setWaMessage}
-          />
-        </SectionCard>
+              <SectionCard label="Business Category" icon={<Tag size={14} />}>
+                <BusinessCategorySelectorSection storeId={store.id} initial={store.business_category} />
+              </SectionCard>
+            </div>
 
-        {/* Row 6d: Private feedback (under 4★) */}
-        <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
-          <FeedbackSection count={feedbackCount} recent={feedback} />
-        </SectionCard>
+            <SectionCard label="Google Review Link" icon={<Link2 size={14} />}>
+              <ReviewUrlEditor storeId={store.id} initial={store.google_review_url} />
+            </SectionCard>
 
-        {/* Row 6c: AI review replies */}
-        <SectionCard label="Review replies" icon={<Reply size={14} />}>
-          <ReplyGenerator
-            storeName={storeName}
-            defaultLocale={store.default_language}
-          />
-        </SectionCard>
+            <SectionCard label="Forced GEO keywords" icon={<Lock size={14} />}>
+              <ForcedKeywordManager storeId={store.id} initial={store.forced_keywords ?? []} />
+            </SectionCard>
 
-        {/* Row 7: CRM Stats */}
-        <SectionCard label="Customers" icon={<Users size={14} />}>
-          <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} />
-        </SectionCard>
+            <SectionCard label="Guest keyword pills" icon={<Tag size={14} />}>
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                Shown as tappable tags on the customer review page. Combined with forced phrases
+                above when generating text (duplicates removed automatically).
+              </p>
+              <KeywordManager storeId={store.id} initial={store.keywords} />
+            </SectionCard>
+          </div>
+        )}
 
       </main>
     </div>
