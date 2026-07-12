@@ -1237,9 +1237,11 @@ export default function StoreDashboard({
           {TABS.find((t) => t.id === tab)?.blurb}
         </p>
 
-        {/* ── GROW ── */}
-        {tab === 'grow' && (
-          <div className="space-y-6">
+        {/* ── GROW ──
+            Panels are hidden, not unmounted, when inactive: unmounting would
+            discard in-progress state (a generated reply draft, half-typed
+            keywords, an edited WhatsApp message) on every tab switch. */}
+        <div hidden={tab !== 'grow'} className="space-y-6">
             <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
               <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
             </SectionCard>
@@ -1261,12 +1263,10 @@ export default function StoreDashboard({
                 defaultLocale={store.default_language}
               />
             </SectionCard>
-          </div>
-        )}
+        </div>
 
         {/* ── CUSTOMERS ── */}
-        {tab === 'customers' && (
-          <div className="space-y-6">
+        <div hidden={tab !== 'customers'} className="space-y-6">
             <SectionCard label="Customers" icon={<Users size={14} />}>
               <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} />
             </SectionCard>
@@ -1274,12 +1274,10 @@ export default function StoreDashboard({
             <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
               <FeedbackSection count={feedbackCount} recent={feedback} />
             </SectionCard>
-          </div>
-        )}
+        </div>
 
         {/* ── SETTINGS ── */}
-        {tab === 'settings' && (
-          <div className="space-y-6">
+        <div hidden={tab !== 'settings'} className="space-y-6">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <SectionCard label="Store Logo" icon={<span className="text-base leading-none">🖼</span>}>
                 <LogoUploader
@@ -1329,8 +1327,7 @@ export default function StoreDashboard({
               </p>
               <KeywordManager storeId={store.id} initial={store.keywords} />
             </SectionCard>
-          </div>
-        )}
+        </div>
 
       </main>
     </div>
