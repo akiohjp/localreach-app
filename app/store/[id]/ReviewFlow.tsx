@@ -101,7 +101,9 @@ export default function ReviewFlow({
     forcedKeywords.map((k) => k.trim()).filter(Boolean),
   ).size
 
-  async function proceedToGenerate(guestSelected: string[]) {
+  // ratingValue is passed explicitly because handleRating calls this right
+  // after setRating — the `rating` state is still stale in that same tick.
+  async function proceedToGenerate(guestSelected: string[], ratingValue: number = rating) {
     const merged = mergeGuestAndForced(forcedKeywords, guestSelected)
     setSelectedKeywords(merged)
     setStep('generating')
@@ -113,6 +115,7 @@ export default function ReviewFlow({
         locale,
         category: businessCategory,
         forcedCount,
+        rating: ratingValue,
       }),
     )
     setStep('result')
@@ -125,7 +128,7 @@ export default function ReviewFlow({
       return
     }
     if (!hasAnyConfiguredKeywords()) {
-      void proceedToGenerate([])
+      void proceedToGenerate([], value)
       return
     }
     setStep('keywords')
@@ -237,6 +240,7 @@ export default function ReviewFlow({
                   locale,
                   category: businessCategory,
                   forcedCount,
+                  rating,
                 })}
             />
           )}

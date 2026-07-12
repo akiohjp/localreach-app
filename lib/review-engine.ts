@@ -141,6 +141,39 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
   },
 };
 
+// ------------------------------------------------------- length variation ----
+
+/**
+ * Real reviews vary WIDELY in length; a store whose reviews all land ~100
+ * words is a visible pattern (to readers and to spam heuristics). Each review
+ * is seeded into a short/medium/long bucket. Guards: verbatim keywords need
+ * room, so keyword-heavy selections are pushed to longer buckets; a 4-star
+ * guest reads more measured than a 5-star one, so 4-star biases shorter.
+ */
+type LenBucket = { kind: "short" | "medium" | "long"; target: number; min: number; max: number };
+const LEN_BUCKETS: Record<ReviewLocale, { short: LenBucket; medium: LenBucket; long: LenBucket }> = {
+  en: {
+    short: { kind: "short", target: 52, min: 38, max: 68 },
+    medium: { kind: "medium", target: 85, min: 68, max: 100 },
+    long: { kind: "long", target: 105, min: 90, max: 125 },
+  },
+  ja: {
+    short: { kind: "short", target: 115, min: 80, max: 160 },
+    medium: { kind: "medium", target: 175, min: 135, max: 235 },
+    long: { kind: "long", target: 215, min: 150, max: 300 },
+  },
+};
+
+function pickLenBucket(locale: ReviewLocale, seed: number, rating: number, wovenCount: number): LenBucket {
+  const b = LEN_BUCKETS[locale];
+  if (wovenCount >= 5) return b.long;                       // 5 verbatim phrases can't breathe in 55 words
+  const r = forkRng(seed, 0x777)();
+  const measured = rating <= 4;
+  if (wovenCount >= 4) return r < (measured ? 0.6 : 0.5) ? b.medium : b.long;
+  if (measured) return r < 0.45 ? b.short : r < 0.9 ? b.medium : b.long;
+  return r < 0.34 ? b.short : r < 0.74 ? b.medium : b.long;
+}
+
 // -------------------------------------------------------------- assembly ----
 
 function weaveParagraphs(parts: string[], rng: () => number, compact: boolean, glue: string): string {
@@ -192,13 +225,30 @@ function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => num
   return "";
 }
 
-function tuneLength(text: string, store: string, pool: PoolSet, cfg: LocaleCfg, seed: number, salt: number): string {
+/** True when trimming would delete a verbatim keyword the review must keep. */
+function trimLosesKeyword(before: string, after: string, protect: readonly string[]): boolean {
+  return protect.some((k) => k && before.includes(k) && !after.includes(k));
+}
+
+function tuneLength(
+  text: string,
+  store: string,
+  pool: PoolSet,
+  cfg: LocaleCfg,
+  seed: number,
+  salt: number,
+  protect: readonly string[] = [],
+): string {
   const rng = forkRng(seed, salt);
   let t = text;
   let n = cfg.measure(t);
   let guard = 0;
   while (n > cfg.max && guard < 4) {
-    t = trimTailSentence(t, cfg.sentenceEnd);
+    const trimmed = trimTailSentence(t, cfg.sentenceEnd);
+    // Never trim away a woven keyword to satisfy a (short) length bucket —
+    // the verbatim-keyword guarantee outranks the target length.
+    if (trimmed === t || trimLosesKeyword(t, trimmed, protect)) break;
+    t = trimmed;
     n = cfg.measure(t);
     guard++;
   }
@@ -214,13 +264,18 @@ function tuneLength(text: string, store: string, pool: PoolSet, cfg: LocaleCfg, 
     const filler = pickFreshFiller(t, store, pool, rng);
     if (filler) t = appendToLast(t, filler, cfg.glue);
   }
-  if (cfg.measure(t) > cfg.max) t = trimTailSentence(t, cfg.sentenceEnd);
+  if (cfg.measure(t) > cfg.max) {
+    const trimmed = trimTailSentence(t, cfg.sentenceEnd);
+    if (trimmed !== t && !trimLosesKeyword(t, trimmed, protect)) t = trimmed;
+  }
   return normalizeParagraphFormatting(t);
 }
 
 function joinKeywordDual(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, rng: () => number, seed: number): string | null {
-  if (kws.length < 6 || pool.dualBlocks.length === 0) return null;
-  if (rng() > 0.34) return null;
+  // From 5 phrases up, a single-sentence list reads as a keyword dump, so the
+  // two-part weave kicks in earlier and more often than it used to (>=6, 34%).
+  if (kws.length < 5 || pool.dualBlocks.length === 0) return null;
+  if (rng() > 0.55) return null;
   const minFirst = 2;
   const maxFirst = kws.length - 2;
   if (maxFirst < minFirst) return null;
@@ -270,6 +325,35 @@ function reviewNoKeywords(store: string, pool: PoolSet, cfg: LocaleCfg, seed: nu
   return tuneLength(t, store, pool, cfg, seed, 0x203);
 }
 
+/**
+ * Real guests name a business 0-2 times; our templates could stack it up to 5
+ * (opener + core + filler + closer each carrying {store}), which reads as SEO
+ * spam. Keep the first two mentions, swap the rest for a natural stand-in.
+ * (If a woven keyword itself contains the store name, that rare case is left
+ * alone by running this before keyword tails are appended.)
+ */
+function capStoreMentions(text: string, name: string, locale: ReviewLocale): string {
+  if (!name) return text;
+  let out = "";
+  let rest = text;
+  let count = 0;
+  for (;;) {
+    const i = rest.indexOf(name);
+    if (i === -1) return out + rest;
+    count++;
+    if (count <= 2) {
+      out += rest.slice(0, i + name.length);
+    } else {
+      const before = rest.slice(0, i);
+      const prev = (out + before).trimEnd().slice(-1);
+      const sentenceStart = (out + before).trim() === "" || /[.!?。！？]/.test(prev);
+      const sub = locale === "ja" ? "このお店" : sentenceStart ? "This place" : "this place";
+      out += before + sub;
+    }
+    rest = rest.slice(i + name.length);
+  }
+}
+
 /** Typographic sentence dashes read "AI"; normalize any leak. Keeps `\n\n`. */
 function normalizeDashes(text: string): string {
   return normalizeParagraphFormatting(
@@ -287,16 +371,17 @@ function normalizeDashes(text: string): string {
  * seed-rotated handful of the guest's picks, and let the rest surface in other
  * generations (which also keeps 100s of reviews unique and human-sounding).
  */
-const WOVEN_KEYWORD_CAP = 6;
+const WOVEN_KEYWORD_CAP = 5;
 
 /**
- * Pick the phrases to actually weave: always keep the forced/core ones, then top
- * up with a seed-rotated subset of the guest picks up to the cap. Different seed
- * (i.e. different run) rotates the guest subset, so many selections still yield
- * varied, natural reviews instead of one long list.
+ * Pick the phrases to actually weave: ALWAYS keep the forced/core ones, then a
+ * seed-rotated SUBSET of the guest picks (1..room) — even when everything would
+ * fit under the cap. Weaving every pick every time makes all of a store's
+ * reviews carry the same phrase list at the same ~length (a visible pattern);
+ * rotating the guest subset varies both content and length per generation, and
+ * the remaining picks surface in other guests' reviews instead.
  */
 function selectWovenKeywords(keywords: string[], forcedCount: number, seed: number): string[] {
-  if (keywords.length <= WOVEN_KEYWORD_CAP) return keywords;
   const fc = Math.max(0, Math.min(forcedCount, keywords.length));
   const forced = keywords.slice(0, fc);
   const guest = keywords.slice(fc);
@@ -307,8 +392,9 @@ function selectWovenKeywords(keywords: string[], forcedCount: number, seed: numb
       ? forced
       : shuffle(forced, forkRng(seed, 0xc0ffe1)).slice(0, WOVEN_KEYWORD_CAP);
   }
-  const take = 1 + Math.floor(forkRng(seed, 0xc0ffee)() * room); // 1..room
-  const guestWoven = shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, Math.min(take, guest.length));
+  const maxTake = Math.min(room, guest.length);
+  const take = 1 + Math.floor(forkRng(seed, 0xc0ffee)() * maxTake); // 1..maxTake
+  const guestWoven = shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, take);
   return [...forced, ...guestWoven];
 }
 
@@ -319,26 +405,33 @@ export function buildLocalizedReview(
   locale: ReviewLocale,
   vertical: Vertical,
   forcedCount = 0,
+  rating = 5,
 ): string {
-  const cfg = LOCALE_CFG[locale];
   const pool = resolvePoolSet(locale, vertical);
   const name = store.trim() || (locale === "ja" ? "こちらのお店" : "this establishment");
   const allKeywords = kws.map((k) => k.trim()).filter(Boolean);
 
   if (allKeywords.length === 0) {
-    return normalizeDashes(reviewNoKeywords(name, pool, cfg, seed));
+    const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
+    return normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale));
   }
 
   const keywords = selectWovenKeywords(allKeywords, forcedCount, seed);
+  // Length bucket is chosen AFTER keyword selection: the woven count decides
+  // how short a review can honestly be while keeping every phrase verbatim.
+  const bucket = pickLenBucket(locale, seed, rating, keywords.length);
+  const cfg = { ...LOCALE_CFG[locale], ...bucket };
   const shuffled = shuffle(keywords, forkRng(seed, 0xb8b26351));
   const many = shuffled.length > 8;
   const longPhrases =
     shuffled.reduce((n, k) => n + k.length, 0) > 140 ||
     shuffled.some((k) => k.split(/\s+/).length > 5);
-  const compact = many || longPhrases;
+  // A short-bucket review needs the compact template set (short openers/cores/
+  // closers) or the assembled baseline alone overshoots the bucket ceiling.
+  const compact = many || longPhrases || bucket.kind === "short";
 
   let text = buildInner(name, shuffled, pool, cfg, compact, seed);
-  text = tuneLength(text, name, pool, cfg, seed, 0x301);
+  text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled);
 
   if (!text.includes(name)) {
     text = appendToLast(text, `(${name})`, cfg.glue);
@@ -351,6 +444,11 @@ export function buildLocalizedReview(
     }
   }
 
-  text = tuneLength(text, name, pool, cfg, seed, 0x302);
+  text = tuneLength(text, name, pool, cfg, seed, 0x302, shuffled);
+  // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
+  // itself contains the name, so the verbatim-keyword guarantee is never broken.
+  if (!shuffled.some((k) => k.includes(name))) {
+    text = capStoreMentions(text, name, locale);
+  }
   return normalizeDashes(text);
 }
