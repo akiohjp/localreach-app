@@ -15,6 +15,8 @@ type Props = {
   defaultLocale: SupportedLocale
   /** Saved per-store defaults (stores.reply_settings). NULL = built-in defaults. */
   initialSettings?: ReplySettings | null
+  /** Forced GEO keywords — one is woven (quoted) into positive/mixed replies. */
+  forcedKeywords?: string[]
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -30,13 +32,14 @@ const TONES: { code: ReplyTone; label: string }[] = [
   { code: 'professional', label: 'Professional' },
 ]
 
-export default function ReplyGenerator({ storeId, storeName, defaultLocale, initialSettings }: Props) {
+export default function ReplyGenerator({ storeId, storeName, defaultLocale, initialSettings, forcedKeywords = [] }: Props) {
   const [rating, setRating] = useState<number>(5)
   const [reviewText, setReviewText] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>(defaultLocale)
   const [tone, setTone] = useState<ReplyTone>(initialSettings?.tone === 'professional' ? 'professional' : 'warm')
   const [geoPhrase, setGeoPhrase] = useState<string>(initialSettings?.locality ?? '')
   const [weaveGeo, setWeaveGeo] = useState<boolean>(initialSettings?.weaveGeo !== false)
+  const [weaveKw, setWeaveKw] = useState<boolean>(true)
   const [signature, setSignature] = useState<string>(initialSettings?.signature ?? '')
   const [draft, setDraft] = useState('')
   const [copied, setCopied] = useState(false)
@@ -51,6 +54,7 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         tone,
         geoPhrase,
         weaveGeo,
+        geoKeywords: weaveKw ? forcedKeywords : [],
         signature,
         nonce: createReplyNonce(),
       }),
@@ -217,12 +221,30 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
             onChange={(e) => setWeaveGeo(e.target.checked)}
             className="h-3.5 w-3.5 rounded border-gray-300 accent-emerald-600"
           />
-          Weave it into replies naturally
+          Weave the area into replies naturally
         </label>
+        {forcedKeywords.length > 0 && (
+          <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={weaveKw}
+              onChange={(e) => setWeaveKw(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 accent-emerald-600"
+            />
+            <span>
+              Mention one of your GEO keywords per reply{' '}
+              <span className="text-slate-400">
+                ({forcedKeywords.slice(0, 3).join(' · ')}
+                {forcedKeywords.length > 3 ? ` +${forcedKeywords.length - 3}` : ''})
+              </span>
+            </span>
+          </label>
+        )}
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          Mentioning your neighbourhood in replies (lightly, never stuffed) helps
-          Google local search and AI Overviews connect you to the area. Only used
-          on positive and mixed replies, not apologies.
+          Your replies are indexed by Google and read by AI assistants. Mentioning
+          your area and one keyword per reply (lightly, never stuffed) strengthens
+          local search and AI Overviews. Only on positive and mixed replies, never
+          apologies.
         </p>
       </div>
 

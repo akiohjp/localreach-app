@@ -32,6 +32,12 @@ export type GenerateReplyOptions = {
   geoPhrase?: string;
   /** Set false to suppress geo weaving. Default true. */
   weaveGeo?: boolean;
+  /**
+   * The store's forced GEO keywords ("best doughnuts in Dubai" …). ONE is
+   * seed-rotated into positive/mixed replies, quoted so any phrase reads
+   * naturally — the AIO/Local-SEO signal owner replies should carry.
+   */
+  geoKeywords?: string[];
   /** Custom sign-off (verbatim; "{store}" is replaced). Empty = pool sign-offs. */
   signature?: string;
   /** Per-run entropy so each "Regenerate" yields a different draft. */
@@ -223,21 +229,54 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   const customSig = (options.signature ?? "").trim();
   const signoff = (customSig || pick(pool.signoff, r(0x106))).replace(/\{store\}/g, store);
 
-  // Optional human beat (pos/mixed), ~40%.
-  const warm = pool.warm.length && (sentiment !== "negative") && r(0x140)() < 0.4 ? pick(pool.warm, r(0x141)) : "";
+  const notNegative = sentiment !== "negative";
 
-  // Local SEO / GEO weave: one locality, place-framed, pos/mixed only, ~55%.
+  // ── SEO/AIO beats (pos/mixed only — never decorate an apology) ──
+  // Locality: near-always when the owner set one (each reply answers a
+  // different review, so repetition across replies is fine and desirable).
   const geo = (options.geoPhrase ?? "").trim();
-  const geoOn = options.weaveGeo !== false && geo && pool.geoWoven.length && (sentiment !== "negative") && r(0x120)() < 0.55;
+  const geoOn = options.weaveGeo !== false && geo && pool.geoWoven.length && notNegative && r(0x120)() < 0.9;
   const geoSentence = geoOn ? pick(pool.geoWoven, r(0x121)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store) : "";
 
-  // Structure: keep it multi-beat (guest complained the old replies were too short),
-  // but vary which optional beats appear so no two read the same.
-  const dropClose = r(0x131)() < 0.4;
-  const segments: string[] = [open, reaction];
-  if (warm) segments.push(warm);
-  if (geoSentence) segments.push(geoSentence);
-  segments.push(body);
+  // One forced GEO keyword, seed-rotated across the store's list, quoted in-template.
+  const kws = (options.geoKeywords ?? []).map((k) => k.trim()).filter(Boolean);
+  const kwOn = kws.length > 0 && pool.kwWoven.length > 0 && notNegative && r(0x150)() < 0.75;
+  const kw = kwOn ? kws[Math.floor(r(0x151)() * kws.length)]! : "";
+  const kwSentence = kw ? pick(pool.kwWoven, r(0x152)).replace(/\{kw\}/g, kw).replace(/\{store\}/g, store) : "";
+
+  // Brand line: the store name inside the body (entity signal beyond the sign-off).
+  const brandOn = pool.brand.length > 0 && notNegative && r(0x160)() < 0.5;
+  const brandSentence = brandOn ? pick(pool.brand, r(0x161)).replace(/\{store\}/g, store) : "";
+
+  // Human beat.
+  const warmOn = pool.warm.length > 0 && notNegative && r(0x140)() < 0.5;
+  const warmSentence = warmOn ? pick(pool.warm, r(0x141)) : "";
+
+  // ── Structure ──
+  // Owner requirement (2026-07-12): replies must NOT come out short. Core beats
+  // (open, reaction, body) always ship; the close drops only occasionally; and
+  // of the optional beats we keep at most TWO so replies stay 4-6 sentences,
+  // never 2-3 and never a bloated 8. Priority: kw > geo > brand > warm when
+  // over budget (SEO beats win; the human beat is the garnish).
+  const optional: string[] = [];
+  const ranked: Array<[string, string]> = [
+    ["kw", kwSentence], ["geo", geoSentence], ["brand", brandSentence], ["warm", warmSentence],
+  ];
+  for (const [, s] of ranked) {
+    if (s && optional.length < 2) optional.push(s);
+  }
+  // If nothing optional rolled on a positive/mixed reply, force one SEO beat so
+  // the reply always carries more than the bare minimum.
+  if (optional.length === 0 && notNegative) {
+    if (geo && pool.geoWoven.length) {
+      optional.push(pick(pool.geoWoven, r(0x122)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store));
+    } else if (pool.brand.length) {
+      optional.push(pick(pool.brand, r(0x162)).replace(/\{store\}/g, store));
+    }
+  }
+
+  const dropClose = r(0x131)() < 0.25;
+  const segments: string[] = [open, reaction, ...optional, body];
   if (!dropClose) segments.push(close);
 
   const bodyText = joinSentences(segments, locale);

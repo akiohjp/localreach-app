@@ -1277,6 +1277,7 @@ export default function StoreDashboard({
                 storeName={storeName}
                 defaultLocale={store.default_language}
                 initialSettings={store.reply_settings ?? null}
+                forcedKeywords={store.forced_keywords ?? []}
               />
             </SectionCard>
         </div>
