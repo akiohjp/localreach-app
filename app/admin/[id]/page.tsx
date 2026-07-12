@@ -29,10 +29,14 @@ function isMissingCustomerNameColumn(error: SupabaseColumnError | null): boolean
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }
 
-export default async function AdminStorePage({ params }: Props) {
+export default async function AdminStorePage({ params, searchParams }: Props) {
   const { id } = await params
+  const { tab } = await searchParams
+  const initialTab =
+    tab === 'customers' || tab === 'settings' ? tab : ('grow' as const)
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -121,6 +125,7 @@ export default async function AdminStorePage({ params }: Props) {
       feedback={feedback}
       feedbackCount={feedbackCount}
       logoSignedUrl={logoSignedUrl}
+      initialTab={initialTab}
     />
   )
 }

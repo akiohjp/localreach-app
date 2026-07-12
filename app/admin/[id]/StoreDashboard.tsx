@@ -46,7 +46,11 @@ type Props = {
   feedbackCount?: number
   /** Signed URL when logo bucket is non-public. */
   logoSignedUrl?: string | null
+  /** Workspace to open first (from the URL's ?tab=). */
+  initialTab?: TabId
 }
+
+type TabId = 'grow' | 'customers' | 'settings'
 
 // ─────────────────────────────────────────────
 // Shared primitives
@@ -1118,6 +1122,7 @@ export default function StoreDashboard({
   feedback = [],
   feedbackCount = 0,
   logoSignedUrl,
+  initialTab = 'grow',
 }: Props) {
   const router = useRouter()
 
@@ -1129,7 +1134,16 @@ export default function StoreDashboard({
   )
 
   // Dashboard is split into three focused workspaces instead of one long scroll.
-  const [tab, setTab] = useState<'grow' | 'customers' | 'settings'>('grow')
+  // The active tab is mirrored to the URL (?tab=) so a reload or a shared link
+  // lands on the same workspace (the server passes it back as initialTab).
+  const [tab, setTab] = useState<TabId>(initialTab)
+
+  function switchTab(t: TabId) {
+    setTab(t)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', t)
+    window.history.replaceState(null, '', url)
+  }
   const TABS = [
     { id: 'grow' as const, label: 'Grow', icon: Megaphone, blurb: 'Collect and answer reviews' },
     { id: 'customers' as const, label: 'Customers', icon: Users, blurb: 'Who came in, and private feedback' },
@@ -1212,7 +1226,7 @@ export default function StoreDashboard({
               return (
                 <button
                   key={t.id}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => switchTab(t.id)}
                   className={[
                     'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2',
                     'text-xs font-bold transition-all',
