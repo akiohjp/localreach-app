@@ -24,6 +24,10 @@
 
   /* Custom entrance animation used on the LP hero. */
   --animate-fade-in: fade-in 0.5s ease-out both;
+
+  /* Review-flow step transition — quick fade+rise so step changes feel smooth
+     rather than an abrupt swap. Kept under 300ms so it never reads as lag. */
+  --animate-step-in: step-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes fade-in {
@@ -35,6 +39,24 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Determinate fill for the generating screen: a bar that visibly completes
+   makes the short wait feel bounded (unbounded pulsing reads as "stuck"). */
+@keyframes progress-fill {
+  from { width: 4%; }
+  to   { width: 100%; }
 }
 
 /* ------------------------------------------------------------------ *

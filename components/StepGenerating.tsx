@@ -1,7 +1,21 @@
 import { Sparkles } from "lucide-react";
 import type { UiStrings } from "@/lib/ui-strings";
 
-export default function StepGenerating({ t }: { t: UiStrings }) {
+/**
+ * Shown while the review is assembled. The wait is short and bounded, so the
+ * bar is DETERMINATE: it visibly fills to completion (duration matches the
+ * flow's generate delay). A bar that finishes reads as "almost done"; endless
+ * pulsing dots read as "stuck" and make the same wait feel longer.
+ */
+export default function StepGenerating({
+  t,
+  brandColor = "#0f172a",
+  durationMs = 900,
+}: {
+  t: UiStrings;
+  brandColor?: string;
+  durationMs?: number;
+}) {
   return (
     <div
       className="flex flex-col items-center gap-8 text-center py-8"
@@ -29,14 +43,15 @@ export default function StepGenerating({ t }: { t: UiStrings }) {
         </p>
       </div>
 
-      <div className="flex gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="size-1.5 rounded-full bg-slate-300 animate-pulse"
-            style={{ animationDelay: `${i * 0.2}s` }}
-          />
-        ))}
+      {/* Determinate progress bar — fills over the actual generate delay. */}
+      <div className="h-1.5 w-48 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+        <div
+          className="h-full rounded-full"
+          style={{
+            backgroundColor: brandColor,
+            animation: `progress-fill ${durationMs}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+          }}
+        />
       </div>
     </div>
   );

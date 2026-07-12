@@ -34,6 +34,14 @@ function mergeGuestAndForced(forced: string[], guest: string[]): string[] {
 // Steps that show the progress bar
 const POSITIVE_STEPS: Step[] = ['rating', 'keywords', 'generating', 'result']
 
+/**
+ * Generation itself is instant (zero API); this brief pause is deliberate so
+ * the "crafting your review" beat registers as real work. Kept short and
+ * matched exactly by StepGenerating's determinate progress bar, so the wait
+ * feels bounded instead of laggy.
+ */
+const GENERATE_DELAY_MS = 900
+
 type Props = {
   storeId: string
   storeName: string       // pre-resolved by Server Component (locale-aware)
@@ -97,7 +105,7 @@ export default function ReviewFlow({
     const merged = mergeGuestAndForced(forcedKeywords, guestSelected)
     setSelectedKeywords(merged)
     setStep('generating')
-    await new Promise((r) => setTimeout(r, 1200))
+    await new Promise((r) => setTimeout(r, GENERATE_DELAY_MS))
     setReviewText(
       generateReview(storeName, merged, {
         nonce: createReviewNonce(),
@@ -185,8 +193,10 @@ export default function ReviewFlow({
           )}
         </div>
 
-        {/* ── Step content ─────────────────────────────── */}
-        <div className="p-6">
+        {/* ── Step content ───────────────────────────────
+            key={step} remounts the wrapper on every step change so the
+            entrance animation replays — swaps glide in instead of popping. */}
+        <div key={step} className="p-6 animate-step-in">
           {step === 'rating' && (
             <StepRating
               t={t}
@@ -207,7 +217,9 @@ export default function ReviewFlow({
             />
           )}
 
-          {step === 'generating' && <StepGenerating t={t} />}
+          {step === 'generating' && (
+            <StepGenerating t={t} brandColor={brandColor} durationMs={GENERATE_DELAY_MS} />
+          )}
 
           {step === 'result' && (
             <StepResult
