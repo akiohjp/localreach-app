@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isValidUuid } from '@/lib/is-valid-uuid'
+import { isStoreCurrentlyActive } from '@/lib/subscription'
 
 type LeadPayload = {
   store_id?: unknown
@@ -66,12 +67,14 @@ export async function POST(request: Request) {
   const admin = createAdminClient()
   const { data: store, error: storeError } = await admin
     .from('stores')
-    .select('id, is_active')
+    .select('id, is_active, subscription_expires_at')
     .eq('id', storeId)
     .maybeSingle()
 
   if (storeError) return logAndHideError('store lookup failed', storeError)
-  if (!store?.is_active) return jsonError('inactive_or_unknown_store', 404)
+  if (!store || !isStoreCurrentlyActive(store)) {
+    return jsonError('inactive_or_unknown_store', 404)
+  }
 
   const row = {
     store_id: storeId,
