@@ -317,14 +317,28 @@ const LocalReachLP = () => {
             <div className="grid lg:grid-cols-2 gap-16 items-center relative z-10">
                <div className="space-y-8">
                   <div>
-                    <h3 className="text-4xl font-black mb-4 tracking-tight">LocalReach All-in-One</h3>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-8xl font-black tracking-tighter text-[#D4AF37]">298</span>
-                      <span className="text-2xl font-bold text-gray-500 uppercase tracking-widest">AED / Mo</span>
+                    <h3 className="text-4xl font-black mb-4 tracking-tight">LocalReach — Core &amp; Plus</h3>
+                    <div className="flex items-end gap-8">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-gray-500 mb-1">Core</p>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-6xl font-black tracking-tighter text-white">298</span>
+                          <span className="text-sm font-bold text-gray-500 uppercase">AED/Mo</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">口コミを集める</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-[#D4AF37] mb-1">Plus</p>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-6xl font-black tracking-tighter text-[#D4AF37]">498</span>
+                          <span className="text-sm font-bold text-gray-500 uppercase">AED/Mo</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Core＋AI返信</p>
+                      </div>
                     </div>
                   </div>
                   <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 font-black text-gray-300">
-                    {["初期費用 0 AED", "AIレビュー無制限", "WhatsApp CRM", "多言語対応", "MEO分析レポート", "24/7 サポート"].map((f, i) => (
+                    {["初期費用 0 AED", "AIレビュー返信（Plus）", "AIレビュー無制限", "WhatsApp CRM", "多言語対応", "MEO分析レポート"].map((f, i) => (
                       <li key={i} className="flex items-center gap-3">
                         <CheckCircle2 size={20} className="text-[#D4AF37] flex-shrink-0" aria-hidden="true" /> <span className="text-sm">{f}</span>
                       </li>
