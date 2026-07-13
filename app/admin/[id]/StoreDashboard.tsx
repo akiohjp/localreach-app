@@ -56,6 +56,16 @@ type TabId = 'grow' | 'customers' | 'settings'
 // Shared primitives
 // ─────────────────────────────────────────────
 
+/** Group label between cards so a long settings list stays scannable. */
+function SettingsHeading({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="px-1 pt-1">
+      <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+      <p className="text-xs text-slate-400">{hint}</p>
+    </div>
+  )
+}
+
 function SectionCard({
   label,
   icon,
@@ -370,10 +380,10 @@ function ForcedKeywordManager({
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-600 leading-relaxed">
-        These phrases are <span className="font-semibold text-slate-800">always woven into</span>{' '}
-        the auto-generated review (shop name, locale, GBP link unchanged). Guests choose from{' '}
-        <span className="font-semibold text-slate-800">Guest keyword pills</span> below — they never
-        have to tap these, but they still appear in the final text for GEO.
+        These phrases are <span className="font-semibold text-slate-800">automatically added to every review</span>{' '}
+        your guests create, so the terms you want to be found for always appear. Guests never see or
+        tap them. Add your location and what you want to rank for, e.g.{' '}
+        <span className="font-medium text-slate-700">&ldquo;best doughnuts in Dubai&rdquo;</span>.
       </p>
       <div
         className="flex min-h-[3rem] flex-wrap gap-2 rounded-xl border border-slate-700/20
@@ -744,8 +754,10 @@ function ReviewUrlEditor({
           text-sm text-slate-900 placeholder:text-slate-400 outline-none
           focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition"
       />
-      <p className="text-[10px] text-slate-400">
-        The direct link to your Google Business Profile review page.
+      <p className="text-[10px] text-slate-400 leading-relaxed">
+        The link that opens your Google review box (looks like g.page/r/…). Guests who rate you
+        4–5 stars are sent here to post it. To find it: open your Google Business Profile, tap
+        &ldquo;Ask for reviews&rdquo;, and copy the link.
       </p>
       <div className="flex items-center justify-between">
         <SaveFeedback state={state} />
@@ -1256,6 +1268,35 @@ export default function StoreDashboard({
             discard in-progress state (a generated reply draft, half-typed
             keywords, an edited WhatsApp message) on every tab switch. */}
         <div hidden={tab !== 'grow'} className="space-y-6">
+            {/* First-run orientation — folds away, always available for reference. */}
+            <details className="group rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-5 py-3.5">
+                <span className="flex items-center gap-2 text-xs font-bold tracking-[0.15em] uppercase text-slate-500">
+                  <span className="text-base leading-none">💡</span>
+                  How LocalReach works
+                </span>
+                <span className="text-[10px] font-semibold text-slate-400 group-open:hidden">Show</span>
+                <span className="hidden text-[10px] font-semibold text-slate-400 group-open:inline">Hide</span>
+              </summary>
+              <ol className="space-y-3 border-t border-gray-100 px-5 py-4">
+                {[
+                  ['Show your QR code', 'Print it for your counter or table, or send your review link by WhatsApp (both are below).'],
+                  ['Guests leave a review in seconds', 'They scan, tap a few keywords, and post a 5-star Google review. Anyone unhappy is quietly routed to private feedback instead.'],
+                  ['Reply to Google reviews with AI', 'Got a review on Google? Paste it into “Review replies” below and post the reply we write for you.'],
+                ].map(([title, body], i) => (
+                  <li key={i} className="flex gap-3">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{title}</p>
+                      <p className="text-xs text-slate-500 leading-relaxed">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </details>
+
             <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
               <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
             </SectionCard>
@@ -1295,6 +1336,8 @@ export default function StoreDashboard({
 
         {/* ── SETTINGS ── */}
         <div hidden={tab !== 'settings'} className="space-y-6">
+            <SettingsHeading title="Branding" hint="How your review page looks to guests" />
+
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <SectionCard label="Store Logo" icon={<span className="text-base leading-none">🖼</span>}>
                 <LogoUploader
@@ -1319,6 +1362,8 @@ export default function StoreDashboard({
               />
             </SectionCard>
 
+            <SettingsHeading title="Review setup" hint="Controls the reviews and replies you generate" />
+
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <SectionCard label="Default Language" icon={<Languages size={14} />}>
                 <LanguageSelectorSection storeId={store.id} initial={store.default_language} />
@@ -1333,14 +1378,16 @@ export default function StoreDashboard({
               <ReviewUrlEditor storeId={store.id} initial={store.google_review_url} />
             </SectionCard>
 
-            <SectionCard label="Forced GEO keywords" icon={<Lock size={14} />}>
+            <SectionCard label="Always-include keywords (SEO)" icon={<Lock size={14} />}>
               <ForcedKeywordManager storeId={store.id} initial={store.forced_keywords ?? []} />
             </SectionCard>
 
-            <SectionCard label="Guest keyword pills" icon={<Tag size={14} />}>
+            <SectionCard label="Guest keywords (tap-to-add)" icon={<Tag size={14} />}>
               <p className="text-xs text-slate-600 mb-4 leading-relaxed">
-                Shown as tappable tags on the customer review page. Combined with forced phrases
-                above when generating text (duplicates removed automatically).
+                These appear as tappable buttons on your review page. Guests tap the ones that
+                match their visit, and we build a natural review from them. Add the dishes, services
+                and highlights guests are likely to mention. (Your always-include keywords above are
+                added on top automatically.)
               </p>
               <KeywordManager storeId={store.id} initial={store.keywords} />
             </SectionCard>
