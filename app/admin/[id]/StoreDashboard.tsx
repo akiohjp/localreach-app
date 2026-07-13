@@ -415,7 +415,7 @@ function ForcedKeywordManager({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={items.length === 0 ? 'Type a forced phrase and press Enter…' : ''}
+          placeholder={items.length === 0 ? 'Type a keyword and press Enter…' : ''}
           className="min-w-[8rem] flex-1 bg-transparent text-xs text-slate-800
             placeholder:text-slate-400 outline-none"
         />
@@ -424,7 +424,7 @@ function ForcedKeywordManager({
       <p className="text-[10px] text-slate-400">
         Press <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">Enter</kbd>{' '}
         or <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">,</kbd> to
-        add · {items.length} forced phrase{items.length !== 1 ? 's' : ''}
+        add · {items.length} keyword{items.length !== 1 ? 's' : ''}
       </p>
 
       <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ function ForcedKeywordManager({
               text-white shadow-sm hover:bg-slate-800 active:scale-[0.98] transition-all
               disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Save forced keywords
+            Save keywords
           </button>
         </div>
       </div>
