@@ -119,6 +119,19 @@ function joinListJa(phrases: string[], rng: () => number): string {
   const head = p.slice(0, -1).join("、");
   return rng() < 0.5 ? `${head}、${last}` : `${head}、そして${last}`;
 }
+function joinListAr(phrases: string[], rng: () => number): string {
+  // Arabic "و" (and). Spaced (" و ") rather than attached, so a mixed
+  // Arabic + Latin list (English SEO keywords) never glues an Arabic letter
+  // onto a Latin word. Two natural styles, chosen by rng for variety: a comma
+  // list with a final "و", or "و" repeated between every item (both idiomatic).
+  const p = phrases.filter(Boolean);
+  if (p.length <= 1) return p[0] ?? "";
+  if (p.length === 2) return `${p[0]} و ${p[1]}`;
+  if (rng() < 0.5) return p.join(" و ");
+  const last = p[p.length - 1]!;
+  const head = p.slice(0, -1).join("، ");
+  return `${head} و ${last}`;
+}
 
 const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
   en: {
@@ -138,6 +151,17 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
     sentenceEnd: /。/g,
     glue: "",
     joinList: joinListJa,
+  },
+  ar: {
+    // Arabic is space-delimited, so word count is a fair length metric; it packs
+    // more meaning per word than English, so the targets sit a touch lower.
+    measure: wordCount,
+    target: 82,
+    min: 60,
+    max: 112,
+    sentenceEnd: /\./g,
+    glue: " ",
+    joinList: joinListAr,
   },
 };
 
@@ -161,6 +185,11 @@ const LEN_BUCKETS: Record<ReviewLocale, { short: LenBucket; medium: LenBucket; l
     short: { kind: "short", target: 115, min: 80, max: 160 },
     medium: { kind: "medium", target: 175, min: 135, max: 235 },
     long: { kind: "long", target: 215, min: 150, max: 300 },
+  },
+  ar: {
+    short: { kind: "short", target: 45, min: 32, max: 62 },
+    medium: { kind: "medium", target: 72, min: 58, max: 92 },
+    long: { kind: "long", target: 92, min: 76, max: 115 },
   },
 };
 
@@ -347,7 +376,10 @@ function capStoreMentions(text: string, name: string, locale: ReviewLocale): str
       const before = rest.slice(0, i);
       const prev = (out + before).trimEnd().slice(-1);
       const sentenceStart = (out + before).trim() === "" || /[.!?。！？]/.test(prev);
-      const sub = locale === "ja" ? "このお店" : sentenceStart ? "This place" : "this place";
+      const sub =
+        locale === "ja" ? "このお店"
+        : locale === "ar" ? "هذا المكان"
+        : sentenceStart ? "This place" : "this place";
       out += before + sub;
     }
     rest = rest.slice(i + name.length);
@@ -408,7 +440,9 @@ export function buildLocalizedReview(
   rating = 5,
 ): string {
   const pool = resolvePoolSet(locale, vertical);
-  const name = store.trim() || (locale === "ja" ? "こちらのお店" : "this establishment");
+  const name =
+    store.trim() ||
+    (locale === "ja" ? "こちらのお店" : locale === "ar" ? "هذا المكان" : "this establishment");
   const allKeywords = kws.map((k) => k.trim()).filter(Boolean);
 
   if (allKeywords.length === 0) {

@@ -3,6 +3,9 @@ import { useState } from "react";
 import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
 import type { UiStrings } from "@/lib/ui-strings";
+import type { SupportedLocale } from "@/types/database";
+
+type ReviewLocaleOption = { code: SupportedLocale; label: string };
 
 type Props = {
   t: UiStrings;
@@ -10,6 +13,12 @@ type Props = {
   gbpReviewUrl: string;
   storeId: string;
   selectedKeywords: string[];
+  /** Language the current review text is in (drives the picker + translate source). */
+  reviewLocale: SupportedLocale;
+  /** Languages the guest can switch the generated review between. */
+  reviewLocaleOptions: ReviewLocaleOption[];
+  /** Regenerate the review in `loc`; returns the new text. */
+  onReviewLocaleChange: (loc: SupportedLocale) => string;
   onRetry: () => void;
   /** Fresh nonce + new wording; same merged keywords. For client demos. */
   onRegenerate?: () => string;
@@ -19,8 +28,10 @@ type Props = {
 
 type WaState = "idle" | "saving" | "saved" | "error";
 
-function buildTranslateUrl(text: string) {
-  return `https://translate.google.com/?sl=en&tl=auto&text=${encodeURIComponent(text)}`;
+function buildTranslateUrl(text: string, sourceLocale: SupportedLocale) {
+  // sl must match the review's actual language, or Google mis-detects (e.g. an
+  // Arabic review sent as sl=en translates to gibberish).
+  return `https://translate.google.com/?sl=${sourceLocale}&tl=auto&text=${encodeURIComponent(text)}`;
 }
 
 export default function StepResult({
@@ -29,12 +40,23 @@ export default function StepResult({
   gbpReviewUrl,
   storeId,
   selectedKeywords,
+  reviewLocale,
+  reviewLocaleOptions,
+  onReviewLocaleChange,
   onRetry,
   onRegenerate,
   onReviewTextChange,
 }: Props) {
   const [text, setText] = useState(reviewText);
   const [copied, setCopied] = useState(false);
+
+  function handleLanguageChange(loc: SupportedLocale) {
+    if (loc === reviewLocale) return;
+    setCopied(false);
+    const next = onReviewLocaleChange(loc);
+    setText(next);
+    onReviewTextChange?.(next);
+  }
 
   // WhatsApp capture state
   const [customerName, setCustomerName] = useState("");
@@ -139,6 +161,36 @@ export default function StepResult({
         </h2>
         <p className="text-sm text-slate-600">{t.result.subtitle}</p>
       </div>
+
+      {/* Review-language picker — the guest chooses which language the review is
+          written in (English / العربية / 日本語), independent of the page UI. */}
+      {reviewLocaleOptions.length > 1 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500">
+            {t.result.reviewLanguage}
+          </p>
+          <div className="flex gap-1.5 flex-wrap">
+            {reviewLocaleOptions.map((opt) => {
+              const active = opt.code === reviewLocale;
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => handleLanguageChange(opt.code)}
+                  aria-pressed={active}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all active:scale-[0.98] ${
+                    active
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-600 border-gray-300 hover:border-slate-400"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Textarea */}
       <div className="relative">
@@ -298,7 +350,7 @@ export default function StepResult({
         </button>
 
         <a
-          href={buildTranslateUrl(text)}
+          href={buildTranslateUrl(text, reviewLocale)}
           target="_blank"
           rel="noopener noreferrer"
           className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white

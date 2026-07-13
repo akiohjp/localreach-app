@@ -55,6 +55,8 @@ export interface UiStrings {
     savedLive: string;
     copiedToast: string;
     tryAnotherWording: string;
+    /** Label for the guest's review-language selector (English / العربية / 日本語). */
+    reviewLanguage: string;
     copyReview: string;
     translate: string;
     postOnGoogle: string;
@@ -134,6 +136,7 @@ const en: UiStrings = {
     savedLive: "WhatsApp registered. Thank you!",
     copiedToast: "Copied to clipboard",
     tryAnotherWording: "Try another wording",
+    reviewLanguage: "Review language",
     copyReview: "Copy Review",
     translate: "Translate via Google",
     postOnGoogle: "Post on Google",
@@ -221,6 +224,7 @@ const ja: UiStrings = {
     savedLive: "WhatsAppを登録しました。ありがとうございます！",
     copiedToast: "クリップボードにコピーしました",
     tryAnotherWording: "別の文面を試す",
+    reviewLanguage: "レビューの言語",
     copyReview: "レビューをコピー",
     translate: "Googleで翻訳",
     postOnGoogle: "Googleに投稿",
@@ -299,6 +303,7 @@ const ar: UiStrings = {
     savedLive: "تم تسجيل واتساب. شكرًا لك!",
     copiedToast: "تم النسخ إلى الحافظة",
     tryAnotherWording: "جرّب صياغة أخرى",
+    reviewLanguage: "لغة المراجعة",
     copyReview: "نسخ المراجعة",
     translate: "ترجم عبر Google",
     postOnGoogle: "انشر على Google",

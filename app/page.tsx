@@ -12,11 +12,17 @@ import StepFeedback from "@/components/StepFeedback";
 import StepFeedbackSent from "@/components/StepFeedbackSent";
 import { getUiStrings } from "@/lib/ui-strings";
 import { useFlowPersistence } from "@/lib/use-flow-persistence";
+import type { SupportedLocale } from "@/types/database";
 
 const POSITIVE_STEPS: Step[] = ["rating", "keywords", "generating", "result"];
 
-// The `/` demo is English-only.
+// The `/` demo UI is English, but the generated review can be switched to Arabic
+// so the sample flow shows off guest-selectable review language.
 const t = getUiStrings("en");
+const DEMO_REVIEW_LOCALES: { code: SupportedLocale; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "ar", label: "العربية" },
+];
 
 const DEMO_STORE_ID =
   typeof process.env.NEXT_PUBLIC_DEMO_STORE_ID === "string"
@@ -30,6 +36,7 @@ export default function ReviewPage() {
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
+  const [reviewLocale, setReviewLocale] = useState<SupportedLocale>("en");
 
   // Survive an accidental reload so a generated review isn't lost back to rating.
   // Namespaced with "demo:" so the home-page demo never shares a sessionStorage
@@ -60,11 +67,23 @@ export default function ReviewPage() {
       generateReview(STORE_CONFIG.storeName, selected, {
         nonce: createReviewNonce(),
         outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
-        locale: "en",
+        locale: reviewLocale,
         category: "restaurant",
       }),
     );
     setStep("result");
+  }
+
+  function generateInLocale(loc: SupportedLocale): string {
+    setReviewLocale(loc);
+    const next = generateReview(STORE_CONFIG.storeName, selectedKeywords, {
+      nonce: createReviewNonce(),
+      outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
+      locale: loc,
+      category: "restaurant",
+    });
+    setReviewText(next);
+    return next;
   }
 
   function reset() {
@@ -72,6 +91,7 @@ export default function ReviewPage() {
     setRating(0);
     setReviewText("");
     setSelectedKeywords([]);
+    setReviewLocale("en");
   }
 
   return (
@@ -149,13 +169,16 @@ export default function ReviewPage() {
                 gbpReviewUrl={STORE_CONFIG.gbpReviewUrl}
                 storeId={RESULT_STORE_ID}
                 selectedKeywords={selectedKeywords}
+                reviewLocale={reviewLocale}
+                reviewLocaleOptions={DEMO_REVIEW_LOCALES}
+                onReviewLocaleChange={generateInLocale}
                 onRetry={reset}
                 onReviewTextChange={setReviewText}
                 onRegenerate={() =>
                   generateReview(STORE_CONFIG.storeName, selectedKeywords, {
                     nonce: createReviewNonce(),
                     outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
-                    locale: "en",
+                    locale: reviewLocale,
                     category: "restaurant",
                   })}
               />

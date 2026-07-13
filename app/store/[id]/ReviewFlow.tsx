@@ -34,6 +34,14 @@ function mergeGuestAndForced(forced: string[], guest: string[]): string[] {
 // Steps that show the progress bar
 const POSITIVE_STEPS: Step[] = ['rating', 'keywords', 'generating', 'result']
 
+// Native language names for the guest's review-language picker (self-referential,
+// so they read correctly whatever the surrounding UI language is).
+const LANG_LABEL: Record<SupportedLocale, string> = {
+  en: 'English',
+  ja: '日本語',
+  ar: 'العربية',
+}
+
 /**
  * Generation itself is instant (zero API); this brief pause is deliberate so
  * the "crafting your review" beat registers as real work. Kept short and
@@ -75,6 +83,15 @@ export default function ReviewFlow({
   const [rating, setRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
+  // The guest picks which language the REVIEW is generated in (independent of the
+  // page UI). Defaults to the page locale; UAE guests can switch English <-> العربية.
+  const [reviewLocale, setReviewLocale] = useState<SupportedLocale>(locale)
+
+  // Options for the review-language picker: the page default first, then always
+  // offer English + Arabic (the UAE market). Deduped, order-preserving.
+  const reviewLocaleOptions = Array.from(
+    new Set<SupportedLocale>([locale, 'en', 'ar']),
+  ).map((code) => ({ code, label: LANG_LABEL[code] }))
 
   // Survive an accidental reload so a generated review isn't lost back to rating.
   useFlowPersistence(
@@ -112,13 +129,31 @@ export default function ReviewFlow({
       generateReview(storeName, merged, {
         nonce: createReviewNonce(),
         outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
-        locale,
+        locale: reviewLocale,
         category: businessCategory,
         forcedCount,
         rating: ratingValue,
       }),
     )
     setStep('result')
+  }
+
+  /**
+   * Regenerate the current review in a specific language (guest picked it on the
+   * result step). Returns the new text so StepResult can swap its local copy.
+   */
+  function generateInLocale(loc: SupportedLocale): string {
+    setReviewLocale(loc)
+    const next = generateReview(storeName, selectedKeywords, {
+      nonce: createReviewNonce(),
+      outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
+      locale: loc,
+      category: businessCategory,
+      forcedCount,
+      rating,
+    })
+    setReviewText(next)
+    return next
   }
 
   function handleRating(value: number) {
@@ -151,6 +186,7 @@ export default function ReviewFlow({
     setRating(0)
     setReviewText('')
     setSelectedKeywords([])
+    setReviewLocale(locale)
   }
 
   return (
@@ -231,13 +267,16 @@ export default function ReviewFlow({
               gbpReviewUrl={googleReviewUrl}
               storeId={storeId}
               selectedKeywords={selectedKeywords}
+              reviewLocale={reviewLocale}
+              reviewLocaleOptions={reviewLocaleOptions}
+              onReviewLocaleChange={generateInLocale}
               onRetry={reset}
               onReviewTextChange={setReviewText}
               onRegenerate={() =>
                 generateReview(storeName, selectedKeywords, {
                   nonce: createReviewNonce(),
                   outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
-                  locale,
+                  locale: reviewLocale,
                   category: businessCategory,
                   forcedCount,
                   rating,
