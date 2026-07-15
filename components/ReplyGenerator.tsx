@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Star, Sparkles, Copy, RefreshCw, CheckCircle, MapPin, Loader2, PenLine } from 'lucide-react'
+import { Star, Sparkles, Copy, RefreshCw, CheckCircle, MapPin, Loader2, PenLine, MessageSquareOff, MessageSquareText } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { generateReply, createReplyNonce } from '@/lib/reply-engine'
 import type { ReplyTone } from '@/lib/reply-pools'
@@ -32,8 +32,12 @@ const TONES: { code: ReplyTone; label: string }[] = [
   { code: 'professional', label: 'Professional' },
 ]
 
+/** What the guest actually left. Rating-only is a distinct writing job, not an empty field. */
+type ReviewKind = 'text' | 'rating-only'
+
 export default function ReplyGenerator({ storeId, storeName, defaultLocale, initialSettings, forcedKeywords = [] }: Props) {
   const [rating, setRating] = useState<number>(5)
+  const [kind, setKind] = useState<ReviewKind>('text')
   const [reviewText, setReviewText] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>(defaultLocale)
   const [tone, setTone] = useState<ReplyTone>(initialSettings?.tone === 'professional' ? 'professional' : 'warm')
@@ -56,12 +60,19 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
     return `The team at ${storeName}`
   }
 
+  /**
+   * Rating-only sends no text at all, so both the AI and the template engine take
+   * their no-text path (which invents nothing) rather than reacting to a stale
+   * draft the owner typed and then switched away from.
+   */
+  const effectiveText = kind === 'rating-only' ? '' : reviewText
+
   /** Instant offline draft from the template engine (also the AI fallback). */
   function runLocal() {
     setDraft(
       generateReply(storeName, {
         rating,
-        reviewText,
+        reviewText: effectiveText,
         locale,
         tone,
         geoPhrase,
@@ -90,7 +101,7 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         body: JSON.stringify({
           storeName,
           rating,
-          reviewText,
+          reviewText: effectiveText,
           locale,
           tone,
           geoPhrase: weaveGeo ? geoPhrase : '',
@@ -155,8 +166,8 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-600 leading-relaxed">
-        Paste a customer&apos;s Google review, pick the rating, and generate a reply in
-        your brand voice. Nothing is posted automatically — <span className="font-semibold text-slate-800">edit the draft, then copy it into Google yourself</span>.
+        Generate a reply in your brand voice — for a written review, or for a guest
+        who left a rating and nothing else. Nothing is posted automatically — <span className="font-semibold text-slate-800">edit the draft, then copy it into Google yourself</span>.
       </p>
 
       {/* Rating */}
@@ -190,21 +201,70 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         </div>
       </div>
 
-      {/* Review text */}
+      {/* What the guest left: written review vs rating only */}
       <div className="space-y-1.5">
         <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
-          Their review <span className="font-medium text-slate-300 normal-case">(optional — helps tailor the reply)</span>
+          What did they leave?
         </label>
-        <textarea
-          value={reviewText}
-          onChange={(e) => setReviewText(e.target.value)}
-          placeholder="Paste the customer's review here…"
-          rows={3}
-          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
-            text-sm text-slate-900 placeholder:text-slate-400 outline-none
-            focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-none"
-        />
+        <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+          {([
+            { code: 'text', label: 'Rating + written review', Icon: MessageSquareText },
+            { code: 'rating-only', label: 'Rating only (no words)', Icon: MessageSquareOff },
+          ] as const).map(({ code, label, Icon }) => (
+            <button
+              key={code}
+              type="button"
+              onClick={() => { setKind(code); setCopied(false) }}
+              className={[
+                'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all',
+                kind === code ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600',
+              ].join(' ')}
+            >
+              <Icon size={13} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Review text — written reviews only */}
+      {kind === 'text' ? (
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-400">
+            Their review <span className="font-medium text-slate-300 normal-case">(paste it — the AI answers what they actually wrote)</span>
+          </label>
+          <textarea
+            value={reviewText}
+            onChange={(e) => setReviewText(e.target.value)}
+            placeholder="Paste the customer's review here…"
+            rows={3}
+            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
+              text-sm text-slate-900 placeholder:text-slate-400 outline-none
+              focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-none"
+          />
+        </div>
+      ) : (
+        /* Rating-only: no text to react to. Say plainly what the draft will do,
+           so the owner isn't left wondering why it reads differently. */
+        <div className="space-y-2 rounded-xl border border-sky-200/70 bg-sky-50/50 p-3">
+          <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.12em] uppercase text-sky-700">
+            <MessageSquareOff size={12} />
+            Rating-only reply
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {rating >= 4
+              ? 'They gave you stars and no words, so the draft thanks them for the rating without pretending to know what they enjoyed — and it carries your area and keyword, because this reply is the only text Google and AI assistants can read under that rating.'
+              : rating === 3
+                ? 'A silent 3-star means something missed and you cannot see what. The draft says so honestly and asks them what would have made it better. No keywords, no guessing at the problem.'
+                : 'A silent low rating means something went wrong and you cannot see what. The draft apologises in general terms, admits you do not know what happened, and asks them to tell you so you can fix it. It never invents a reason.'}
+          </p>
+          <p className="text-[10px] text-slate-400 leading-relaxed">
+            Silent ratings are worth replying to. Your reply is indexed either way,
+            and the guest gets a notification — which is often what brings the words
+            out, especially on a low rating.
+          </p>
+        </div>
+      )}
 
       {/* Language + Tone */}
       <div className="grid grid-cols-2 gap-3">
@@ -295,8 +355,8 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         <p className="text-[10px] text-slate-400 leading-relaxed">
           Your replies are indexed by Google and read by AI assistants. Mentioning
           your area and one keyword per reply (lightly, never stuffed) strengthens
-          local search and AI Overviews. Only on positive and mixed replies, never
-          apologies.
+          local search and AI Overviews. Never used on apologies, or on a silent
+          low rating — those need honesty, not marketing.
         </p>
       </div>
 
@@ -353,7 +413,9 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
           active:scale-[0.99] transition-all disabled:opacity-60 disabled:cursor-wait"
       >
         {generating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-        {generating ? 'Reading the review…' : draft ? 'Generate another' : 'Generate reply'}
+        {generating
+          ? kind === 'rating-only' ? 'Writing the reply…' : 'Reading the review…'
+          : draft ? 'Generate another' : 'Generate reply'}
       </button>
 
       {/* Draft */}

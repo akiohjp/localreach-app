@@ -65,6 +65,30 @@ function pick<T>(arr: readonly T[], rng: () => number): T {
   return arr[Math.floor(rng() * arr.length)]!;
 }
 
+// ── Rating-only safety net ──────────────────────────────────────────────────
+// The open/react/body beats have dedicated no-text pools, but the optional beats
+// (warm, brand, kw, geo) and the closers are shared, and plenty of them thank the
+// guest for what they wrote ("your kind words", 「何より嬉しいお言葉です」) or claim to
+// know what they made of the visit ("delighted you noticed"). Under a silent rating
+// both are inventions, so those lines are filtered out rather than audited by hand
+// across three languages — new pool entries are covered automatically.
+
+const ASSUMES_TEXT: Record<ReplyLocale, RegExp> = {
+  en: /\b(words?|wrote|writing|write|said|saying|say so|reviews?|mention(ed)?|describ(e|ed)|note|comments?|feedback|reading|read|message)\b|\byou (noticed|enjoyed|loved|liked|felt|found|caught)\b/i,
+  ja: /お言葉|レビュー|ご感想|書い|拝読|コメント|おっしゃ|仰っ|お褒め|ご指摘|読ん|読み/,
+  ar: /كلمات|كلماتك|كتبت|ذكرت|قلت|ملاحظات|تعليق|مراجعت|قرأنا|قراءة/,
+};
+
+/**
+ * Drop templates that reference words the guest never wrote. `required` keeps the
+ * original pool if filtering would empty it (a slightly off line beats no line);
+ * optional beats just disappear, which is the better outcome for them.
+ */
+function noTextSafe(lines: string[], locale: ReplyLocale, required = false): string[] {
+  const kept = lines.filter((l) => !ASSUMES_TEXT[locale].test(l));
+  return kept.length > 0 || !required ? kept : lines;
+}
+
 // ── Specific-phrase extraction ──────────────────────────────────────────────
 
 /** Tidy a captured noun phrase into a bare {spec}: drop article, trim, guard. */
@@ -218,14 +242,31 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   const themes = detectThemes(options.reviewText ?? "");
   const primaryTheme: Theme | null = themes[0] ?? null;
 
+  // Rating-only: stars, no words. The normal beats all assume the guest wrote
+  // something ("thanks for the kind words", "glad the whole visit landed well"),
+  // which reads as a lie under a silent rating, so this case gets its own pools.
+  const ratingOnly = !(options.reviewText ?? "").trim();
+
   const nonce = options.nonce ?? (typeof globalThis !== "undefined" ? `${Date.now()}-${Math.random().toString(16).slice(2)}` : "ssr");
-  const seed = hashString(`${store}\0${locale}\0${tone}\0${sentiment}\0${praise.join(",")}\0${gripe.join(",")}\0${primaryTheme ?? "-"}\0${nonce}`);
+  const seed = hashString(`${store}\0${locale}\0${tone}\0${sentiment}\0${ratingOnly ? "notext" : "text"}\0${praise.join(",")}\0${gripe.join(",")}\0${primaryTheme ?? "-"}\0${nonce}`);
   const r = (salt: number) => forkRng(seed, salt);
 
-  const open = pick(pool.open, r(0x101));
-  const reaction = buildReaction(pool, locale, sentiment, praise, gripe, primaryTheme, seed);
-  const body = pick(pool.body, r(0x104));
-  const close = pick(pool.close, r(0x105));
+  /** Shared pools need the writing-reference filter in rating-only mode. */
+  const usable = (lines: string[], required = false) => (ratingOnly ? noTextSafe(lines, locale, required) : lines);
+
+  const bodyPool = usable(ratingOnly && pool.bodyNoText.length ? pool.bodyNoText : pool.body, true);
+  const closePool = usable(pool.close, true);
+  const geoPool = usable(pool.geoWoven);
+  const kwPool = usable(pool.kwWoven);
+  const brandPool = usable(pool.brand);
+  const warmPool = usable(pool.warm);
+
+  const open = pick(ratingOnly && pool.openNoText.length ? pool.openNoText : pool.open, r(0x101));
+  const reaction = ratingOnly && pool.reactNoText.length
+    ? pick(pool.reactNoText, r(0x102))
+    : buildReaction(pool, locale, sentiment, praise, gripe, primaryTheme, seed);
+  const body = pick(bodyPool, r(0x104));
+  const close = pick(closePool, r(0x105));
   const customSig = (options.signature ?? "").trim();
   const signoff = (customSig || pick(pool.signoff, r(0x106))).replace(/\{store\}/g, store);
 
@@ -235,22 +276,26 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   // Locality: near-always when the owner set one (each reply answers a
   // different review, so repetition across replies is fine and desirable).
   const geo = (options.geoPhrase ?? "").trim();
-  const geoOn = options.weaveGeo !== false && geo && pool.geoWoven.length && notNegative && r(0x120)() < 0.9;
-  const geoSentence = geoOn ? pick(pool.geoWoven, r(0x121)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store) : "";
+  const geoOn = options.weaveGeo !== false && geo && geoPool.length && notNegative && r(0x120)() < 0.9;
+  const geoSentence = geoOn ? pick(geoPool, r(0x121)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store) : "";
 
   // One forced GEO keyword, seed-rotated across the store's list, quoted in-template.
+  // Suppressed on a silent 3-star: quoting a marketing phrase at a guest who was
+  // unimpressed enough to say nothing reads as tone-deaf. Silent 5-star keeps it —
+  // there the reply is the only text Google and the AI assistants can index.
   const kws = (options.geoKeywords ?? []).map((k) => k.trim()).filter(Boolean);
-  const kwOn = kws.length > 0 && pool.kwWoven.length > 0 && notNegative && r(0x150)() < 0.75;
+  const kwAllowed = notNegative && !(ratingOnly && sentiment === "mixed");
+  const kwOn = kws.length > 0 && kwPool.length > 0 && kwAllowed && r(0x150)() < 0.75;
   const kw = kwOn ? kws[Math.floor(r(0x151)() * kws.length)]! : "";
-  const kwSentence = kw ? pick(pool.kwWoven, r(0x152)).replace(/\{kw\}/g, kw).replace(/\{store\}/g, store) : "";
+  const kwSentence = kw ? pick(kwPool, r(0x152)).replace(/\{kw\}/g, kw).replace(/\{store\}/g, store) : "";
 
   // Brand line: the store name inside the body (entity signal beyond the sign-off).
-  const brandOn = pool.brand.length > 0 && notNegative && r(0x160)() < 0.5;
-  const brandSentence = brandOn ? pick(pool.brand, r(0x161)).replace(/\{store\}/g, store) : "";
+  const brandOn = brandPool.length > 0 && notNegative && r(0x160)() < 0.5;
+  const brandSentence = brandOn ? pick(brandPool, r(0x161)).replace(/\{store\}/g, store) : "";
 
   // Human beat.
-  const warmOn = pool.warm.length > 0 && notNegative && r(0x140)() < 0.5;
-  const warmSentence = warmOn ? pick(pool.warm, r(0x141)) : "";
+  const warmOn = warmPool.length > 0 && notNegative && r(0x140)() < 0.5;
+  const warmSentence = warmOn ? pick(warmPool, r(0x141)) : "";
 
   // ── Structure ──
   // Owner requirement (2026-07-12): replies must NOT come out short. Core beats
@@ -258,20 +303,23 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   // of the optional beats we keep at most TWO so replies stay 4-6 sentences,
   // never 2-3 and never a bloated 8. Priority: kw > geo > brand > warm when
   // over budget (SEO beats win; the human beat is the garnish).
+  // A silent 3-star gives us nothing to answer, so padding it with extra beats
+  // reads as filler; keep that one lean and let the ask-what-went-wrong body carry it.
+  const optionalCap = ratingOnly && sentiment === "mixed" ? 1 : 2;
   const optional: string[] = [];
   const ranked: Array<[string, string]> = [
     ["kw", kwSentence], ["geo", geoSentence], ["brand", brandSentence], ["warm", warmSentence],
   ];
   for (const [, s] of ranked) {
-    if (s && optional.length < 2) optional.push(s);
+    if (s && optional.length < optionalCap) optional.push(s);
   }
   // If nothing optional rolled on a positive/mixed reply, force one SEO beat so
   // the reply always carries more than the bare minimum.
   if (optional.length === 0 && notNegative) {
-    if (geo && pool.geoWoven.length) {
-      optional.push(pick(pool.geoWoven, r(0x122)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store));
-    } else if (pool.brand.length) {
-      optional.push(pick(pool.brand, r(0x162)).replace(/\{store\}/g, store));
+    if (geo && geoPool.length) {
+      optional.push(pick(geoPool, r(0x122)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store));
+    } else if (brandPool.length) {
+      optional.push(pick(brandPool, r(0x162)).replace(/\{store\}/g, store));
     }
   }
 

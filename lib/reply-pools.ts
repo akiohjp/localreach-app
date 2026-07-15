@@ -71,6 +71,19 @@ export const SPEC_STOP = new Set([
 // ── Pool shape ──────────────────────────────────────────────────────────────
 export type ReplyPool = {
   open: string[];
+  /**
+   * Rating-only reviews (a star rating, no words). The normal openers thank the
+   * guest for what they wrote, which is wrong when they wrote nothing, so these
+   * thank them for the rating instead and claim no knowledge of the visit.
+   */
+  openNoText: string[];
+  /** Rating-only reaction: acknowledges the score without inventing details. */
+  reactNoText: string[];
+  /**
+   * Rating-only body. Empty = reuse `body`. Mixed/negative override it to ASK
+   * what went wrong, since a silent low score gives us nothing to fix.
+   */
+  bodyNoText: string[];
   reactSpec: string[];     // {spec}
   reactPair: string[];     // {spec} {spec2}
   reactTheme: string[];    // {theme}
@@ -118,6 +131,33 @@ const EN: LocalePools = {
       "We appreciate you! Thanks for spending part of your day writing this.",
       "This one's going on the wall. Thank you!",
     ],
+    openNoText: [
+      "Five stars with no notes, we'll take that any day. Thank you.",
+      "Thanks for the rating, it went straight to the team.",
+      "You took a second to rate us, and that second counts. Thank you.",
+      "Quiet five stars are still five stars, and we appreciate every one.",
+      "Thank you for the stars.",
+      "No words needed, the rating says plenty. Thanks for leaving it.",
+      "Appreciate you stopping to rate us.",
+      "Thanks for the score, it means more to a small place than you'd guess.",
+      "A rating from you is a good start to the day, so thank you.",
+      "Thank you for taking a moment to rate us.",
+      "Short and sweet, and very welcome. Thank you.",
+      "That rating landed well over here, thanks for it.",
+    ],
+    reactNoText: [
+      "We won't pretend to know which part won you over, but we're glad something did.",
+      "Whatever it was that worked for you, we're happy it did.",
+      "You didn't say what landed, and that's fine, the score tells us enough.",
+      "We'd love to know what stood out, though we're glad it went well either way.",
+      "A rating like that tells us we got the important parts right.",
+      "Sounds like we did our job, which is all we ask for.",
+      "We'll take it as a sign we're pointed the right way.",
+      "If you ever feel like telling us what stood out, we're all ears.",
+      "No detail needed, we're just glad the visit was worth the stars.",
+      "That's a good sign we're doing something right.",
+    ],
+    bodyNoText: [],
     reactSpec: [
       "So glad the {spec} hit the spot for you.",
       "Really pleased the {spec} landed the way it did.",
@@ -302,6 +342,34 @@ const EN: LocalePools = {
       "Appreciate the detail here, it gives us something concrete to work with.",
       "A balanced review takes more effort to write, and we appreciate it.",
     ],
+    openNoText: [
+      "Thanks for the rating. It's honest, and we'd rather have honest.",
+      "We noticed the rating, and we're taking it seriously.",
+      "Appreciate you rating us, even if it wasn't a glowing one.",
+      "Thank you for the rating. A middling score is still worth knowing about.",
+      "We saw the stars, and we'd like to understand them.",
+      "Thanks for rating us honestly rather than not at all.",
+      "A three-star day is a day we can do better, so thank you for saying so.",
+      "We'd rather see this than nothing at all, so thanks for leaving it.",
+    ],
+    reactNoText: [
+      "Without any detail we're guessing, and we'd rather not guess.",
+      "You didn't write anything, so we're left wondering which part missed.",
+      "Something clearly fell short of good, we just don't know what yet.",
+      "A score like that usually means one thing went wrong on an otherwise fine visit.",
+      "We can't fix what we can't see, and right now we can't see it.",
+      "There's a gap between that rating and what we aim for, and we'd like to close it.",
+      "We'd genuinely like to know what kept it from being a better visit.",
+      "Somewhere in there we missed, and it'd help to know where.",
+    ],
+    bodyNoText: [
+      "If you have a minute, tell us what would have made it better.",
+      "We'd welcome a line about what let it down, even a short one.",
+      "Drop us a note about what missed and we'll do something about it.",
+      "If you're up for it, let us know what we could have done differently.",
+      "Even one sentence about what went wrong would help us fix it.",
+      "We'd rather hear the specifics than guess, so please get in touch if you can.",
+    ],
     reactSpec: [
       "Point taken on the {spec}, we'll sort it.",
       "We hear you on the {spec}, and we'll tighten it up.",
@@ -402,6 +470,34 @@ const EN: LocalePools = {
       "First off: we're sorry. No excuses.",
       "That's not the visit you deserved, and we apologize.",
     ],
+    openNoText: [
+      "A rating like that means we let you down somewhere, and we're sorry.",
+      "We're sorry. That score tells us the visit went badly.",
+      "Sorry to see this. Nobody leaves a rating like that for no reason.",
+      "That's a hard rating to read, and we'd rather understand it than ignore it.",
+      "We saw the rating, and we're sorry the visit earned it.",
+      "First off, our apologies. That score says we got something badly wrong.",
+      "Sorry. A rating like this one means we missed by a long way.",
+      "We won't argue with the rating, we'd just like to know what caused it.",
+    ],
+    reactNoText: [
+      "You didn't say what happened, and we'd really like to know.",
+      "We're in the dark on the details, which makes it hard to fix.",
+      "Whatever went wrong, we'd rather hear it than guess at it.",
+      "We can't put right what we don't understand yet.",
+      "Something clearly went wrong on our side, and we want the specifics.",
+      "We'd rather know exactly where we failed than assume.",
+      "No detail means no fix, and we do want to fix this.",
+      "We'd like to hear what happened, straight from you.",
+    ],
+    bodyNoText: [
+      "Please tell us what went wrong, we'll look into it properly.",
+      "If you'll share what happened, we'll make it right.",
+      "Get in touch and tell us what we did, we'd like the chance to fix it.",
+      "We'd appreciate a line about what went wrong so we can deal with it.",
+      "Reach out and let us know what happened, we take this seriously.",
+      "Tell us what we got wrong and we'll do something about it, not just apologise.",
+    ],
     reactSpec: [
       "You're right about the {spec}, and it's not good enough.",
       "We're sorry the {spec} let you down.",
@@ -476,6 +572,29 @@ const JA: LocalePools = {
       "この仕事をやっていて良かったと思える瞬間です。ありがとうございます。",
       "何度も読み返してしまいました。本当にありがとうございます。",
     ],
+    openNoText: [
+      "高い評価をつけてくださって、ありがとうございます。",
+      "星をつけていただけただけで、十分嬉しいです。ありがとうございます。",
+      "評価をいただき、ありがとうございます。スタッフにもすぐ伝えました。",
+      "ひと手間かけて評価してくださったこと、感謝しています。",
+      "満点の評価、ありがたく受け取りました。",
+      "コメントがなくても、この評価だけで伝わるものがあります。ありがとうございます。",
+      "お忙しい中、評価だけでも残していただけて嬉しいです。",
+      "評価をつけていただき、ありがとうございます。励みになります。",
+      "その星の数が、何よりの励みです。ありがとうございます。",
+      "ご来店と評価、どちらも本当にありがとうございます。",
+    ],
+    reactNoText: [
+      "どの部分が良かったのかは分かりませんが、ご満足いただけたようで安心しました。",
+      "何がお気に召したのか、いつか教えていただけたら嬉しいです。",
+      "詳しいことは分かりませんが、良い時間を過ごしていただけたのだと受け止めています。",
+      "この評価をいただけたということは、大事なところは外していなかったのだと思います。",
+      "何かひとつでも良いと感じていただけたのなら、それだけで十分です。",
+      "私たちのやっていることが間違っていないと、背中を押された気持ちです。",
+      "気に入っていただけた点があれば、次回ぜひ聞かせてください。",
+      "細かいことは抜きにして、良い一日になっていたなら嬉しいです。",
+    ],
+    bodyNoText: [],
     reactSpec: [
       "{spec}を気に入っていただけて、本当に嬉しいです。",
       "{spec}が印象に残ったとのこと、何よりの励みになります。",
@@ -581,6 +700,29 @@ const JA: LocalePools = {
       "バランスの取れたご意見、ありがたく拝読しました。",
       "褒めるだけでなく課題も伝えてくださる方は貴重です。ありがとうございます。",
     ],
+    openNoText: [
+      "評価をつけてくださり、ありがとうございます。正直な数字として受け止めます。",
+      "評価を拝見しました。真摯に受け止めています。",
+      "満点ではない評価も、いただけるだけありがたいです。",
+      "評価をありがとうございます。この点数の理由を知りたいと思っています。",
+      "何も書かずとも、評価を残してくださったことに感謝します。",
+      "正直な評価をいただけたことを、ありがたく思っています。",
+    ],
+    reactNoText: [
+      "コメントがない分、どこが物足りなかったのかを推測するしかない状況です。",
+      "何かが期待に届かなかったのだと思いますが、その中身がまだ分かりません。",
+      "見えていない課題があるはずで、それを知りたいと思っています。",
+      "この評価と私たちの目指すところには差があります。その差を埋めたいです。",
+      "どこでご期待に添えなかったのか、正直なところ掴めていません。",
+      "推測で直すのではなく、実際のところを教えていただきたいです。",
+    ],
+    bodyNoText: [
+      "もしお時間があれば、どこが惜しかったのか一言でも教えていただけませんか。",
+      "気になった点を教えていただけると、必ず改善に活かします。",
+      "一行で構いませんので、足りなかった点をお聞かせいただけると助かります。",
+      "次はもっと良い時間にできるよう、ご意見をお待ちしています。",
+      "推測で終わらせたくないので、よろしければご連絡ください。",
+    ],
     reactSpec: [
       "{spec}のご指摘、しっかり改善します。",
       "{spec}についてはおっしゃる通りで、見直します。",
@@ -649,6 +791,29 @@ const JA: LocalePools = {
       "まずお詫びさせてください。言い訳はいたしません。",
       "拝読して、あってはならないことだと痛感しました。申し訳ございません。",
     ],
+    openNoText: [
+      "この評価をいただくということは、どこかで至らなかったということです。申し訳ありません。",
+      "評価を拝見しました。ご期待に応えられず、申し訳ありませんでした。",
+      "厳しい評価、真摯に受け止めます。申し訳ございませんでした。",
+      "理由のない低評価はないと思っています。まずはお詫び申し上げます。",
+      "まずお詫びさせてください。この評価は、私どもの落ち度だと受け止めています。",
+      "評価そのものに異論はありません。ただ、何があったのかを知りたいのです。",
+    ],
+    reactNoText: [
+      "何があったのかが分からないままで、それが一番心苦しいところです。",
+      "詳細が見えないままでは、同じことを繰り返してしまいます。",
+      "推測でお詫びするのではなく、実際に起きたことを知りたいです。",
+      "どこで失礼があったのか、正直に教えていただきたいと思っています。",
+      "分からないままにしておきたくない、というのが本音です。",
+      "私どものどこに問題があったのか、はっきり伺えればと思います。",
+    ],
+    bodyNoText: [
+      "何があったのか、ぜひお聞かせください。必ず確認いたします。",
+      "差し支えなければご連絡ください。きちんと対応させていただきます。",
+      "お手数ですが、状況を教えていただけないでしょうか。責任を持って改善します。",
+      "一言でも構いませんので、何が起きたのかお知らせいただけると助かります。",
+      "お詫びだけで終わらせたくありません。ぜひご連絡ください。",
+    ],
     reactSpec: [
       "{spec}については、おっしゃる通り私どもの至らぬ点です。",
       "{spec}でご不便をおかけし、申し訳ありません。",
@@ -706,6 +871,23 @@ const AR: LocalePools = {
       "قرأنا تقييمك للفريق كله، وأسعد الجميع.",
       "هذا النوع من التقييمات يجعل الأيام الطويلة تستحق العناء.",
     ],
+    openNoText: [
+      "شكرًا على التقييم، وصل إلى الفريق مباشرة.",
+      "خمس نجوم دون كلمات تكفينا تمامًا. شكرًا لك.",
+      "شكرًا لتخصيص لحظة لتقييمنا.",
+      "نقدّر لك هذا التقييم، ويعني الكثير لمكان صغير مثلنا.",
+      "شكرًا على النجوم.",
+      "لا حاجة للكلمات، التقييم يقول ما يكفي. شكرًا لك.",
+    ],
+    reactNoText: [
+      "لا نعرف أي جزء أعجبك تحديدًا، لكننا سعداء أن شيئًا ما نال إعجابك.",
+      "مهما كان سبب رضاك، يسعدنا أنه كان كذلك.",
+      "تقييم كهذا يعني أننا أصبنا في الأمور المهمة.",
+      "يسرّنا أن نعرف ما الذي أعجبك، وإن كنا سعداء بالنتيجة على أي حال.",
+      "نعتبره إشارة إلى أننا نسير في الاتجاه الصحيح.",
+      "يبدو أننا قمنا بعملنا، وهذا كل ما نطمح إليه.",
+    ],
+    bodyNoText: [],
     reactSpec: [
       "يسعدنا حقًا أن {spec} نال إعجابك.",
       "جميل أن نعرف أن {spec} كان مميزًا لك.",
@@ -780,6 +962,26 @@ const AR: LocalePools = {
       "من الجيد أن نعرف ما نجح وما لم ينجح.",
       "التقييم الصادق أهم لنا من العلامة الكاملة.",
     ],
+    openNoText: [
+      "شكرًا على التقييم، صادق، ونحن نفضّل الصدق.",
+      "رأينا التقييم، ونأخذه على محمل الجد.",
+      "نقدّر تقييمك حتى وإن لم يكن كاملًا.",
+      "شكرًا على التقييم، فحتى العلامة المتوسطة تستحق أن نعرفها.",
+      "نفضّل أن نرى هذا على ألا نرى شيئًا، فشكرًا لك.",
+    ],
+    reactNoText: [
+      "من دون تفاصيل نحن نخمّن، ونحن لا نحب التخمين.",
+      "لم تكتب شيئًا، لذا لا نعرف أي جزء لم يكن على المستوى.",
+      "من الواضح أن شيئًا ما لم يكن كما ينبغي، لكننا لا نعرفه بعد.",
+      "لا يمكننا إصلاح ما لا نراه، وحاليًا لا نراه.",
+      "هناك فجوة بين هذا التقييم وما نطمح إليه، ونود ردمها.",
+    ],
+    bodyNoText: [
+      "إن كان لديك دقيقة، أخبرنا ما الذي كان سيجعل التجربة أفضل.",
+      "سطر واحد عمّا لم يعجبك سيساعدنا كثيرًا.",
+      "تواصل معنا وأخبرنا بما نقص، وسنعمل عليه.",
+      "نفضّل سماع التفاصيل على تخمينها، فلا تتردد في التواصل.",
+    ],
     reactSpec: [
       "نأخذ ملاحظتك حول {spec} على محمل الجد.",
       "نتفق معك بشأن {spec}، وسنحسّنه.",
@@ -835,6 +1037,26 @@ const AR: LocalePools = {
       "هذه ليست الطريقة التي نريد أن يغادر بها أحد، نعتذر.",
       "لقد قصّرنا هنا، ونعتذر.",
       "أولًا: نعتذر. بلا أعذار.",
+    ],
+    openNoText: [
+      "تقييم كهذا يعني أننا خذلناك في مكان ما، ونعتذر.",
+      "نعتذر. هذا التقييم يخبرنا أن الزيارة لم تكن جيدة.",
+      "نأسف لرؤية هذا. لا أحد يترك تقييمًا كهذا بلا سبب.",
+      "أولًا نعتذر، فهذه العلامة تعني أننا أخطأنا بشكل واضح.",
+      "لا نجادل في التقييم، لكننا نود معرفة سببه.",
+    ],
+    reactNoText: [
+      "لم تذكر ما حدث، ونحن نود حقًا أن نعرف.",
+      "التفاصيل غائبة عنا، وهذا يجعل الإصلاح صعبًا.",
+      "مهما كان الخطأ، نفضّل سماعه على تخمينه.",
+      "لا يمكننا تصحيح ما لم نفهمه بعد.",
+      "من الواضح أن خطأً وقع من جانبنا، ونريد التفاصيل.",
+    ],
+    bodyNoText: [
+      "أخبرنا من فضلك بما حدث، وسننظر في الأمر بجدية.",
+      "إن شاركتنا ما جرى، فسنصحّح الأمر.",
+      "تواصل معنا وأخبرنا بما حدث، نود فرصة لإصلاحه.",
+      "سطر واحد عمّا حدث سيساعدنا على معالجته.",
     ],
     reactSpec: [
       "أنت محقّ بشأن {spec}، وهو ليس بالمستوى الكافي.",
