@@ -98,10 +98,9 @@ function joinListEn(phrases: string[], rng: () => number): string {
   const p = phrases.filter(Boolean);
   if (p.length <= 1) return p[0] ?? "";
   if (p.length === 2) {
-    const r = rng();
-    if (r < 0.48) return `${p[0]} and ${p[1]}`;
-    if (r < 0.8) return `${p[0]}, ${p[1]}`;
-    return `${p[0]} plus ${p[1]}`;
+    // Two items read best joined with "and"; a bare comma ("A, B was great")
+    // looks like a clipped list. Keep an occasional "plus" for variety.
+    return rng() < 0.82 ? `${p[0]} and ${p[1]}` : `${p[0]} plus ${p[1]}`;
   }
   if (p.length === 3) {
     const r = rng();
@@ -114,7 +113,9 @@ function joinListEn(phrases: string[], rng: () => number): string {
 function joinListJa(phrases: string[], rng: () => number): string {
   const p = phrases.filter(Boolean);
   if (p.length <= 1) return p[0] ?? "";
-  if (p.length === 2) return rng() < 0.5 ? `${p[0]}と${p[1]}` : `${p[0]}、${p[1]}`;
+  // Two items read best joined with「と」; a bare「、」("A、B が…") looks like a
+  // clipped list. Keep「、」only occasionally for variety.
+  if (p.length === 2) return rng() < 0.8 ? `${p[0]}と${p[1]}` : `${p[0]}、${p[1]}`;
   const last = p[p.length - 1]!;
   const head = p.slice(0, -1).join("、");
   return rng() < 0.5 ? `${head}、${last}` : `${head}、そして${last}`;
@@ -135,19 +136,25 @@ function joinListAr(phrases: string[], rng: () => number): string {
 
 const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
   en: {
+    // Real Google reviews skew SHORT (a great many are 10-40 words); high targets
+    // force the length-tuner to stuff fillers, which reads as padding. Kept low so
+    // most reviews stay lean and only occasionally run long. Per-review buckets
+    // (LEN_BUCKETS) spread the actual length so a store's reviews don't cluster.
     measure: wordCount,
-    target: 100,
-    min: 90,
-    max: 118,
+    target: 55,
+    min: 24,
+    max: 100,
     sentenceEnd: /\./g,
     glue: " ",
     joinList: joinListEn,
   },
   ja: {
+    // JA Google reviews also skew short (many are 30-80 chars). Low targets keep
+    // most reviews lean; buckets below spread the actual length.
     measure: cjkCount,
-    target: 210,
-    min: 150,
-    max: 300,
+    target: 90,
+    min: 30,
+    max: 220,
     sentenceEnd: /。/g,
     glue: "",
     joinList: joinListJa,
@@ -156,9 +163,9 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
     // Arabic is space-delimited, so word count is a fair length metric; it packs
     // more meaning per word than English, so the targets sit a touch lower.
     measure: wordCount,
-    target: 82,
-    min: 60,
-    max: 112,
+    target: 42,
+    min: 16,
+    max: 95,
     sentenceEnd: /\./g,
     glue: " ",
     joinList: joinListAr,
@@ -177,19 +184,19 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
 type LenBucket = { kind: "short" | "medium" | "long"; target: number; min: number; max: number };
 const LEN_BUCKETS: Record<ReviewLocale, { short: LenBucket; medium: LenBucket; long: LenBucket }> = {
   en: {
-    short: { kind: "short", target: 52, min: 38, max: 68 },
-    medium: { kind: "medium", target: 85, min: 68, max: 100 },
-    long: { kind: "long", target: 105, min: 90, max: 125 },
+    short: { kind: "short", target: 18, min: 10, max: 32 },
+    medium: { kind: "medium", target: 42, min: 28, max: 62 },
+    long: { kind: "long", target: 72, min: 52, max: 100 },
   },
   ja: {
-    short: { kind: "short", target: 115, min: 80, max: 160 },
-    medium: { kind: "medium", target: 175, min: 135, max: 235 },
-    long: { kind: "long", target: 215, min: 150, max: 300 },
+    short: { kind: "short", target: 34, min: 18, max: 58 },
+    medium: { kind: "medium", target: 72, min: 45, max: 115 },
+    long: { kind: "long", target: 128, min: 90, max: 220 },
   },
   ar: {
-    short: { kind: "short", target: 45, min: 32, max: 62 },
-    medium: { kind: "medium", target: 72, min: 58, max: 92 },
-    long: { kind: "long", target: 92, min: 76, max: 115 },
+    short: { kind: "short", target: 14, min: 8, max: 26 },
+    medium: { kind: "medium", target: 32, min: 22, max: 50 },
+    long: { kind: "long", target: 58, min: 42, max: 95 },
   },
 };
 
@@ -361,8 +368,20 @@ function reviewNoKeywords(store: string, pool: PoolSet, cfg: LocaleCfg, seed: nu
  * (If a woven keyword itself contains the store name, that rare case is left
  * alone by running this before keyword tails are appended.)
  */
-function capStoreMentions(text: string, name: string, locale: ReviewLocale): string {
+const STANDINS: Record<ReviewLocale, string[]> = {
+  // Stand-ins that read naturally in ANY slot the store name occupies (subject,
+  // or object after a preposition like "back to ___"). Rotated so a review never
+  // repeats the same stand-in twice, which itself reads as a bot tell. Deliberately
+  // no bare "here" — it breaks after prepositions ("back to here").
+  en: ["this place", "the place", "the spot"],
+  ja: ["こちら", "このお店", "お店", "こちらのお店"],
+  ar: ["هذا المكان", "المكان"],
+};
+
+function capStoreMentions(text: string, name: string, locale: ReviewLocale, rng: () => number): string {
   if (!name) return text;
+  const variants = STANDINS[locale];
+  let vi = Math.floor(rng() * variants.length);
   let out = "";
   let rest = text;
   let count = 0;
@@ -376,10 +395,11 @@ function capStoreMentions(text: string, name: string, locale: ReviewLocale): str
       const before = rest.slice(0, i);
       const prev = (out + before).trimEnd().slice(-1);
       const sentenceStart = (out + before).trim() === "" || /[.!?。！？]/.test(prev);
-      const sub =
-        locale === "ja" ? "このお店"
-        : locale === "ar" ? "هذا المكان"
-        : sentenceStart ? "This place" : "this place";
+      let sub = variants[vi % variants.length]!;
+      vi++;
+      if (locale === "en" && sentenceStart) {
+        sub = sub.charAt(0).toUpperCase() + sub.slice(1);
+      }
       out += before + sub;
     }
     rest = rest.slice(i + name.length);
@@ -403,7 +423,19 @@ function normalizeDashes(text: string): string {
  * seed-rotated handful of the guest's picks, and let the rest surface in other
  * generations (which also keeps 100s of reviews unique and human-sounding).
  */
-const WOVEN_KEYWORD_CAP = 5;
+const WOVEN_KEYWORD_CAP = 4;
+
+/**
+ * Max keyword phrases allowed inside ONE {list} sentence. A real guest names one
+ * or two things in a single breath ("the doughnuts were fresh and the Karak was
+ * great"), never a comma-list of five. Keeping the core sentence to <=2 phrases
+ * is what makes the text read human — and it is ALSO the SEO/AIO-safe choice:
+ * exact-match keyword dumps read as spam to Google's review filter and add no
+ * signal for LLM/AI-Overview extraction, which keys off natural entity mentions.
+ * Every remaining verbatim keyword still appears, woven later as its own natural
+ * single-keyword sentence (the tail loop), so nothing is dropped.
+ */
+const LIST_CAP = 2;
 
 /**
  * Pick the phrases to actually weave: ALWAYS keep the forced/core ones, then a
@@ -447,7 +479,7 @@ export function buildLocalizedReview(
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
-    return normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale));
+    return normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale, forkRng(seed, 0xca9)));
   }
 
   const keywords = selectWovenKeywords(allKeywords, forcedCount, seed);
@@ -456,15 +488,22 @@ export function buildLocalizedReview(
   const bucket = pickLenBucket(locale, seed, rating, keywords.length);
   const cfg = { ...LOCALE_CFG[locale], ...bucket };
   const shuffled = shuffle(keywords, forkRng(seed, 0xb8b26351));
-  const many = shuffled.length > 8;
+
+  // Only a small CORE of keywords goes into the {list} sentence (see LIST_CAP);
+  // the rest are appended as natural single-keyword tails below. This is the
+  // single biggest human-ness lever: it turns "A, B, C, D and E" dumps into a
+  // guest naming one or two things, then mentioning the others in passing.
+  const coreCount = bucket.kind === "short" ? 1 : Math.min(LIST_CAP, shuffled.length);
+  const coreKws = shuffled.slice(0, coreCount);
   const longPhrases =
-    shuffled.reduce((n, k) => n + k.length, 0) > 140 ||
-    shuffled.some((k) => k.split(/\s+/).length > 5);
+    coreKws.reduce((n, k) => n + k.length, 0) > 90 ||
+    coreKws.some((k) => k.split(/\s+/).length > 5);
   // A short-bucket review needs the compact template set (short openers/cores/
   // closers) or the assembled baseline alone overshoots the bucket ceiling.
-  const compact = many || longPhrases || bucket.kind === "short";
+  const compact = longPhrases || bucket.kind === "short";
 
-  let text = buildInner(name, shuffled, pool, cfg, compact, seed);
+  let text = buildInner(name, coreKws, pool, cfg, compact, seed);
+  // protect ALL verbatim keywords from length-trimming, not just the core ones.
   text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled);
 
   if (!text.includes(name)) {
@@ -482,7 +521,7 @@ export function buildLocalizedReview(
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
   // itself contains the name, so the verbatim-keyword guarantee is never broken.
   if (!shuffled.some((k) => k.includes(name))) {
-    text = capStoreMentions(text, name, locale);
+    text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9));
   }
   return normalizeDashes(text);
 }
