@@ -88,11 +88,24 @@ async function main() {
   }
   console.log("kw surfacing /" + N + ":", Object.entries(kwFreq).map(([k, v]) => `"${k}"=${v}`).join("  "));
 
+  // ---- selection completeness (real-store bug: guest's picks vanished) ----
+  // A guest who taps several pills must see ALL of them in the draft, not a
+  // random subset. Probe a heavy 7-keyword selection.
+  const selForced = ["fresh doughnuts", "best doughnuts in Dubai"];
+  const selGuest = ["Boston Cream", "gift box", "Karak and doughnuts", "matcha latte", "cinnamon roll"];
+  const selKws = [...selForced, ...selGuest];
+  let selDrop = 0;
+  for (let i = 0; i < 150; i++) {
+    const t = generateReview(store, selKws, { nonce: createReviewNonce(), outletKey: "sel|cafe|#f97316", locale: "en", category: "cafe", forcedCount: selForced.length });
+    if (!selKws.every((k) => t.includes(k))) selDrop++;
+  }
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
   assert(nameMissing === 0, `SEO: store name present in every review (missing ${nameMissing})`);
   assert(forced.every((k) => kwFreq[k] === N), `SEO: forced GEO keywords woven in 100% of reviews`);
-  assert(guest.every((k) => kwFreq[k] >= N * 0.15), `AIO: every guest keyword surfaces across reviews (rotation breadth)`);
+  assert(guest.every((k) => kwFreq[k] === N), `selection: every guest-selected keyword appears in EVERY review (no vanishing)`);
+  assert(selDrop === 0, `selection: all 7 of a heavy selection present every time (got ${selDrop} with drops)`);
   assert(spread >= 30, `length spread >= 30 (got ${spread})`);
   assert(kwMiss === 0, "forced keywords always present");
   assert(nameOver === 0, "store name never mentioned more than twice");

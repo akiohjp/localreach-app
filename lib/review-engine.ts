@@ -136,25 +136,24 @@ function joinListAr(phrases: string[], rng: () => number): string {
 
 const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
   en: {
-    // Real Google reviews skew SHORT (a great many are 10-40 words); high targets
-    // force the length-tuner to stuff fillers, which reads as padding. Kept low so
-    // most reviews stay lean and only occasionally run long. Per-review buckets
-    // (LEN_BUCKETS) spread the actual length so a store's reviews don't cluster.
+    // Balance: fleshed-out enough that a review never reads as a bare one-liner
+    // (real-store feedback: "too simple", 2026-07-16), but not so high that the
+    // tuner stuffs fillers. Most length now comes from weaving every guest
+    // keyword as its own sentence; buckets still spread the total so reviews vary.
     measure: wordCount,
-    target: 55,
-    min: 24,
-    max: 100,
+    target: 72,
+    min: 38,
+    max: 125,
     sentenceEnd: /\./g,
     glue: " ",
     joinList: joinListEn,
   },
   ja: {
-    // JA Google reviews also skew short (many are 30-80 chars). Low targets keep
-    // most reviews lean; buckets below spread the actual length.
+    // Fleshed-out but not padded; most length comes from weaving every keyword.
     measure: cjkCount,
-    target: 90,
-    min: 30,
-    max: 220,
+    target: 135,
+    min: 55,
+    max: 260,
     sentenceEnd: /。/g,
     glue: "",
     joinList: joinListJa,
@@ -163,9 +162,9 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
     // Arabic is space-delimited, so word count is a fair length metric; it packs
     // more meaning per word than English, so the targets sit a touch lower.
     measure: wordCount,
-    target: 42,
-    min: 16,
-    max: 95,
+    target: 58,
+    min: 28,
+    max: 115,
     sentenceEnd: /\./g,
     glue: " ",
     joinList: joinListAr,
@@ -184,27 +183,31 @@ const LOCALE_CFG: Record<ReviewLocale, LocaleCfg> = {
 type LenBucket = { kind: "short" | "medium" | "long"; target: number; min: number; max: number };
 const LEN_BUCKETS: Record<ReviewLocale, { short: LenBucket; medium: LenBucket; long: LenBucket }> = {
   en: {
-    short: { kind: "short", target: 18, min: 10, max: 32 },
-    medium: { kind: "medium", target: 42, min: 28, max: 62 },
-    long: { kind: "long", target: 72, min: 52, max: 100 },
+    short: { kind: "short", target: 30, min: 20, max: 44 },
+    medium: { kind: "medium", target: 54, min: 40, max: 76 },
+    long: { kind: "long", target: 100, min: 74, max: 132 },
   },
   ja: {
-    short: { kind: "short", target: 34, min: 18, max: 58 },
-    medium: { kind: "medium", target: 72, min: 45, max: 115 },
-    long: { kind: "long", target: 128, min: 90, max: 220 },
+    short: { kind: "short", target: 58, min: 40, max: 90 },
+    medium: { kind: "medium", target: 110, min: 80, max: 150 },
+    long: { kind: "long", target: 175, min: 120, max: 260 },
   },
   ar: {
-    short: { kind: "short", target: 14, min: 8, max: 26 },
-    medium: { kind: "medium", target: 32, min: 22, max: 50 },
-    long: { kind: "long", target: 58, min: 42, max: 95 },
+    short: { kind: "short", target: 30, min: 20, max: 44 },
+    medium: { kind: "medium", target: 50, min: 38, max: 72 },
+    long: { kind: "long", target: 82, min: 60, max: 115 },
   },
 };
 
 function pickLenBucket(locale: ReviewLocale, seed: number, rating: number, wovenCount: number): LenBucket {
   const b = LEN_BUCKETS[locale];
-  if (wovenCount >= 5) return b.long;                       // 5 verbatim phrases can't breathe in 55 words
+  // Bias longer as keyword count grows, but never LOCK to one bucket — that makes
+  // every keyword-heavy review the same length (a pattern tell). Keyword count is
+  // the main length driver; the bucket just adds spread on top.
   const r = forkRng(seed, 0x777)();
   const measured = rating <= 4;
+  if (wovenCount >= 7) return b.long;
+  if (wovenCount >= 5) return r < 0.45 ? b.medium : b.long;
   if (wovenCount >= 4) return r < (measured ? 0.6 : 0.5) ? b.medium : b.long;
   if (measured) return r < 0.45 ? b.short : r < 0.9 ? b.medium : b.long;
   return r < 0.34 ? b.short : r < 0.74 ? b.medium : b.long;
@@ -417,13 +420,14 @@ function normalizeDashes(text: string): string {
 }
 
 /**
- * Max keyword phrases woven into a single review. A real guest names a few
- * things, not a list of ten. Above this the review reads as a keyword dump and
- * every review looks the same — so we weave the forced/core phrases plus only a
- * seed-rotated handful of the guest's picks, and let the rest surface in other
- * generations (which also keeps 100s of reviews unique and human-sounding).
+ * Upper safety bound on keyword phrases woven into one review — only trims a
+ * genuinely extreme selection (a guest who tapped 8+ pills) so it can't become a
+ * ten-item monster. It is NOT the naturalness limiter: LIST_CAP keeps each
+ * SENTENCE to <=2 phrases, so extra keywords surface as their own natural
+ * sentences rather than a dump. The guest's own selections must all appear (they
+ * chose them) — dropping a selected keyword reads as a bug to the guest.
  */
-const WOVEN_KEYWORD_CAP = 4;
+const WOVEN_KEYWORD_CAP = 8;
 
 /**
  * Max keyword phrases allowed inside ONE {list} sentence. A real guest names one
@@ -438,12 +442,13 @@ const WOVEN_KEYWORD_CAP = 4;
 const LIST_CAP = 2;
 
 /**
- * Pick the phrases to actually weave: ALWAYS keep the forced/core ones, then a
- * seed-rotated SUBSET of the guest picks (1..room) — even when everything would
- * fit under the cap. Weaving every pick every time makes all of a store's
- * reviews carry the same phrase list at the same ~length (a visible pattern);
- * rotating the guest subset varies both content and length per generation, and
- * the remaining picks surface in other guests' reviews instead.
+ * Pick the phrases to weave: ALWAYS keep the forced/core ones, and weave EVERY
+ * guest pick too — the guest deliberately tapped those, so dropping any of them
+ * reads as "my keyword disappeared" (real-store feedback 2026-07-16). Only when a
+ * selection is extreme (forced + guest exceeds WOVEN_KEYWORD_CAP) do we trim, and
+ * even then forced win and a seed-shuffled slice of guest picks fills the rest.
+ * Uniqueness across a store's reviews comes from the nonce, template rotation and
+ * length buckets — not from hiding the guest's own choices.
  */
 function selectWovenKeywords(keywords: string[], forcedCount: number, seed: number): string[] {
   const fc = Math.max(0, Math.min(forcedCount, keywords.length));
@@ -456,9 +461,9 @@ function selectWovenKeywords(keywords: string[], forcedCount: number, seed: numb
       ? forced
       : shuffle(forced, forkRng(seed, 0xc0ffe1)).slice(0, WOVEN_KEYWORD_CAP);
   }
-  const maxTake = Math.min(room, guest.length);
-  const take = 1 + Math.floor(forkRng(seed, 0xc0ffee)() * maxTake); // 1..maxTake
-  const guestWoven = shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, take);
+  // Weave ALL guest picks; only a selection bigger than `room` gets trimmed.
+  const guestWoven =
+    guest.length <= room ? guest : shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, room);
   return [...forced, ...guestWoven];
 }
 
@@ -510,10 +515,15 @@ export function buildLocalizedReview(
     text = appendToLast(text, `(${name})`, cfg.glue);
   }
 
-  let salt = 0xd00;
+  // Give each leftover keyword its OWN tail template — cycling a shuffled order so
+  // consecutive keywords never reuse the same sentence ("Really enjoyed the X.
+  // Really enjoyed the Y." was a visible tell when several keywords were woven).
+  const tailOrder = shuffle([...pool.tails], forkRng(seed, 0x7a11));
+  let ti = 0;
   for (const kw of shuffled) {
-    if (kw.length > 0 && !text.includes(kw) && pool.tails.length > 0) {
-      text = appendToLast(text, fill(pick(pool.tails, forkRng(seed, salt++)), { kw }), cfg.glue);
+    if (kw.length > 0 && !text.includes(kw) && tailOrder.length > 0) {
+      text = appendToLast(text, fill(tailOrder[ti % tailOrder.length]!, { kw }), cfg.glue);
+      ti++;
     }
   }
 
