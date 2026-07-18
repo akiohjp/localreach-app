@@ -92,6 +92,30 @@ async function main() {
   assert(counts.ja >= 150, `JA has ${counts.ja} templates (>=150)`);
   assert(counts.ar >= 80, `AR has ${counts.ar} templates (>=80)`);
 
+  console.log("\nTEST 10 — subject/verb agreement with PLURAL specifics");
+  // A guest naming a plural item ("the pastries", "the brownies") must never get
+  // "the pastries has been raised" / "the brownies was a highlight". Templates use
+  // number-neutral past-tense or object framing; probe it hard.
+  const PLURALS = ["brownies", "pastries", "doughnuts", "cakes", "cookies"];
+  const plReviews = [
+    [5, "The brownies were amazing and the pastries were so fresh."],
+    [5, "Loved the doughnuts and the cookies were perfect."],
+    [3, "The doughnuts were great but the cakes were a bit dry."],
+    [2, "The pastries were stale and the brownies were hard."],
+    [1, "Cold cakes and the pastries were old."],
+  ];
+  let agreementErr = 0;
+  const badForms = (t) => {
+    const low = t.toLowerCase();
+    return PLURALS.some((n) => low.includes(`${n} has `) || low.includes(`${n} is `) || low.includes(`${n} was `));
+  };
+  for (let i = 0; i < 400; i++) {
+    const [rating, text] = plReviews[i % plReviews.length];
+    const t = generateReply(store, { rating, reviewText: text, locale: "en", geoPhrase: "Dubai Marina", geoKeywords: KWS, nonce: createReplyNonce() });
+    if (badForms(t)) { agreementErr++; if (agreementErr <= 3) console.error("     ✗ disagreement:", t.split("\n")[0]); }
+  }
+  assert(agreementErr === 0, `no "<plural> has/is/was" disagreement over 400 runs (got ${agreementErr})`);
+
   console.log("\n─── SAMPLES (EN, warm, geo+kw like Let It Dough) ───");
   const reviews = [
     [5, "The matcha croissant was incredible and the staff were so warm. Cosy spot too."],

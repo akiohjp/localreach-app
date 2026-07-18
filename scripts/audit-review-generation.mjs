@@ -75,8 +75,24 @@ async function main() {
   const jaHits = scanLocale("ja", "restaurant", ["新鮮なネタ", "落ち着いた雰囲気"], ["取ってつけた", "当てにならない", "素直なメモ", "話半分", "削ぎ落と"]);
   const arHits = scanLocale("ar", "restaurant", ["مذاق رائع", "أجواء هادئة"], ["مقحم", "منمّق", "مزيف", "لست هنا لأكتب"]);
 
+  // ---- SEO / GEO / AIO signal (must SURVIVE the naturalness rework) ----
+  // Naturalness must not cost discoverability: every review must still carry the
+  // business name + all forced GEO keywords verbatim, and guest keywords must
+  // rotate across reviews so the whole keyword set surfaces (AIO breadth).
+  let nameMissing = 0;
+  const kwFreq = Object.fromEntries(kws.map((k) => [k, 0]));
+  for (let i = 0; i < N; i++) {
+    const t = generateReview(store, kws, opts());
+    if (!t.includes(store)) nameMissing++;
+    for (const k of kws) if (t.includes(k)) kwFreq[k]++;
+  }
+  console.log("kw surfacing /" + N + ":", Object.entries(kwFreq).map(([k, v]) => `"${k}"=${v}`).join("  "));
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
+  assert(nameMissing === 0, `SEO: store name present in every review (missing ${nameMissing})`);
+  assert(forced.every((k) => kwFreq[k] === N), `SEO: forced GEO keywords woven in 100% of reviews`);
+  assert(guest.every((k) => kwFreq[k] >= N * 0.15), `AIO: every guest keyword surfaces across reviews (rotation breadth)`);
   assert(spread >= 30, `length spread >= 30 (got ${spread})`);
   assert(kwMiss === 0, "forced keywords always present");
   assert(nameOver === 0, "store name never mentioned more than twice");
