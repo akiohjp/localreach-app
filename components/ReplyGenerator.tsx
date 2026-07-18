@@ -43,7 +43,7 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
   const [tone, setTone] = useState<ReplyTone>(initialSettings?.tone === 'professional' ? 'professional' : 'warm')
   const [geoPhrase, setGeoPhrase] = useState<string>(initialSettings?.locality ?? '')
   const [weaveGeo, setWeaveGeo] = useState<boolean>(initialSettings?.weaveGeo !== false)
-  const [weaveKw, setWeaveKw] = useState<boolean>(true)
+  const [weaveKw, setWeaveKw] = useState<boolean>(initialSettings?.weaveKw !== false)
   const [signature, setSignature] = useState<string>(initialSettings?.signature ?? '')
   const [draft, setDraft] = useState('')
   const [copied, setCopied] = useState(false)
@@ -133,6 +133,7 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         tone,
         locality: geoPhrase.trim(),
         weaveGeo,
+        weaveKw,
         signature: signature.trim(),
       }
       const supabase = createClient()

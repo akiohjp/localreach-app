@@ -1,8 +1,10 @@
 import { notFound, redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
+import { isStoreCurrentlyActive } from '@/lib/subscription'
 import { getLocalizedText } from '@/types/database'
 import { qrPngDataUrl } from '@/lib/qr'
 import StoreDashboard from './StoreDashboard'
@@ -54,7 +56,12 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
   // Auth check: store owner only (マスターコンソールは /master-admin で運用し、JWT の super_admin とは別)
   if (store.owner_id !== user.id) redirect('/admin/login')
 
-  if (!store.is_active) redirect('/inactive')
+  // Effective active = kill switch AND contract not expired. The public QR page
+  // gets this via the public_store_review view; the dashboard reads the base
+  // table, so it must apply the same rule or an expired store keeps dashboard
+  // access (edits content, burns AI-reply quota) after lockout. Owners go to the
+  // owner-facing paused screen — the guest /inactive page has no sign-out.
+  if (!isStoreCurrentlyActive(store)) redirect('/admin/paused')
 
   const storeName = getLocalizedText(
     store.store_name,
@@ -82,10 +89,13 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       .limit(5)
     recentCustomers = customersWithoutName.data as RecentCustomerRow[] | null
     customerCount = customersWithoutName.count
-  } else if (customersWithName.error) {
+  }
+  let crmLoadError = false
+  if (customersWithName.error && !isMissingCustomerNameColumn(customersWithName.error)) {
     // Any other error (transient network, rotated service key) would otherwise
-    // render as a misleading "0 customers" with no trace — surface it in logs.
+    // render as a misleading "0 customers" — log it AND surface an error state.
     console.error('[admin] customers query failed for store', id, customersWithName.error)
+    crmLoadError = true
   }
 
   // Private low-rating (<4★) feedback — service-role read, scoped to this store.
@@ -106,7 +116,18 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
   }[]
   const feedbackCount = feedbackRes.count ?? 0
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // NEXT_PUBLIC_APP_URL missing must NEVER silently mint localhost QR codes /
+  // WhatsApp links in production — derive from the live request host instead.
+  let appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) {
+    const h = await headers()
+    const host = h.get('x-forwarded-host') ?? h.get('host')
+    const proto = h.get('x-forwarded-proto') ?? 'https'
+    appUrl = host ? `${proto}://${host}` : 'http://localhost:3000'
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[admin] NEXT_PUBLIC_APP_URL unset — derived', appUrl, 'from request host')
+    }
+  }
   const storeUrl = `${appUrl}/store/${store.id}`
 
   const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
@@ -122,6 +143,7 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       customerCount={customerCount ?? 0}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recentCustomers={(recentCustomers ?? []) as any}
+      crmLoadError={crmLoadError}
       feedback={feedback}
       feedbackCount={feedbackCount}
       logoSignedUrl={logoSignedUrl}

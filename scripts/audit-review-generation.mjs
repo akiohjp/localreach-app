@@ -56,12 +56,22 @@ async function main() {
   ];
   const maxCommasInSentence = (t) =>
     Math.max(0, ...t.split(/[.!?\n]+/).map((s) => (s.match(/,/g) || []).length));
-  let commaDump = 0, bannedHits = 0;
+  let commaDump = 0, bannedHits = 0, doubleThe = 0;
   for (let i = 0; i < N; i++) {
     const t = generateReview(store, kws, opts());
     if (maxCommasInSentence(t) > 2) commaDump++;
     const low = t.toLowerCase();
     if (BANNED.some((b) => low.includes(b))) bannedHits++;
+    if (/\bthe the\b/i.test(t)) doubleThe++;
+  }
+  // Article grammar with PROPER-NOUN / capitalized keywords ("Dubai Marina",
+  // "Friendly Staff"): templates must not hardcode "the" before a slot — the
+  // engine adds it only for lowercase phrases. Probe the capitalized set.
+  const PROPER = ["Omakase", "Friendly Staff", "Dubai Marina", "Michelin Quality"];
+  let badArticle = 0;
+  for (let i = 0; i < 150; i++) {
+    const t = generateReview("Marina Sushi", PROPER, { nonce: createReviewNonce(), outletKey: "art|restaurant|#000", locale: "en", category: "restaurant" });
+    if (/\bthe (Omakase|Friendly Staff|Dubai Marina|Michelin Quality)\b/.test(t) || /\bthe the\b/i.test(t)) badArticle++;
   }
   // Cross-locale meta-phrase scan (JA/AR pools carried the same tells).
   const scanLocale = (locale, cat, kwset, banned) => {
@@ -113,6 +123,8 @@ async function main() {
   assert(set.size === N, "all unique");
   assert(avg(l4) < avg(l5), "4★ reads shorter than 5★");
   assert(commaDump === 0, `EN: no sentence crams >2 comma items i.e. keyword-dump (got ${commaDump})`);
+  assert(doubleThe === 0, `EN: no "the the" double article (got ${doubleThe})`);
+  assert(badArticle === 0, `EN: no "the <ProperNoun>" bad article with capitalized keywords (got ${badArticle})`);
   assert(bannedHits === 0, `EN: no meta/AI-tell phrases (got ${bannedHits})`);
   assert(jaHits === 0, `JA: no meta/AI-tell phrases (got ${jaHits})`);
   assert(arHits === 0, `AR: no meta/AI-tell phrases (got ${arHits})`);

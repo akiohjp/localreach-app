@@ -25,9 +25,11 @@ export default function StepKeywords({
     );
   }
 
-  const canConfirm =
-    (keywords.length > 0 && selected.length > 0) ||
-    (allowGuestSkip && keywords.length === 0);
+  // Never hard-block the flow: a guest who doesn't want to tag anything must
+  // still be able to generate (the engine handles zero keywords, and the
+  // store's always-include keywords arrive from the owner side regardless).
+  // Selecting pills stays encouraged via the counter copy, not a locked button.
+  const canConfirm = true;
 
   return (
     <div className="flex flex-col gap-6">

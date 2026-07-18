@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { getLocalizedText } from '@/types/database'
+import SignOutButton from '@/components/SignOutButton'
 
 export const metadata: Metadata = { title: 'Dashboard — LocalReach' }
 
@@ -26,7 +27,13 @@ export default async function AdminIndexPage() {
             LocalReach · Dashboard
           </p>
           <h1 className="text-lg font-bold text-slate-900">No stores found</h1>
-          <p className="text-sm text-slate-500">Contact support to set up your store.</p>
+          <p className="text-sm text-slate-500">
+            Contact support to set up your store — or if you signed in with the wrong
+            account, sign out and try the right one.
+          </p>
+          <div className="pt-2">
+            <SignOutButton label="Sign out / switch account" />
+          </div>
         </div>
       </div>
     )

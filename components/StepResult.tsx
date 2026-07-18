@@ -49,6 +49,8 @@ export default function StepResult({
 }: Props) {
   const [text, setText] = useState(reviewText);
   const [copied, setCopied] = useState(false);
+  /** Both clipboard APIs blocked — show the manual-copy hint instead of silence. */
+  const [copyBlocked, setCopyBlocked] = useState(false);
 
   function handleLanguageChange(loc: SupportedLocale) {
     if (loc === reviewLocale) return;
@@ -69,24 +71,74 @@ export default function StepResult({
 
   const canSaveWhatsApp = isValidUuid(storeId);
 
+  /**
+   * Legacy-path copy for contexts where the async Clipboard API is blocked —
+   * QR scans routinely open inside Instagram/Facebook/LINE in-app webviews and
+   * older iOS Safari, where clipboard.writeText rejects. A hidden textarea +
+   * execCommand('copy') still works there. Must run inside the user gesture.
+   */
+  function execCommandCopy(value: string): boolean {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, value.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
   async function copyToClipboard(value: string): Promise<boolean> {
     // clipboard.writeText can reject in iOS WebViews / non-secure contexts.
     try {
       await navigator.clipboard.writeText(value);
       return true;
     } catch {
-      return false;
+      return execCommandCopy(value);
+    }
+  }
+
+  /** Select the visible review textarea so a guest can long-press → Copy. */
+  function selectReviewText() {
+    const ta = document.querySelector<HTMLTextAreaElement>("textarea[data-review-text]");
+    if (ta) {
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
     }
   }
 
   async function handleCopy() {
     const ok = await copyToClipboard(text);
-    if (!ok) return; // leave the textarea for manual select rather than a false toast
+    if (!ok) {
+      // Both clipboard paths blocked (rare): select the text and tell the guest
+      // to copy manually instead of failing silently.
+      selectReviewText();
+      setCopyBlocked(true);
+      setTimeout(() => setCopyBlocked(false), 4000);
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
+  /** A usable Google review target = absolute http(s) URL. */
+  const hasValidReviewUrl = /^https?:\/\/.+/i.test((gbpReviewUrl ?? "").trim());
+
   function handlePostOnGoogle() {
+    // The owner hasn't configured the Google review link yet — never open a
+    // blank/404 tab on the money path. Copy the text and tell the guest.
+    if (!hasValidReviewUrl) {
+      void handleCopy();
+      return;
+    }
     // Fire-and-forget copy (can't throw), and keep window.open in the same user
     // gesture tick so the popup isn't blocked.
     void copyToClipboard(text);
@@ -106,7 +158,12 @@ export default function StepResult({
     // Drop a local trunk-zero (e.g. UAE "050…" typed after "+971") so the
     // number is stored in deliverable E.164 form, not "+9710…".
     const digits = phone.trim().replace(/^0+/, "");
-    if (digits.length < 7 || cc.length < 2) return;
+    if (digits.length < 7 || cc.length < 2) {
+      // The button enables on raw length, but trunk-zero stripping can drop the
+      // number below the floor — surface it instead of a silent no-op.
+      setWaState("error");
+      return;
+    }
 
     if (!canSaveWhatsApp) {
       // Preview pages (non-UUID store) simulate the save without a DB write.
@@ -195,6 +252,7 @@ export default function StepResult({
       {/* Textarea */}
       <div className="relative">
         <textarea
+          data-review-text
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -314,6 +372,18 @@ export default function StepResult({
         </div>
       )}
 
+      {/* Manual-copy hint — clipboard blocked (in-app browser); text is pre-selected */}
+      <div className={`transition-all duration-300 overflow-hidden ${copyBlocked ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
+        <div className="flex items-center justify-center gap-2 bg-amber-50 border border-amber-300
+          rounded-xl py-2.5 px-3 text-xs font-semibold text-amber-800 text-center">
+          {reviewLocale === "ja"
+            ? "自動コピーできませんでした。選択された本文を長押しでコピーしてください。"
+            : reviewLocale === "ar"
+              ? "تعذّر النسخ التلقائي. النص محدد — اضغط مطولاً ثم انسخ."
+              : "Couldn't copy automatically. The text is selected — long-press and copy."}
+        </div>
+      </div>
+
       {/* Copied toast */}
       <div className={`transition-all duration-300 overflow-hidden ${copied ? "max-h-10 opacity-100" : "max-h-0 opacity-0"}`}>
         <div className="flex items-center justify-center gap-2 bg-slate-50 border border-gray-300
@@ -361,16 +431,28 @@ export default function StepResult({
           {t.result.translate}
         </a>
 
-        <button
-          type="button"
-          onClick={handlePostOnGoogle}
-          className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
-            hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
-            flex items-center justify-center gap-2"
-        >
-          <ExternalLink size={13} />
-          {t.result.postOnGoogle}
-        </button>
+        {hasValidReviewUrl ? (
+          <button
+            type="button"
+            onClick={handlePostOnGoogle}
+            className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
+              hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
+              flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={13} />
+            {t.result.postOnGoogle}
+          </button>
+        ) : (
+          // Owner hasn't set the Google review link — never open a blank/404
+          // tab on the money path. Tell the guest what to do instead.
+          <div className="border border-gray-300 bg-gray-50 rounded-xl px-4 py-3 text-xs text-slate-600 text-center leading-relaxed">
+            {reviewLocale === "ja"
+              ? "本文をコピーして、Googleマップでお店を検索し、クチコミに貼り付けてください。"
+              : reviewLocale === "ar"
+                ? "انسخ النص، ثم ابحث عن المتجر في خرائط Google والصقه في المراجعة."
+                : "Copy the review, then find this place on Google Maps and paste it there."}
+          </div>
+        )}
       </div>
 
       {/* How-to guide */}

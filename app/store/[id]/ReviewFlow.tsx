@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createReviewNonce, generateReview } from '@/lib/assembler'
 import StepRating from '@/components/StepRating'
 import StepKeywords from '@/components/StepKeywords'
@@ -96,14 +96,26 @@ export default function ReviewFlow({
   // Survive an accidental reload so a generated review isn't lost back to rating.
   useFlowPersistence(
     storeId,
-    { step, rating, reviewText, selectedKeywords },
+    { step, rating, reviewText, selectedKeywords, reviewLocale },
     (s) => {
       setStep(s.step as Step)
       setRating(s.rating)
       setReviewText(s.reviewText)
       setSelectedKeywords(s.selectedKeywords)
+      // Restore the language the text was generated in, or the result screen
+      // mislabels it after the top language switcher navigates (wrong sl= too).
+      if (s.reviewLocale === 'en' || s.reviewLocale === 'ja' || s.reviewLocale === 'ar') {
+        setReviewLocale(s.reviewLocale)
+      }
     },
   )
+
+  // The shared root layout hardcodes <html lang="en">; reflect the page locale
+  // on the document element for a11y / auto-translate / SEO correctness.
+  useEffect(() => {
+    document.documentElement.lang = locale
+    document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
+  }, [locale])
 
   const progressIdx = POSITIVE_STEPS.indexOf(step)
 

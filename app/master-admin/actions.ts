@@ -109,6 +109,11 @@ export async function createStore(payload: {
     return { ok: false, error: (e as Error).message }
   }
 
+  const nameTrim = payload.storeName.trim()
+  if (!nameTrim) {
+    return { ok: false, error: '店舗名を入力してください。' }
+  }
+
   const emailTrim = payload.email.trim()
   const emailNorm = emailTrim.toLowerCase()
 
@@ -153,7 +158,7 @@ export async function createStore(payload: {
       .from('stores')
       .insert({
         owner_id: ownerId,
-        store_name: { en: payload.storeName.trim() },
+        store_name: { en: nameTrim },
         google_review_url: '',
         is_active: true,
       })
@@ -198,8 +203,15 @@ export async function masterSetStoreActive(
 
   try {
     const admin = createAdminClient()
-    const { error } = await admin.from('stores').update({ is_active: isActive }).eq('id', storeId)
+    const { data, error } = await admin
+      .from('stores')
+      .update({ is_active: isActive })
+      .eq('id', storeId)
+      .select('id')
     if (error) return { ok: false, error: error.message }
+    // Service role bypasses RLS, so 0 rows here means the storeId is wrong —
+    // report it instead of a false ok.
+    if (!data || data.length === 0) return { ok: false, error: 'Store not found.' }
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e as Error).message }
@@ -224,11 +236,13 @@ export async function masterSetStoreExpiry(
 
   try {
     const admin = createAdminClient()
-    const { error } = await admin
+    const { data, error } = await admin
       .from('stores')
       .update({ subscription_expires_at: expiresAt })
       .eq('id', storeId)
+      .select('id')
     if (error) return { ok: false, error: error.message }
+    if (!data || data.length === 0) return { ok: false, error: 'Store not found.' }
     return { ok: true }
   } catch (e) {
     return { ok: false, error: (e as Error).message }

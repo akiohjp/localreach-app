@@ -32,6 +32,8 @@ export type ReplySettings = {
   /** Real neighbourhood/area woven into replies for Local SEO (e.g. "Dubai Marina"). */
   locality?: string;
   weaveGeo?: boolean;
+  /** Weave one forced GEO keyword per reply (AIO signal). Default true. */
+  weaveKw?: boolean;
   /** Custom sign-off (verbatim; "{store}" is replaced with the store name). */
   signature?: string;
 };
@@ -237,6 +239,14 @@ export type Database = {
           p_whatsapp_number: string;
         };
         Returns: string;
+      };
+      bump_rate_limit: {
+        Args: {
+          p_key: string;
+          p_window_seconds: number;
+          p_max: number;
+        };
+        Returns: { allowed: boolean; retry_after_seconds: number }[];
       };
     };
     Enums: Record<string, never>;

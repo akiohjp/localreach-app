@@ -88,6 +88,22 @@ function cjkCount(text: string): number {
   return text.replace(/\s+/g, "").length;
 }
 
+/**
+ * Smart article for EN keyword slots. Store keywords are arbitrary phrases:
+ * common nouns ("fresh doughnuts") read naturally as "the fresh doughnuts",
+ * but proper nouns / capitalized pills ("Dubai Marina", "Friendly Staff",
+ * "Boston Cream") break with a hardcoded article ("nailed the Dubai Marina" —
+ * caught in the live store E2E). Heuristic: lowercase first letter → common
+ * noun → prepend "the"; uppercase → leave bare. Templates therefore never
+ * hardcode "the" before {list}/{kw}/{a}/{b}. The raw keyword stays a verbatim
+ * substring either way, so the SEO guarantee is unchanged.
+ */
+function withArt(phrase: string): string {
+  // Never double an article the keyword already carries ("the best pizza in town").
+  if (/^the\s/i.test(phrase)) return phrase;
+  return /^[a-z]/.test(phrase) ? `the ${phrase}` : phrase;
+}
+
 function oxford(p: string[]): string {
   if (p.length === 0) return "";
   if (p.length === 1) return p[0]!;
@@ -95,7 +111,7 @@ function oxford(p: string[]): string {
   return `${p.slice(0, -1).join(", ")}, and ${p[p.length - 1]}`;
 }
 function joinListEn(phrases: string[], rng: () => number): string {
-  const p = phrases.filter(Boolean);
+  const p = phrases.filter(Boolean).map(withArt);
   if (p.length <= 1) return p[0] ?? "";
   if (p.length === 2) {
     // Two items read best joined with "and"; a bare comma ("A, B was great")
@@ -522,7 +538,8 @@ export function buildLocalizedReview(
   let ti = 0;
   for (const kw of shuffled) {
     if (kw.length > 0 && !text.includes(kw) && tailOrder.length > 0) {
-      text = appendToLast(text, fill(tailOrder[ti % tailOrder.length]!, { kw }), cfg.glue);
+      const kwSlot = locale === "en" ? withArt(kw) : kw;
+      text = appendToLast(text, fill(tailOrder[ti % tailOrder.length]!, { kw: kwSlot }), cfg.glue);
       ti++;
     }
   }

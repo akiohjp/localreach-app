@@ -53,6 +53,26 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // Baseline security headers. The guest page is QR-opened (never legitimately
+  // embedded), so denying framing is free clickjacking protection. A full
+  // script-src CSP is deliberately NOT set here — Next.js inline runtime chunks
+  // would need nonces and an untested strict CSP can take the whole app down;
+  // frame-ancestors covers the framing vector without that risk.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

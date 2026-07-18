@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "check:deploy": "node scripts/check-deploy-env.cjs",
-    "test:generation": "tsx scripts/test-generation-uniqueness.mjs"
+    "test:generation": "npx tsx scripts/test-generation-uniqueness.mjs",
+    "audit:reviews": "npx tsx scripts/audit-review-generation.mjs",
+    "test:replies": "npx tsx scripts/test-reply-generation.mjs",
+    "test:rating-only": "npx tsx scripts/test-rating-only.mjs",
+    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

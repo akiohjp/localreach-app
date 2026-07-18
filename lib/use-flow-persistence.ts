@@ -5,6 +5,13 @@ export type FlowSnapshot = {
   rating: number;
   reviewText: string;
   selectedKeywords: string[];
+  /**
+   * Language the review text was generated in. Without it, a restore after the
+   * top language switcher navigates re-inits from the page locale and the
+   * result screen mislabels the text (and the Translate deep-link sends the
+   * wrong sl=). Optional for backward-compat with stored snapshots.
+   */
+  reviewLocale?: string;
 };
 
 const TTL_MS = 30 * 60 * 1000; // 30 min — a review session shouldn't outlive this
@@ -48,6 +55,7 @@ export function useFlowPersistence(
           rating: s.rating ?? 0,
           reviewText: s.reviewText ?? "",
           selectedKeywords: Array.isArray(s.selectedKeywords) ? s.selectedKeywords : [],
+          reviewLocale: typeof s.reviewLocale === "string" ? s.reviewLocale : undefined,
         });
       }
     } catch {
@@ -69,5 +77,5 @@ export function useFlowPersistence(
       /* best-effort */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot.step, snapshot.rating, snapshot.reviewText, snapshot.selectedKeywords]);
+  }, [snapshot.step, snapshot.rating, snapshot.reviewText, snapshot.selectedKeywords, snapshot.reviewLocale]);
 }

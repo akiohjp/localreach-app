@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { buildPrompt, clip, LANGUAGE_NAME } from "@/lib/reply-prompt";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
  * AI review-reply generation (Gemini) — owner-authed.
@@ -68,6 +69,22 @@ export async function POST(req: Request) {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: "ai_unavailable" }, { status: 503 });
+
+  // Global per-user ceiling (shared across instances): a burst window for
+  // regenerate-mashing and an hourly cap against cost abuse from a leaked or
+  // shared owner login. 429 → the client falls back to the template engine, so
+  // the owner still gets a draft instantly.
+  const [burst, hourly] = await Promise.all([
+    checkRateLimit(`reply:m:${user.id}`, 60, 10),
+    checkRateLimit(`reply:h:${user.id}`, 3600, 60),
+  ]);
+  const limited = !burst.allowed ? burst : !hourly.allowed ? hourly : null;
+  if (limited) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } },
+    );
+  }
 
   let body: GenerateReplyRequest;
   try {

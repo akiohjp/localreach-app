@@ -1,0 +1,7 @@
+# Normalize line endings so mirror-syncs between the monorepo and the deploy
+# repo (localreach-app) never produce phantom whole-file diffs.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

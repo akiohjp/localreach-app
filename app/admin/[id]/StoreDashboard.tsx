@@ -41,6 +41,8 @@ type Props = {
   qrDataUrl: string
   customerCount?: number
   recentCustomers?: RecentCustomer[]
+  /** True when the server-side customers query failed (renders an error state instead of a misleading 0). */
+  crmLoadError?: boolean
   /** Private low-rating (<4★) guest feedback — owner-only. */
   feedback?: FeedbackEntry[]
   feedbackCount?: number
@@ -244,9 +246,14 @@ function KeywordManager({
   }
 
   async function handleSave() {
+    // Flush any text still sitting in the input — an owner who types a keyword
+    // and clicks Save (without Enter) must not silently lose it.
+    const pending = input.trim()
+    const toSave = pending && !keywords.includes(pending) ? [...keywords, pending] : keywords
+    if (toSave !== keywords) { setKeywords(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { keywords })
+      await saveField(storeId, { keywords: toSave })
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -367,9 +374,13 @@ function ForcedKeywordManager({
   }
 
   async function handleSave() {
+    // Flush pending input so a typed-but-not-committed keyword isn't lost.
+    const pending = input.trim()
+    const toSave = pending && !items.includes(pending) ? [...items, pending] : items
+    if (toSave !== items) { setItems(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { forced_keywords: items })
+      await saveField(storeId, { forced_keywords: toSave })
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -729,11 +740,31 @@ function ReviewUrlEditor({
 }) {
   const [url, setUrl] = useState(initial)
   const [state, setState] = useState<SaveState>('idle')
+  const [formatError, setFormatError] = useState<string | null>(null)
 
   async function handleSave() {
+    // Normalize before saving: guests' "Post on Google" opens this verbatim, so
+    // a scheme-less paste (g.page/r/…) must become https://… — and anything that
+    // still isn't an absolute http(s) URL is rejected with a visible error.
+    let candidate = url.trim()
+    if (candidate && !/^https?:\/\//i.test(candidate)) {
+      candidate = `https://${candidate}`
+    }
+    if (candidate) {
+      try {
+        const parsed = new URL(candidate)
+        if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname.includes('.')) throw new Error('bad')
+      } catch {
+        setFormatError('That does not look like a valid link. It should start with https:// (e.g. https://g.page/r/...).')
+        setState('idle')
+        return
+      }
+    }
+    setFormatError(null)
     setState('saving')
     try {
-      await saveField(storeId, { google_review_url: url })
+      await saveField(storeId, { google_review_url: candidate })
+      setUrl(candidate)
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -745,15 +776,25 @@ function ReviewUrlEditor({
 
   return (
     <div className="space-y-4">
+      {!initial.trim() && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
+          <span className="font-semibold">Action needed:</span> without this link, guests can
+          copy their review but the &ldquo;Post on Google&rdquo; button can&apos;t open your
+          review box. Set it to complete your funnel.
+        </div>
+      )}
       <input
         type="url"
         value={url}
-        onChange={(e) => { setUrl(e.target.value); setState('idle') }}
+        onChange={(e) => { setUrl(e.target.value); setState('idle'); setFormatError(null) }}
         placeholder="https://g.page/r/..."
         className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5
           text-sm text-slate-900 placeholder:text-slate-400 outline-none
           focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition"
       />
+      {formatError && (
+        <p className="text-xs text-red-500" role="alert">{formatError}</p>
+      )}
       <p className="text-[10px] text-slate-400 leading-relaxed">
         The link that opens your Google review box (looks like g.page/r/…). Guests who rate you
         4–5 stars are sent here to post it. To find it: open your Google Business Profile, tap
@@ -974,11 +1015,21 @@ function CrmSection({
   count,
   recent,
   waMessage,
+  loadError = false,
 }: {
   count: number
   recent: RecentCustomer[]
   waMessage: string
+  loadError?: boolean
 }) {
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Couldn&apos;t load your customer list right now. Your data is safe — refresh the
+        page to try again.
+      </div>
+    )
+  }
   return (
     <div className="space-y-4">
       {/* Total count */}
@@ -1131,6 +1182,7 @@ export default function StoreDashboard({
   qrDataUrl,
   customerCount = 0,
   recentCustomers = [],
+  crmLoadError = false,
   feedback = [],
   feedbackCount = 0,
   logoSignedUrl,
@@ -1326,7 +1378,7 @@ export default function StoreDashboard({
         {/* ── CUSTOMERS ── */}
         <div hidden={tab !== 'customers'} className="space-y-6">
             <SectionCard label="Customers" icon={<Users size={14} />}>
-              <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} />
+              <CrmSection count={customerCount} recent={recentCustomers} waMessage={waMessage} loadError={crmLoadError} />
             </SectionCard>
 
             <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
