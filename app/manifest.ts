@@ -14,7 +14,11 @@ export default function manifest(): MetadataRoute.Manifest {
     description:
       "Guided Google review flow for your venue — multilingual copy, keywords, and QR routing that lifts your local ranking.",
     id: "/",
-    start_url: "/",
+    // The only person who ever installs this is the STORE OWNER — a guest scans
+    // a QR once and leaves. So the installed app must open on the dashboard,
+    // not the public demo page. Unauthenticated /admin redirects to login, then
+    // straight into the store, which is exactly the owner's path.
+    start_url: "/admin",
     scope: "/",
     display: "standalone",
     background_color: "#ffffff",

@@ -11,6 +11,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
 import ReplyGenerator from '@/components/ReplyGenerator'
+import InstallAppButton from '@/components/InstallAppButton'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
 import type { Store, LocalizedText, SupportedLocale, StoreUpdate } from '@/types/database'
 
@@ -1259,6 +1260,7 @@ export default function StoreDashboard({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <InstallAppButton />
               <a
                 href={storeUrl}
                 target="_blank"
