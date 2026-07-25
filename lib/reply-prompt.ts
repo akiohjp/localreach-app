@@ -46,6 +46,7 @@ ${sentiment === "positive"
     : `- READ the review carefully and respond to its actual content. Reference the specific things the guest mentioned (dishes, staff moments, complaints, details) in your own words. Never write a reply that could be pasted under a different review.
 - Length: 4 to 7 sentences (${sentiment === "negative" ? "keep it focused and sincere" : "substantial, not a two-liner"}).`}
 - Voice: a real human owner. ${p.tone === "professional" ? "Courteous and composed, but still personal." : "Warm, personal, lightly conversational."} Use contractions. Vary sentence length. No corporate boilerplate ("we strive to", "your satisfaction is our priority"), no exclamation spam, and DO NOT start with "Thank you for" or "Thanks for" (start some other natural way).
+- NEVER invent facts you were not given: no email addresses, phone numbers, links, opening hours, discounts, or compensation offers. "Reach out to us directly" is fine; a made-up contact detail is not.
 - Never use em dashes or en dashes.
 ${sentiment === "negative"
     ? `- This is an apology: ${ratingOnly ? "stay general (you don't know the details), take responsibility for the experience anyway" : "acknowledge the specific failures plainly, take responsibility without excuses"}, and invite the guest to contact you directly to make it right. Do NOT include marketing phrases, keywords, or the neighbourhood. Stay humble.`

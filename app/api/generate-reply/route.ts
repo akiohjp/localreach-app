@@ -27,28 +27,70 @@ type GenerateReplyRequest = {
   signature?: string;     // custom sign-off ({store} replaced client-side display)
 };
 
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+// flash-latest FIRST: keys issued after mid-2026 get 404 "no longer available
+// to new users" on gemini-2.5-flash and 429 (zero quota) on gemini-2.0-flash —
+// with the old order every AI reply silently fell back to the template engine.
+// The pinned models stay as fallbacks for older keys.
+const MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
+
+// gemini-3.x (what flash-latest resolves to since 2026-07) rejects
+// thinkingBudget:0 with HTTP 400; 2.5-era thinking models NEED it or thinking
+// eats the output budget and the reply comes back empty (finish=MAX_TOKENS).
+// Adaptive: try thinking-off first, remember a 400 so later calls go direct.
+let thinkingRejected = false;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function callGemini(apiKey: string, model: string, prompt: string): Promise<string | null> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 1.05, topP: 0.95, maxOutputTokens: 4096 },
-      }),
-      // A hung upstream should fail fast so the client can fall back.
-      signal: AbortSignal.timeout(20_000),
-    },
-  );
-  if (!res.ok) return null;
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.map((x) => x.text ?? "").join("").trim();
-  return text || null;
+  const attempts = thinkingRejected ? [false] : [true, false];
+  let retriedTransient = false;
+  for (let i = 0; i < attempts.length; i++) {
+    const disableThinking = attempts[i]!;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 1.05,
+            topP: 0.95,
+            maxOutputTokens: 4096,
+            ...(disableThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
+        }),
+        // A hung upstream should fail fast so the client can fall back.
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+    if (res.status === 400 && disableThinking) {
+      thinkingRejected = true;
+      continue;
+    }
+    // One short retry on a transient upstream blip (429/5xx) before giving this
+    // model up — a lone 503 on the primary model otherwise cascades into dead
+    // fallbacks and a template reply (live repro 2026-07-25).
+    if ((res.status === 429 || res.status >= 500) && !retriedTransient) {
+      retriedTransient = true;
+      await sleep(1200);
+      i--; // redo the same thinking mode
+      continue;
+    }
+    if (!res.ok) {
+      console.error(`generate-reply: ${model} HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      return null;
+    }
+    const data = (await res.json()) as {
+      candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    const cand = data.candidates?.[0];
+    const text = cand?.content?.parts?.map((x) => x.text ?? "").join("").trim();
+    if (text) return text;
+    console.error(`generate-reply: ${model} empty reply (finishReason=${cand?.finishReason ?? "?"})`);
+    return null;
+  }
+  return null;
 }
 
 /** Strip markdown/quotes the model occasionally adds despite instructions. */

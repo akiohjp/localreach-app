@@ -222,11 +222,21 @@ function pickLenBucket(locale: ReviewLocale, seed: number, rating: number, woven
   // the main length driver; the bucket just adds spread on top.
   const r = forkRng(seed, 0x777)();
   const measured = rating <= 4;
-  if (wovenCount >= 7) return b.long;
-  if (wovenCount >= 5) return r < 0.45 ? b.medium : b.long;
+  // 7-8 woven phrases can't honestly fit the standard long ceiling (every
+  // keyword is verbatim-protected from trimming), so the ceiling stretches
+  // rather than letting the tuner report an "over max" it can never fix.
+  if (wovenCount >= 7) return { ...b.long, max: Math.round(b.long.max * 1.15) };
+  // A slice of genuinely brief 5-6-keyword reviews (compact voice, every phrase
+  // still verbatim) keeps the store-wide length spread wide — without it every
+  // keyword-loaded review lands 70-105 words, a spread tell the audit guards.
+  if (wovenCount >= 5) return r < 0.15 ? b.short : r < 0.55 ? b.medium : b.long;
   if (wovenCount >= 4) return r < (measured ? 0.6 : 0.5) ? b.medium : b.long;
-  if (measured) return r < 0.45 ? b.short : r < 0.9 ? b.medium : b.long;
-  return r < 0.34 ? b.short : r < 0.74 ? b.medium : b.long;
+  // A 4-star guest reads more measured: bias clearly shorter than 5-star, or
+  // the two distributions collapse together (audit guards the gap).
+  if (measured) return r < 0.55 ? b.short : r < 0.93 ? b.medium : b.long;
+  // <=3 keywords can't honestly fill a long review; long here means filler-
+  // stuffing, so it stays a rare spice rather than a 1-in-4 outcome.
+  return r < 0.3 ? b.short : r < 0.83 ? b.medium : b.long;
 }
 
 // -------------------------------------------------------------- assembly ----
@@ -240,6 +250,36 @@ function weaveParagraphs(parts: string[], rng: () => number, compact: boolean, g
     acc = rng() < mergeProb ? `${acc}${glue}${cleaned[i]}` : `${acc}${PARAGRAPH_GAP}${cleaned[i]}`;
   }
   return normalizeParagraphFormatting(acc);
+}
+
+/**
+ * Append a sentence somewhere natural instead of always the tail. Stacking every
+ * filler and keyword-tail onto the last paragraph produced a closing WALL of 5+
+ * disconnected one-liners (eye-check 2026-07-25) — the single loudest bot tell.
+ * Spread: usually merge into the last paragraph, sometimes an earlier one, and
+ * occasionally stand alone before the closer, so padding reads as passing
+ * remarks woven through the review.
+ */
+function appendSpread(full: string, sentence: string, glue: string, rng: () => number): string {
+  const paras = normalizeParagraphFormatting(full).split(/\n\n+/).filter(Boolean);
+  const frag = oneLineCollapse(sentence);
+  if (!frag) return normalizeParagraphFormatting(full);
+  if (paras.length === 0) return frag;
+  const r = rng();
+  if (r < 0.15 && paras.length >= 2) {
+    paras.splice(paras.length - 1, 0, frag);
+  } else if (r < 0.5 && paras.length >= 2) {
+    // Mid-review remarks read most natural in an EARLIER paragraph; the last
+    // paragraph (usually the closer) takes the minority share so it never
+    // accretes into a checklist.
+    const back = 1 + Math.floor(rng() * Math.min(2, paras.length - 1));
+    const idx = paras.length - 1 - back;
+    paras[idx] = oneLineCollapse(`${paras[idx]}${glue}${frag}`);
+  } else {
+    const li = paras.length - 1;
+    paras[li] = oneLineCollapse(`${paras[li]}${glue}${frag}`);
+  }
+  return paras.join(PARAGRAPH_GAP);
 }
 
 function appendToLast(full: string, sentence: string, glue: string): string {
@@ -307,17 +347,20 @@ function tuneLength(
     n = cfg.measure(t);
     guard++;
   }
-  guard = 0;
-  while (n < cfg.min && guard < 6 && pool.fillers.length > 0) {
+  // Hard cap on fillers: 3 per review. Padding past that to satisfy a length
+  // bucket turns the review into a platitude wall (eye-check 2026-07-25) — an
+  // honest shorter review beats a stuffed "long" one, so the bucket min yields.
+  let added = 0;
+  while (n < cfg.min && added < 3 && pool.fillers.length > 0) {
     const filler = pickFreshFiller(t, store, pool, rng);
     if (!filler) break;
-    t = appendToLast(t, filler, cfg.glue);
+    t = appendSpread(t, filler, cfg.glue, rng);
     n = cfg.measure(t);
-    guard++;
+    added++;
   }
-  if (n < cfg.target - Math.round(cfg.target * 0.06) && pool.fillers.length > 0) {
+  if (added === 0 && n < cfg.target - Math.round(cfg.target * 0.06) && pool.fillers.length > 0) {
     const filler = pickFreshFiller(t, store, pool, rng);
-    if (filler) t = appendToLast(t, filler, cfg.glue);
+    if (filler) t = appendSpread(t, filler, cfg.glue, rng);
   }
   if (cfg.measure(t) > cfg.max) {
     const trimmed = trimTailSentence(t, cfg.sentenceEnd);
@@ -425,6 +468,29 @@ function capStoreMentions(text: string, name: string, locale: ReviewLocale, rng:
   }
 }
 
+/**
+ * EN sentences must start uppercase, but withArt()/tails legitimately place
+ * lowercase "the {kw}" at sentence starts ("the sea view alone made the trip
+ * worth it."), which reads as a typo at scale. Uppercase every sentence-initial
+ * letter, EXCEPT where the change would break a verbatim-protected phrase (a
+ * keyword or store name that itself starts lowercase, e.g. "the best pizza in
+ * town") — the verbatim guarantee outranks capitalization.
+ */
+function capitalizeSentenceStartsEn(text: string, protect: readonly string[]): string {
+  const re = /(^|[.!?]\s+|\n\n+)([a-z])/g;
+  let out = text;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(out)) !== null) {
+    const idx = m.index + m[1]!.length;
+    // Same-length replacement, so the regex cursor stays valid.
+    const cand = out.slice(0, idx) + out[idx]!.toUpperCase() + out.slice(idx + 1);
+    if (!protect.some((k) => k && out.includes(k) && !cand.includes(k))) {
+      out = cand;
+    }
+  }
+  return out;
+}
+
 /** Typographic sentence dashes read "AI"; normalize any leak. Keeps `\n\n`. */
 function normalizeDashes(text: string): string {
   return normalizeParagraphFormatting(
@@ -500,7 +566,9 @@ export function buildLocalizedReview(
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
-    return normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale, forkRng(seed, 0xca9)));
+    let t0 = normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale, forkRng(seed, 0xca9)));
+    if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name]);
+    return t0;
   }
 
   const keywords = selectWovenKeywords(allKeywords, forcedCount, seed);
@@ -535,13 +603,29 @@ export function buildLocalizedReview(
   // consecutive keywords never reuse the same sentence ("Really enjoyed the X.
   // Really enjoyed the Y." was a visible tell when several keywords were woven).
   const tailOrder = shuffle([...pool.tails], forkRng(seed, 0x7a11));
-  let ti = 0;
-  for (const kw of shuffled) {
-    if (kw.length > 0 && !text.includes(kw) && tailOrder.length > 0) {
-      const kwSlot = locale === "en" ? withArt(kw) : kw;
-      text = appendToLast(text, fill(tailOrder[ti % tailOrder.length]!, { kw: kwSlot }), cfg.glue);
-      ti++;
+  const tailSpread = forkRng(seed, 0x7b22);
+  // 4+ leftover keywords as one-liner tails read as a checklist no matter where
+  // they land, so pair them up ("Also have to mention the sea view and the
+  // wagyu.") — both phrases stay verbatim, tail count halves.
+  const leftovers = shuffled.filter((kw) => kw.length > 0 && !text.includes(kw));
+  const slots: string[] = [];
+  if (leftovers.length >= 4) {
+    for (let i = 0; i < leftovers.length; i += 2) {
+      const pair = leftovers.slice(i, i + 2);
+      slots.push(
+        pair.length === 2
+          ? cfg.joinList(pair, forkRng(seed, 0x7c00 + i))
+          : locale === "en" ? withArt(pair[0]!) : pair[0]!,
+      );
     }
+  } else {
+    for (const kw of leftovers) slots.push(locale === "en" ? withArt(kw) : kw);
+  }
+  let ti = 0;
+  for (const slot of slots) {
+    if (tailOrder.length === 0) break;
+    text = appendSpread(text, fill(tailOrder[ti % tailOrder.length]!, { kw: slot }), cfg.glue, tailSpread);
+    ti++;
   }
 
   text = tuneLength(text, name, pool, cfg, seed, 0x302, shuffled);
@@ -550,5 +634,7 @@ export function buildLocalizedReview(
   if (!shuffled.some((k) => k.includes(name))) {
     text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9));
   }
-  return normalizeDashes(text);
+  text = normalizeDashes(text);
+  if (locale === "en") text = capitalizeSentenceStartsEn(text, [...shuffled, name]);
+  return text;
 }

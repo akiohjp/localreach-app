@@ -199,6 +199,11 @@ const EN_GENERIC: PoolSet = {
     "Small touches that made the visit.",
     "Exactly what I was hoping for.",
     "Nice to find a spot this reliable.",
+    "Took a friend's recommendation on this one and it paid off.",
+    "It's clearly run by people who enjoy what they do.",
+    "Didn't feel rushed at any point, which I really rate.",
+    "Good value for what you actually get, too.",
+    "Honestly hard to fault the experience.",
   ],
   // No hardcoded article before {kw}: the engine supplies "the " only for
   // lowercase common-noun phrases (withArt), so proper-noun keywords stay bare.
@@ -221,6 +226,9 @@ const EN_GENERIC: PoolSet = {
   noKeywordMid: [
     "The whole visit just went smoothly, and the service alone would bring me back to {store}.",
     "Nothing to complain about, {store} kept it simple and did it well.",
+    "Everyone I dealt with was helpful, and nothing felt like too much trouble.",
+    "From walking in to leaving, the whole thing was easy and unhurried.",
+    "It's the consistency that stands out, everything handled properly without any fuss.",
   ],
 };
 
@@ -322,6 +330,11 @@ const JA_GENERIC: PoolSet = {
     "ちょっとした心遣いが嬉しかったです。",
     "まさに期待していたとおりでした。",
     "これだけ安定していると安心できます。",
+    "友人のすすめで行きましたが、正解でした。",
+    "仕事を楽しんでいる方たちなのが伝わってきます。",
+    "急かされる感じが一切ないのも良かったです。",
+    "内容を考えるとコスパも良いと思います。",
+    "正直、文句のつけどころがありません。",
   ],
   tails: [
     "{kw}も良かったです。",
@@ -340,6 +353,9 @@ const JA_GENERIC: PoolSet = {
   noKeywordMid: [
     "全体的にスムーズで、対応の良さだけでもまた{store}に来たいと思えました。",
     "特に不満もなく、{store}は基本をきちんと押さえた良いお店でした。",
+    "対応してくれた方がみなさん親切で、気持ちよく利用できました。",
+    "入ってから帰るまで、終始スムーズで快適でした。",
+    "安定感があって、細かいところまできちんとしている印象です。",
   ],
 };
 
@@ -443,6 +459,11 @@ const AR_GENERIC: PoolSet = {
     "لمسات صغيرة صنعت الزيارة.",
     "تماماً ما كنت آمله.",
     "من الجميل أن تجد مكاناً بهذا الثبات.",
+    "جرّبته بتوصية من صديق وكانت توصية في محلها.",
+    "واضح أن القائمين عليه يحبون عملهم.",
+    "لم أشعر بأي استعجال، وهذا ما أقدّره فعلاً.",
+    "قيمة جيدة مقابل ما تحصل عليه فعلاً.",
+    "بصراحة يصعب أن أجد ما أنتقده.",
   ],
   tails: [
     "يجب أن أذكر {kw} أيضاً.",
@@ -461,6 +482,9 @@ const AR_GENERIC: PoolSet = {
   noKeywordMid: [
     "سارت الزيارة بسلاسة، والخدمة وحدها تكفي لأعود إلى {store}.",
     "لا شيء يستحق الشكوى، {store} أتقن الأساسيات وأدّاها جيداً.",
+    "كل من تعاملت معهم كان متعاوناً، ولم يكن أي طلب عبئاً عليهم.",
+    "من الدخول حتى الخروج، كان كل شيء سهلاً ومن دون استعجال.",
+    "الثبات في المستوى هو ما يميّزهم، كل شيء يُنجز بإتقان وهدوء.",
   ],
 };
 
