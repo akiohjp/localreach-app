@@ -32,6 +32,7 @@ export type Vertical =
   | "home"
   | "education"
   | "pet"
+  | "agency"
   | "services";
 
 export type PoolSet = {
@@ -79,13 +80,16 @@ export function resolveVertical(category: string | null | undefined): Vertical {
   if (/clinic|medical|hospital|doctor|pharmacy|therapy|chiro|physio|osteopath|クリニック|医院|病院|治療|整体|接骨|整骨|内科|耳鼻/.test(c)) return "clinic";
   // --- high-value professional / property / trades ---
   if (/real ?estate|realty|realtor|property|properties|broker|brokerage|leasing|letting|不動産|賃貸|物件|仲介|マンション|土地/.test(c)) return "realestate";
+  // agency before legal ("consulting") and retail: B2B client voice, exclusive pool (no generic merge).
+  // "^agency$" = the canonical dropdown key; free text avoids bare "agency" so travel/real-estate agencies don't match.
+  if (/^agency$|marketing|advertis|\bseo\b|\bsem\b|\bppc\b|branding|digital agency|media agency|creative agency|web design|social media|マーケティング|広告代理|集客|ウェブ制作|ホームページ制作/.test(c)) return "agency";
   if (/\blaw\b|legal|lawyer|attorney|solicitor|barrister|notary|accounting|accountant|bookkeep|\btax\b|audit|consultanc|consulting|advisory|法律|弁護士|会計|税理士|行政書士|司法書士|社労士|コンサル|事務所/.test(c)) return "legal";
   if (/renovation|remodel|interior|fit ?out|joinery|contractor|handyman|plumb|electric|carpentr|painting|flooring|landscap|construction|builder|リフォーム|内装|工務店|リノベ|設備|外構|塗装|大工|建築/.test(c)) return "home";
   if (/school|academy|tutor|tutoring|lesson|course|nursery|kindergarten|preschool|training cent|driving school|語学|塾|スクール|教室|予備校|習い事|英会話|保育|幼稚園|学習/.test(c)) return "education";
   // --- broad fallbacks ---
   // hotel before retail so "boutique hotel" isn't swallowed by retail's "boutique".
   if (/hotel|\binn\b|motel|resort|hostel|accommodation|lodging|ホテル|旅館|宿|民宿/.test(c)) return "hotel";
-  // "\bmarket\b/supermarket" (not "marketing"); a marketing agency should stay "services".
+  // "\bmarket\b/supermarket" (not "marketing"); marketing agencies are caught by "agency" above.
   if (/shop|store|retail|boutique|supermarket|\bmarket\b|grocery|apparel|florist|店|ショップ|小売|雑貨/.test(c)) return "retail";
   if (/gym|fitness|yoga|pilates|studio|crossfit|personal training|ジム|フィットネス|ヨガ|トレーニング|ピラティス/.test(c)) return "fitness";
   if (/auto|car|mechanic|garage|tyre|tire|body shop|detailing|自動車|整備|車|カー/.test(c)) return "auto";
@@ -881,6 +885,374 @@ const AR_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
   },
 };
 
+// ========================================================== AGENCY (B2B) ===
+// Exclusive full pools: the client of a marketing/digital agency is a business
+// owner, not a guest at premises. GENERIC's visit/place voice ("went to",
+// "the kind of place", "didn't feel rushed") reads wrong for B2B, so this
+// vertical does NOT merge generic — resolvePoolSet returns these pools alone.
+
+const EN_AGENCY: PoolSet = {
+  openersLong: [
+    "We've been working with {store} for a few months now and it's been one of the easier business decisions I've made.",
+    "Hired {store} to sort out our online presence and I'm glad we did.",
+    "As a small business owner I was wary of marketing companies, but {store} changed my mind.",
+    "We brought {store} in to help customers actually find us, and that's exactly what happened.",
+    "Signed up with {store} after a recommendation from another business owner, and it paid off.",
+    "I run a small company here in Dubai and {store} has been handling our online side.",
+    "After a disappointing experience with a previous provider, {store} was a breath of fresh air.",
+    "We started with their free audit, and it was useful enough that we hired {store} for the monthly work.",
+    "{store} has been looking after our online presence and the difference is noticeable.",
+    "Been with {store} for a while now and they keep proving the choice right.",
+    "I don't usually review suppliers, but {store} has earned it.",
+    "Working with {store} is the first time online marketing has actually felt understandable to me.",
+  ],
+  openersShort: [
+    "Really glad we hired {store}.",
+    "{store} does what they say they'll do.",
+    "Solid, honest work from {store}.",
+    "Happy client of {store} here.",
+    "{store} has been great to work with.",
+    "No regrets choosing {store}.",
+    "Straightforward and professional, that's {store}.",
+    "Quick review for the team at {store}.",
+  ],
+  coresLong: [
+    "{list} they did for us made a visible difference.",
+    "For us the standout was {list}.",
+    "We hired them mainly for {list}, and that part has been handled properly.",
+    "{list} is where {store} really showed their expertise.",
+    "What convinced me was {list}, explained in plain language and done carefully.",
+    "The biggest win so far has been {list}.",
+    "They took ownership of {list} and it shows.",
+    "If you're weighing them up for {list}, that's exactly their strength.",
+    "Most of the value for us came from {list}.",
+    "{list} was set up properly, which is more than our old provider managed.",
+  ],
+  coresCompact: [
+    "{list} was handled really well.",
+    "Great work on {list}.",
+    "{list}, done properly.",
+    "{list} was worth it on its own.",
+    "Really pleased with {list}.",
+    "{list} exceeded what I expected.",
+    "{store} delivered on {list}.",
+    "Top marks for {list}.",
+  ],
+  dualBlocks: [
+    "{a} made the first impression, and {b} has kept us happy since.",
+    "We came for {a} and ended up appreciating {b} just as much.",
+    "{a} was the priority, and {b} turned out to be a real bonus.",
+    "Between {a} and {b}, the monthly fee earns its keep.",
+  ],
+  bridgesLong: [
+    "They answer quickly on WhatsApp and nothing gets lost or forgotten.",
+    "Everything was explained in plain language, no jargon and no pressure.",
+    "Their pricing is published on their website, so there were no surprises on the invoice.",
+    "The monthly report actually arrives, and it shows real numbers rather than fluff.",
+    "They tell you honestly what they can and cannot promise, which I respect.",
+    "Communication has been clear from day one.",
+    "They treat a small business with the same care a big client would get.",
+    "Deadlines were kept without me having to chase anyone.",
+  ],
+  bridgesShort: [
+    "Fast replies, clear answers.",
+    "No jargon, no pressure.",
+    "Fair, transparent pricing.",
+    "They actually report the numbers.",
+    "Easy to communicate with.",
+    "Reliable month after month.",
+  ],
+  closersLong: [
+    "I'd recommend {store} to any small business here.",
+    "If your customers can't find you online, talk to {store}.",
+    "We're staying with {store} for the long run.",
+    "Happy to recommend {store} to other business owners.",
+    "{store} has earned our trust, and that takes some doing.",
+    "Already recommended {store} to two other owners I know.",
+    "If you're on the fence about {store}, the free audit is an easy place to start.",
+    "{store} will be handling our marketing for the foreseeable future.",
+  ],
+  closersShort: [
+    "Recommend {store} without hesitation.",
+    "Glad we found {store}.",
+    "{store} gets our vote.",
+    "Worth every dirham.",
+    "We're sticking with them.",
+    "Recommended for any SME.",
+    "Five stars well earned.",
+  ],
+  fillers: [
+    "It's rare to find a provider this straightforward.",
+    "They do what they promise, which shouldn't be rare, but it is.",
+    "As an owner, that saves me time I don't have.",
+    "You can tell they actually care whether it works.",
+    "Refreshing after some of the agencies we've dealt with.",
+    "The whole thing has been hassle-free.",
+    "It just works, and I can get on with running the business.",
+    "Good people to deal with, too.",
+    "Everything felt honest from the first call.",
+    "No upselling, no drama.",
+    "They made something confusing feel manageable.",
+    "Exactly the kind of support a small business needs.",
+  ],
+  tails: [
+    "Also have to mention {kw}.",
+    "{kw} was worth it on its own.",
+    "Really happy with {kw} too.",
+    "{kw} turned out better than expected.",
+    "Ask them about {kw}.",
+    "{kw} has been a highlight.",
+    "No complaints about {kw} either.",
+    "{kw} was sorted without any fuss.",
+    "Special mention for {kw}.",
+  ],
+  microOpeners: [
+    "Overdue review.",
+    "Quick note from a client.",
+  ],
+  noKeywordMid: [
+    "The whole engagement has been smooth, and the communication alone would keep us with {store}.",
+    "Nothing to complain about, {store} keeps it simple and does it well.",
+    "Everyone we dealt with was helpful, and nothing felt like too much trouble.",
+    "From the first call to the monthly reports, working with them has been easy.",
+    "It's the consistency that stands out, things get done properly without chasing.",
+  ],
+};
+
+const JA_AGENCY: PoolSet = {
+  openersLong: [
+    "数ヶ月前から{store}にお願いしていますが、頼んで良かったと思っています。",
+    "ネット集客を{store}に任せることにしましたが、正解でした。",
+    "小さな会社なのでマーケティング会社には慎重でしたが、{store}は信頼できました。",
+    "お客様に見つけてもらえるようにと{store}に依頼し、その通りになってきています。",
+    "他の経営者の紹介で{store}と契約しましたが、紹介してもらえて感謝しています。",
+    "ドバイで小さな店をやっていますが、ネット周りは{store}に任せています。",
+    "以前の業者で嫌な思いをした後だったので、{store}の対応は新鮮でした。",
+    "無料診断から始めましたが、内容が良かったので{store}に月額でお願いすることにしました。",
+    "{store}にオンライン周りを任せてから、違いを感じています。",
+    "{store}との付き合いはしばらくになりますが、選んで正解だったと思い続けています。",
+    "業者のレビューは普段書きませんが、{store}は書く価値があると思いました。",
+    "{store}に頼んで、初めてウェブ集客の中身が理解できた気がします。",
+  ],
+  openersShort: [
+    "{store}に頼んで良かったです。",
+    "{store}は約束したことをやってくれます。",
+    "{store}、誠実な仕事ぶりです。",
+    "{store}の顧客として満足しています。",
+    "{store}とは仕事がしやすいです。",
+    "{store}を選んで後悔はありません。",
+    "対応が明快でプロフェッショナル、それが{store}です。",
+    "{store}のチームに一言お礼を。",
+  ],
+  coresLong: [
+    "お願いした{list}は目に見えて効果がありました。",
+    "特に良かったのは{list}です。",
+    "主に{list}をお願いしましたが、きちんと対応してもらえました。",
+    "{list}は{store}の専門性を感じた部分です。",
+    "決め手は{list}でした。説明も分かりやすかったです。",
+    "今のところ一番の成果は{list}です。",
+    "{list}を責任を持って進めてくれて、それが結果に出ています。",
+    "{list}で検討しているなら、まさにそこが強みだと思います。",
+    "価値を感じたのは主に{list}でした。",
+    "{list}をきちんと整えてもらえました。前の業者ではできなかったことです。",
+  ],
+  coresCompact: [
+    "{list}の対応が良かったです。",
+    "{list}、丁寧な仕事でした。",
+    "{list}だけでも頼む価値があります。",
+    "{list}に満足しています。",
+    "{list}は期待以上でした。",
+    "{store}は{list}をやり切ってくれました。",
+    "{list}、文句なしです。",
+    "{list}が特に良かったです。",
+  ],
+  dualBlocks: [
+    "{a}が良く、{b}にも満足しています。",
+    "{a}目当てでしたが、{b}も同じくらい価値がありました。",
+    "{a}を優先してもらい、{b}は嬉しいおまけでした。",
+    "{a}と{b}の両方で、月額の元は取れています。",
+  ],
+  bridgesLong: [
+    "WhatsAppの返信が早く、頼んだことが流れることがありません。",
+    "専門用語を使わずに説明してくれるので、押し付けられている感じがしません。",
+    "料金がサイトに公開されているので、請求で驚くことがありませんでした。",
+    "月次レポートがきちんと届き、実際の数字で説明してくれます。",
+    "できることとできないことを正直に言ってくれるのが信頼できます。",
+    "初日からやり取りが明快でした。",
+    "小さな会社にも大口客と同じように丁寧に対応してくれます。",
+    "こちらから催促しなくても期限を守ってくれます。",
+  ],
+  bridgesShort: [
+    "返信が早く、説明も明快です。",
+    "専門用語なし、押し売りなし。",
+    "料金が明朗です。",
+    "数字で報告してくれます。",
+    "やり取りがスムーズです。",
+    "毎月安定して頼れます。",
+  ],
+  closersLong: [
+    "この辺りの中小企業なら{store}をおすすめします。",
+    "お客様にネットで見つけてもらえていないなら、{store}に相談する価値があります。",
+    "{store}とは長く付き合うつもりです。",
+    "他の経営者にも{store}を安心して紹介できます。",
+    "{store}は信頼を勝ち取ったと思います。簡単なことではありません。",
+    "知り合いの経営者にもすでに{store}を紹介しました。",
+    "迷っているなら、まず{store}の無料診断から始めるのが良いと思います。",
+    "今後もマーケティングは{store}にお願いする予定です。",
+  ],
+  closersShort: [
+    "迷わず{store}をおすすめします。",
+    "{store}に出会えて良かったです。",
+    "{store}、おすすめです。",
+    "料金に見合う価値があります。",
+    "今後も継続します。",
+    "中小企業におすすめです。",
+    "星5つに値します。",
+  ],
+  fillers: [
+    "ここまで率直な業者はなかなかありません。",
+    "約束したことをやる。当たり前のようで貴重です。",
+    "経営者としては、その分の時間が浮くのが助かります。",
+    "成果を本気で気にしてくれているのが伝わります。",
+    "いくつかの代理店とやり取りした後だと、新鮮に感じます。",
+    "全体を通して手間がかかりませんでした。",
+    "任せておけるので、本業に集中できます。",
+    "人としても付き合いやすい方々です。",
+    "最初の連絡から誠実さを感じました。",
+    "余計な売り込みがありません。",
+    "分かりにくかったことを整理してくれました。",
+    "小さな会社にちょうどいい支援だと思います。",
+  ],
+  tails: [
+    "{kw}も良かったです。",
+    "{kw}だけでも価値がありました。",
+    "{kw}にも満足しています。",
+    "{kw}は期待以上でした。",
+    "{kw}について聞いてみてください。",
+    "{kw}が特に印象に残っています。",
+    "{kw}にも不満はありません。",
+    "{kw}も手間なく進めてもらえました。",
+    "{kw}は特筆ものです。",
+  ],
+  microOpeners: [
+    "遅ればせながらレビューします。",
+    "一顧客からの感想です。",
+  ],
+  noKeywordMid: [
+    "やり取り全体がスムーズで、対応の良さだけでも{store}を続ける理由になります。",
+    "不満はありません。{store}はシンプルに、きちんとやってくれます。",
+    "関わった皆さんが親切で、無理を言っても嫌な顔をされませんでした。",
+    "最初の相談から月次報告まで、一貫して楽でした。",
+    "安定感が魅力です。催促しなくても物事がきちんと進みます。",
+  ],
+};
+
+const AR_AGENCY: PoolSet = {
+  openersLong: [
+    "نتعامل مع {store} منذ عدة أشهر، وكان قراراً موفقاً لأعمالنا.",
+    "كلّفنا {store} بإدارة حضورنا على الإنترنت، وأنا سعيد بأننا فعلنا.",
+    "بصفتي صاحب شركة صغيرة كنت حذراً من شركات التسويق، لكن {store} غيّر رأيي.",
+    "استعنّا بـ {store} ليجدنا العملاء بسهولة، وهذا ما حدث فعلاً.",
+    "تعاقدنا مع {store} بعد توصية من صاحب عمل آخر، وكانت توصية في محلها.",
+    "أدير شركة صغيرة في دبي، و{store} يتولى الجانب الرقمي لدينا.",
+    "بدأنا بالفحص المجاني، وكان مفيداً لدرجة أننا وقّعنا مع {store} على العمل الشهري.",
+    "لا أكتب مراجعات للموردين عادة، لكن {store} يستحقها.",
+  ],
+  openersShort: [
+    "سعيد جداً بتعاملنا مع {store}.",
+    "{store} ينفذ ما يعد به.",
+    "عمل صادق ومباشر من {store}.",
+    "عميل راضٍ لدى {store}.",
+    "التعامل مع {store} كان سهلاً منذ البداية.",
+    "لا أندم على اختيار {store}.",
+  ],
+  coresLong: [
+    "{list} الذي نفذوه لنا أحدث فرقاً واضحاً.",
+    "الأبرز بالنسبة لنا كان {list}.",
+    "تعاقدنا معهم أساساً من أجل {list}، وقد أُنجز كما يجب.",
+    "{list} هو المجال الذي أظهر فيه {store} خبرته الحقيقية.",
+    "ما أقنعني كان {list}، مشروحاً بلغة واضحة ومنفذاً بعناية.",
+    "أكبر مكسب لنا حتى الآن كان {list}.",
+    "تولوا مسؤولية {list} كاملة، والنتيجة ظاهرة.",
+    "معظم القيمة التي حصلنا عليها جاءت من {list}.",
+  ],
+  coresCompact: [
+    "{list} أُنجز بشكل ممتاز.",
+    "عمل رائع في {list}.",
+    "{list} وحده يستحق الاشتراك.",
+    "راضون تماماً عن {list}.",
+    "{list} فاق التوقعات.",
+    "{store} أوفى بوعده في {list}.",
+  ],
+  dualBlocks: [
+    "{a} ترك الانطباع الأول، و{b} حافظ على رضانا بعد ذلك.",
+    "جئنا من أجل {a} وانتهى بنا الأمر بتقدير {b} بالقدر نفسه.",
+    "كان {a} هو الأولوية، وجاء {b} مكافأة إضافية.",
+    "بين {a} و {b}، الاشتراك الشهري يستحق قيمته.",
+  ],
+  bridgesLong: [
+    "يردّون بسرعة على واتساب، ولا يضيع أي طلب.",
+    "كل شيء يُشرح بلغة بسيطة، من دون مصطلحات معقدة أو ضغط.",
+    "الأسعار منشورة على موقعهم، فلا مفاجآت في الفاتورة.",
+    "التقرير الشهري يصل فعلاً، ويعرض أرقاماً حقيقية.",
+    "يقولون بصدق ما يمكنهم وما لا يمكنهم ضمانه، وهذا ما أحترمه.",
+    "التواصل كان واضحاً منذ اليوم الأول.",
+  ],
+  bridgesShort: [
+    "ردود سريعة وإجابات واضحة.",
+    "لا مصطلحات معقدة ولا ضغط.",
+    "أسعار عادلة ومعلنة.",
+    "تقارير بأرقام حقيقية.",
+    "التعامل معهم سهل.",
+  ],
+  closersLong: [
+    "أوصي بـ {store} لأي شركة صغيرة هنا.",
+    "إذا كان عملاؤك لا يجدونك على الإنترنت، تحدث مع {store}.",
+    "سنبقى مع {store} على المدى الطويل.",
+    "يسعدني ترشيح {store} لأصحاب الأعمال الآخرين.",
+    "{store} كسب ثقتنا، وهذا ليس أمراً سهلاً.",
+    "رشحت {store} بالفعل لاثنين من أصحاب الأعمال الذين أعرفهم.",
+  ],
+  closersShort: [
+    "أوصي بـ {store} من دون تردد.",
+    "سعيد بأننا وجدنا {store}.",
+    "{store} يستحق التقييم الكامل.",
+    "يستحق كل درهم.",
+    "سنواصل معهم.",
+  ],
+  fillers: [
+    "من النادر أن تجد مزود خدمة بهذا الوضوح.",
+    "ينفذون ما يعدون به، وهذا للأسف نادر.",
+    "كصاحب عمل، هذا يوفر لي وقتاً لا أملكه.",
+    "تشعر أنهم يهتمون فعلاً بأن ينجح الأمر.",
+    "تجربة منعشة بعد بعض الوكالات التي تعاملنا معها.",
+    "الأمر كله كان بلا عناء.",
+    "كل شيء بدا صادقاً منذ الاتصال الأول.",
+    "لا مبالغات ولا ضغوط بيع.",
+  ],
+  tails: [
+    "لا بد أن أذكر {kw} أيضاً.",
+    "{kw} كان يستحق وحده.",
+    "راضون عن {kw} كذلك.",
+    "{kw} جاء أفضل من المتوقع.",
+    "اسألوهم عن {kw}.",
+    "{kw} كان من أبرز النقاط.",
+    "لا ملاحظات على {kw} أيضاً.",
+  ],
+  microOpeners: [
+    "مراجعة متأخرة لكنها مستحقة.",
+    "ملاحظة سريعة من عميل.",
+  ],
+  noKeywordMid: [
+    "التعاون كله كان سلساً، وجودة التواصل وحدها تكفي لنبقى مع {store}.",
+    "لا شيء أشتكي منه، {store} يبقي الأمور بسيطة وينجزها كما يجب.",
+    "كل من تعاملنا معهم كان متعاوناً، ولم يكن أي طلب عبئاً.",
+    "من المكالمة الأولى إلى التقارير الشهرية، كان التعامل معهم سهلاً.",
+  ],
+};
+
+const AGENCY: Record<ReviewLocale, PoolSet> = { en: EN_AGENCY, ja: JA_AGENCY, ar: AR_AGENCY };
+
 const GENERIC: Record<ReviewLocale, PoolSet> = { en: EN_GENERIC, ja: JA_GENERIC, ar: AR_GENERIC };
 const VERTICAL: Record<ReviewLocale, Partial<Record<Vertical, Partial<PoolSet>>>> = {
   en: EN_VERTICAL,
@@ -888,8 +1260,12 @@ const VERTICAL: Record<ReviewLocale, Partial<Record<Vertical, Partial<PoolSet>>>
   ar: AR_VERTICAL,
 };
 
-/** Resolve the merged pool for a locale + vertical (generic base + flavour). */
+/** Resolve the merged pool for a locale + vertical (generic base + flavour).
+ * Exception: "agency" is exclusive — a B2B client is not a guest at premises,
+ * so merging GENERIC would leak visit/place phrasing ("went to", "the kind of
+ * place") into service-provider reviews. */
 export function resolvePoolSet(locale: ReviewLocale, vertical: Vertical): PoolSet {
+  if (vertical === "agency") return AGENCY[locale] ?? AGENCY.en;
   const base = GENERIC[locale] ?? GENERIC.en;
   if (vertical === "generic") return base;
   const flavour = VERTICAL[locale]?.[vertical];

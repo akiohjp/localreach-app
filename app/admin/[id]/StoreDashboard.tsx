@@ -672,6 +672,7 @@ const BUSINESS_CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: 'fitness', label: 'ジム・フィットネス / Fitness' },
   { value: 'hotel', label: 'ホテル・宿泊 / Hotel' },
   { value: 'auto', label: '自動車 / Automotive' },
+  { value: 'agency', label: '広告・マーケ・制作会社 / Marketing & Digital Agency' },
   { value: 'services', label: 'その他サービス / Other services' },
 ]
 
