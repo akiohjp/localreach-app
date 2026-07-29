@@ -165,8 +165,55 @@ async function main() {
     if (/Motor City|udon restaurant/.test(t)) entLeak++;
   }
 
+  // ---- store names ending in sentence punctuation (live client "Let It Dough!") ----
+  // The "!" belongs to the NAME, not to a sentence, so the following word must
+  // stay lowercase mid-sentence ("Came to Let It Dough! for the first time").
+  let punctName = 0;
+  const PUNCT_AFTER = /(Let It Dough!|Smith & Co\.)\s+(For|On|And|The|Absolutely|Has|A)\b/;
+  for (let i = 0; i < 200; i++) {
+    const t = generateReview("Let It Dough!", ["premium doughnuts", "Boston Cream"], {
+      nonce: createReviewNonce(), outletKey: "punct|cafe|#000", locale: "en", category: "cafe", forcedCount: 1,
+    });
+    if (PUNCT_AFTER.test(t)) punctName++;
+  }
+  // Arabic entity join must not double the preposition ("في X في Y").
+  let arDoubleFi = 0;
+  for (let i = 0; i < 150; i++) {
+    const t = generateReview("Pitfire Pizza", ["Pitfire Primo"], {
+      nonce: createReviewNonce(), outletKey: "ar|restaurant|#000", locale: "ar", category: "restaurant",
+      entity: { area: "Souk Al Bahar", city: "Dubai", categoryLabel: { ar: "مطعم بيتزا" } },
+    });
+    if (/في\s+\S+[^.]*?\s+في\s+Dubai/.test(t)) arDoubleFi++;
+  }
+
+  // ---- attribute-shaped keywords (owners type these; engine must absorb) ----
+  // "great for groups" / "family friendly" / "clean and comfortable" are
+  // descriptions, not things: they must never land in an object slot
+  // ("Definitely try the family friendly") and must still appear verbatim.
+  const ATTR_KWS = ["great for groups", "family friendly", "clean and comfortable", "no artificial colors"];
+  const ATTR_BAD = [
+    /\btry (the )?(great for|family friendly|clean and comfortable|no artificial)/i,
+    /\bnotes on (the )?(great for|family friendly|clean and comfortable|no artificial)/i,
+    /\bAsk (about|them about) (the )?(great for|family friendly|clean and comfortable|no artificial)/i,
+    /\b(the )?(great for groups|family friendly|clean and comfortable|no artificial colors) (lived up|stood out|turned out|really stood)/i,
+    /\bnailed the (great for|family friendly|clean and)/i,
+    /\bWorth going back for (the )?(family friendly|clean and comfortable) alone/i,
+  ];
+  let attrMisuse = 0, attrMissing = 0;
+  for (let i = 0; i < N; i++) {
+    const t = generateReview("Marina Bistro", ["grilled seabass", ...ATTR_KWS], {
+      nonce: createReviewNonce(), outletKey: "attr|restaurant|#000", locale: "en", category: "restaurant",
+    });
+    if (ATTR_BAD.some((re) => re.test(t))) attrMisuse++;
+    if (!ATTR_KWS.every((k) => t.includes(k))) attrMissing++;
+  }
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
+  assert(attrMisuse === 0, `EN: attribute keywords never land in an object slot (got ${attrMisuse})`);
+  assert(attrMissing === 0, `EN: attribute keywords still appear verbatim (missing in ${attrMissing})`);
+  assert(punctName === 0, `EN: store name ending in "!"/"." does not capitalize the next word (got ${punctName})`);
+  assert(arDoubleFi === 0, `AR: entity location never doubles "في" (got ${arDoubleFi})`);
   assert(entAreaMiss === 0, `entity: area in every review (missing ${entAreaMiss})`);
   assert(entCatMiss === 0, `entity: category noun in every review (missing ${entCatMiss})`);
   assert(entDupe === 0, `entity: area never mentioned twice (got ${entDupe})`);

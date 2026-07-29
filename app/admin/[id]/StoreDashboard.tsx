@@ -211,6 +211,34 @@ function BrandColorEditor({
 // Keyword Manager
 // ─────────────────────────────────────────────
 
+/**
+ * Keyword shape check (owner guidance, never blocking).
+ *
+ * Every keyword lands in an OBJECT slot: "Definitely try {kw}", "No notes on
+ * {kw}", "Worth going back for {kw} alone". Nouns read perfectly there; an
+ * attribute phrase does not ("Definitely try the clean and comfortable").
+ * Place names are the same class of mistake — those belong in the Location &
+ * business type section, not here.
+ */
+const ATTRIBUTE_SHAPED = [
+  /^(great|good|perfect|ideal|nice)\s+(for|to)\b/i,
+  /^(clean|cosy|cozy|comfortable|friendly|quiet|spacious|affordable|cheap|fast|quick|fresh|tasty|delicious)\b(?!\s+\w*(s|ice|ing|ry|ty|room|food|coffee|pizza|udon|staff|team|menu|option|selection|atmosphere|vibe|service)\b)/i,
+  /^(family|kid|pet|wheelchair|budget)[\s-]?friendly$/i,
+  /\b(and|&)\s+(clean|comfortable|cosy|cozy|quiet|friendly|fast|affordable)$/i,
+  /\b(daily|weekly|always|often|24\/7)$/i,
+]
+
+function keywordShapeWarning(kw: string): string | null {
+  const t = kw.trim()
+  if (!t) return null
+  // Latin-only heuristic; JA/AR keywords use different grammar in their pools.
+  if (!/^[\x20-\x7E]+$/.test(t)) return null
+  if (ATTRIBUTE_SHAPED.some((re) => re.test(t))) {
+    return 'reads as a description, not a thing — reviews say "Definitely try the …", so name a dish or feature instead'
+  }
+  return null
+}
+
 function KeywordManager({
   storeId,
   initial,
@@ -300,6 +328,21 @@ function KeywordManager({
       <p className="text-[10px] text-slate-400">
         Press <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">Enter</kbd> or <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">,</kbd> to add · {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}
       </p>
+
+      {keywords.some((k) => keywordShapeWarning(k)) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <p className="text-[11px] font-semibold text-amber-800 mb-1">
+            These still work, but they read better as things a guest can name:
+          </p>
+          <ul className="space-y-0.5">
+            {keywords.filter((k) => keywordShapeWarning(k)).map((k) => (
+              <li key={k} className="text-[10px] text-amber-700">
+                <strong>{k}</strong> — {keywordShapeWarning(k)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {input.trim() && (

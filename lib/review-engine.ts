@@ -104,6 +104,34 @@ function withArt(phrase: string): string {
   return /^[a-z]/.test(phrase) ? `the ${phrase}` : phrase;
 }
 
+/**
+ * Attribute-shaped EN keywords ("great for groups", "family friendly", "clean
+ * and comfortable") are descriptions, not things. Every {kw}/{list} template is
+ * an OBJECT slot, so they came out as "Definitely try the family friendly" —
+ * the same class of bug as putting a place name in a keyword (caught while
+ * auditing live store data 2026-07-29).
+ *
+ * Owners will always type these, so the engine absorbs them instead of relying
+ * on perfect data entry: attribute phrases are pushed out of the {list} core
+ * and rendered through appositive tails ("Another plus: great for groups.")
+ * which accept ANY phrase shape. Latin-script only — JA/AR pools take these
+ * phrases naturally already.
+ */
+const ATTRIBUTE_SHAPED: RegExp[] = [
+  /^(great|good|perfect|ideal|nice|excellent)\s+(for|to)\b/i,
+  /^(family|kid|kids|pet|child|wheelchair|budget)[\s-]?friendly$/i,
+  /^(clean|cosy|cozy|comfortable|friendly|quiet|spacious|affordable|cheap|fast|quick|tasty|delicious|relaxing|welcoming)(\s+and\s+\w+)?$/i,
+  /\b(and|&)\s+(clean|comfortable|cosy|cozy|quiet|friendly|fast|affordable|welcoming)$/i,
+  /\b(daily|weekly|nightly|always|often)$/i,
+  /^(no|not)\s/i,
+];
+
+function isAttributeShaped(phrase: string): boolean {
+  const t = phrase.trim();
+  if (!t || !/^[\x20-\x7E]+$/.test(t)) return false; // non-Latin → leave alone
+  return ATTRIBUTE_SHAPED.some((re) => re.test(t));
+}
+
 function oxford(p: string[]): string {
   if (p.length === 0) return "";
   if (p.length === 1) return p[0]!;
@@ -336,6 +364,20 @@ function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => num
  *   city — occasionally appended to the area     → ~1 in 3 reviews
  *   cat  — locale-resolved business noun ("udon restaurant") → woven whenever provided
  */
+/**
+ * Appositive tails that accept ANY phrase shape (noun, adjective, "great for
+ * groups"). Used for attribute-shaped EN keywords so they never enter an object
+ * slot. Deliberately colon/"plus"-led: no article, no verb agreement to break.
+ */
+const ATTRIBUTE_TAILS_EN: string[] = [
+  "Another plus: {kw}.",
+  "Also worth mentioning: {kw}.",
+  "One more thing: {kw}.",
+  "Plus {kw}, which I appreciated.",
+  "Same goes for {kw}.",
+  "And {kw}, which counts for a lot.",
+];
+
 export type ReviewEntity = {
   area?: string | null;
   city?: string | null;
@@ -427,7 +469,9 @@ function entityLoc(
 ): string | null {
   if (area && city && rng() < 0.35) {
     if (locale === "ja") return `${city}の${area}`;
-    if (locale === "ar") return `${area} في ${city}`;
+    // Arabic templates already carry "في" before {loc}; joining with another
+    // "في" produced "في Souk Al Bahar في Dubai". Arabic comma keeps it clean.
+    if (locale === "ar") return `${area}، ${city}`;
     return `${area}, ${city}`;
   }
   return area ?? city ?? null;
@@ -630,10 +674,30 @@ function capStoreMentions(text: string, name: string, locale: ReviewLocale, rng:
  * town") — the verbatim guarantee outranks capitalization.
  */
 function capitalizeSentenceStartsEn(text: string, protect: readonly string[]): string {
+  // A protected phrase can END in sentence punctuation — store names like
+  // "Let It Dough!" or "Smith & Co." — and that punctuation is NOT a sentence
+  // break. Without this the next word got wrongly capitalized mid-sentence
+  // ("Came to Let It Dough! For the first time", live client, caught 2026-07-29).
+  // Map every character position covered by a protected phrase, then ignore any
+  // terminator that falls inside one.
+  const inProtected = new Uint8Array(text.length);
+  for (const p of protect) {
+    if (!p || !/[.!?]/.test(p)) continue;
+    let from = 0;
+    for (;;) {
+      const at = text.indexOf(p, from);
+      if (at === -1) break;
+      for (let i = at; i < at + p.length && i < text.length; i++) inProtected[i] = 1;
+      from = at + p.length;
+    }
+  }
+
   const re = /(^|[.!?]\s+|\n\n+)([a-z])/g;
   let out = text;
   let m: RegExpExecArray | null;
   while ((m = re.exec(out)) !== null) {
+    // Terminator sits at m.index when the separator starts with punctuation.
+    if (/^[.!?]/.test(m[1]!) && inProtected[m.index]) continue;
     const idx = m.index + m[1]!.length;
     // Same-length replacement, so the regex cursor stays valid.
     const cand = out.slice(0, idx) + out[idx]!.toUpperCase() + out.slice(idx + 1);
@@ -732,14 +796,26 @@ export function buildLocalizedReview(
   // how short a review can honestly be while keeping every phrase verbatim.
   const bucket = pickLenBucket(locale, seed, rating, keywords.length);
   const cfg = { ...LOCALE_CFG[locale], ...bucket };
-  const shuffled = shuffle(keywords, forkRng(seed, 0xb8b26351));
+  const shuffledRaw = shuffle(keywords, forkRng(seed, 0xb8b26351));
+  // Attribute-shaped phrases ("great for groups") cannot sit in the {list}
+  // object slot, so sort them to the back — the core takes nouns, and they come
+  // out through the appositive tails below. Stable within each group, so the
+  // shuffle still drives variety.
+  const shuffled =
+    locale === "en"
+      ? [...shuffledRaw.filter((k) => !isAttributeShaped(k)), ...shuffledRaw.filter(isAttributeShaped)]
+      : shuffledRaw;
 
   // Only a small CORE of keywords goes into the {list} sentence (see LIST_CAP);
   // the rest are appended as natural single-keyword tails below. This is the
   // single biggest human-ness lever: it turns "A, B, C, D and E" dumps into a
   // guest naming one or two things, then mentioning the others in passing.
   const coreCount = bucket.kind === "short" ? 1 : Math.min(LIST_CAP, shuffled.length);
-  const coreKws = shuffled.slice(0, coreCount);
+  // The core {list} sentence is an object slot, so it takes NOUNS only. With
+  // few nouns the core simply gets shorter (or empty) and the attribute phrases
+  // all leave through the appositive tails — never "Loved the family friendly".
+  const coreNouns = locale === "en" ? shuffled.filter((k) => !isAttributeShaped(k)) : shuffled;
+  const coreKws = coreNouns.slice(0, coreCount);
   const longPhrases =
     coreKws.reduce((n, k) => n + k.length, 0) > 90 ||
     coreKws.some((k) => k.split(/\s+/).length > 5);
@@ -747,7 +823,12 @@ export function buildLocalizedReview(
   // closers) or the assembled baseline alone overshoots the bucket ceiling.
   const compact = longPhrases || bucket.kind === "short";
 
-  let text = buildInner(name, coreKws, pool, cfg, compact, seed);
+  // Every keyword is attribute-shaped → no noun exists for the core sentence.
+  // Build the keyword-free skeleton instead; the tails carry all the phrases.
+  let text =
+    coreKws.length === 0
+      ? reviewNoKeywords(name, pool, cfg, seed)
+      : buildInner(name, coreKws, pool, cfg, compact, seed);
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
   text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled);
 
@@ -764,24 +845,40 @@ export function buildLocalizedReview(
   // they land, so pair them up ("Also have to mention the sea view and the
   // wagyu.") — both phrases stay verbatim, tail count halves.
   const leftovers = shuffled.filter((kw) => kw.length > 0 && !text.includes(kw));
-  const slots: string[] = [];
-  if (leftovers.length >= 4) {
-    for (let i = 0; i < leftovers.length; i += 2) {
-      const pair = leftovers.slice(i, i + 2);
-      slots.push(
-        pair.length === 2
-          ? cfg.joinList(pair, forkRng(seed, 0x7c00 + i))
-          : locale === "en" ? withArt(pair[0]!) : pair[0]!,
-      );
+  // Attribute phrases get appositive tails; nouns keep the rich object tails.
+  // Pairing only ever joins same-kind phrases so a pair never mixes the two.
+  const nounLeft = locale === "en" ? leftovers.filter((k) => !isAttributeShaped(k)) : leftovers;
+  const attrLeft = locale === "en" ? leftovers.filter(isAttributeShaped) : [];
+  const slots: { text: string; attr: boolean }[] = [];
+  const pushGroup = (group: string[], attr: boolean) => {
+    if (group.length >= 4 && !attr) {
+      for (let i = 0; i < group.length; i += 2) {
+        const pair = group.slice(i, i + 2);
+        slots.push({
+          attr,
+          text:
+            pair.length === 2
+              ? cfg.joinList(pair, forkRng(seed, 0x7c00 + i))
+              : locale === "en" ? withArt(pair[0]!) : pair[0]!,
+        });
+      }
+      return;
     }
-  } else {
-    for (const kw of leftovers) slots.push(locale === "en" ? withArt(kw) : kw);
-  }
+    for (const kw of group) {
+      slots.push({ attr, text: attr ? kw : locale === "en" ? withArt(kw) : kw });
+    }
+  };
+  pushGroup(nounLeft, false);
+  pushGroup(attrLeft, true);
+
+  const attrOrder = shuffle([...ATTRIBUTE_TAILS_EN], forkRng(seed, 0x7a22));
   let ti = 0;
+  let ai = 0;
   for (const slot of slots) {
-    if (tailOrder.length === 0) break;
-    text = appendSpread(text, fill(tailOrder[ti % tailOrder.length]!, { kw: slot }), cfg.glue, tailSpread);
-    ti++;
+    const order = slot.attr ? attrOrder : tailOrder;
+    if (order.length === 0) break;
+    const tpl = slot.attr ? order[ai++ % order.length]! : order[ti++ % order.length]!;
+    text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread);
   }
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
