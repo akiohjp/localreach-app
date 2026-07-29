@@ -110,8 +110,74 @@ async function main() {
     if (!selKws.every((k) => t.includes(k))) selDrop++;
   }
 
+  // ---- entity layer (AI visibility, 2026-07-29) ----
+  // Every review must carry the entity ONCE via a dedicated sentence: the area
+  // and the category noun present, never routed through the {kw} object slots
+  // ("Definitely try Motor City" was the live-store bug), city ~1/3 of the
+  // time, and no duplicate mention of area/cat from double weaving.
+  const ENT = { area: "Motor City", city: "Dubai", categoryLabel: { en: "udon restaurant", ja: "うどん店", ar: "مطعم ياباني" } };
+  const entOpts = (locale, extra = {}) => ({
+    nonce: createReviewNonce(), outletKey: "ent|restaurant|#000", locale,
+    category: "restaurant", entity: ENT, ...extra,
+  });
+  // {kw}-slot misuse detector: the object templates that made place names absurd.
+  const KW_MISUSE = [
+    /Definitely try (the )?Motor City/i, /No notes on (the )?Motor City/i,
+    /Ask (about|them about) (the )?Motor City/i, /try (the )?Dubai\b/i,
+    /Definitely try (the )?udon restaurant\b/i,
+  ];
+  let entAreaMiss = 0, entCatMiss = 0, entDupe = 0, entMisuse = 0, entCity = 0;
+  const entSet = new Set();
+  for (let i = 0; i < N; i++) {
+    const t = generateReview("Maru Udon", ["handmade udon", "tempura"], entOpts("en"));
+    entSet.add(t);
+    if (!t.includes("Motor City")) entAreaMiss++;
+    if (!t.includes("udon restaurant")) entCatMiss++;
+    if (t.split("Motor City").length - 1 > 1) entDupe++;
+    if (KW_MISUSE.some((re) => re.test(t))) entMisuse++;
+    if (t.includes("Dubai")) entCity++;
+  }
+  // Dedupe guard: a forced keyword already carrying the area must NOT produce a
+  // second area mention from the entity layer.
+  let entForcedDupe = 0;
+  for (let i = 0; i < 120; i++) {
+    const t = generateReview("Maru Udon", ["best udon in Motor City", "tempura"], entOpts("en", { forcedCount: 1 }));
+    if (t.split("Motor City").length - 1 > 1) entForcedDupe++;
+  }
+  // JA + AR: locale label used (not the EN one), area present.
+  let entJaMiss = 0, entArMiss = 0;
+  for (let i = 0; i < 120; i++) {
+    const tj = generateReview("Maru Udon", ["手打ちうどん"], entOpts("ja"));
+    if (!tj.includes("Motor City") || !tj.includes("うどん店")) entJaMiss++;
+    const ta = generateReview("Maru Udon", ["أودون طازج"], entOpts("ar"));
+    if (!ta.includes("Motor City") || !ta.includes("مطعم ياباني")) entArMiss++;
+  }
+  // No-keyword stores (zero pills configured) still get the entity.
+  let entNoKw = 0;
+  for (let i = 0; i < 120; i++) {
+    const t = generateReview("Maru Udon", [], entOpts("en"));
+    if (!t.includes("Motor City") || !t.includes("udon restaurant")) entNoKw++;
+  }
+  // Stores WITHOUT entity fields behave exactly as before (no leakage).
+  let entLeak = 0;
+  for (let i = 0; i < 120; i++) {
+    const t = generateReview(store, kws, opts());
+    if (/Motor City|udon restaurant/.test(t)) entLeak++;
+  }
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
+  assert(entAreaMiss === 0, `entity: area in every review (missing ${entAreaMiss})`);
+  assert(entCatMiss === 0, `entity: category noun in every review (missing ${entCatMiss})`);
+  assert(entDupe === 0, `entity: area never mentioned twice (got ${entDupe})`);
+  assert(entMisuse === 0, `entity: never routed through {kw} object templates (got ${entMisuse})`);
+  assert(entCity > N * 0.15 && entCity < N * 0.6, `entity: city rides along ~1/3 of reviews (got ${entCity}/${N})`);
+  assert(entForcedDupe === 0, `entity: forced keyword carrying the area → no double mention (got ${entForcedDupe})`);
+  assert(entJaMiss === 0, `entity JA: area + JA category label woven (missed ${entJaMiss})`);
+  assert(entArMiss === 0, `entity AR: area + AR category label woven (missed ${entArMiss})`);
+  assert(entNoKw === 0, `entity: woven even with zero keywords configured (missed ${entNoKw})`);
+  assert(entLeak === 0, `entity: no leakage into stores without entity fields (got ${entLeak})`);
+  assert(entSet.size === N, `entity: reviews still all unique (${entSet.size}/${N})`);
   assert(nameMissing === 0, `SEO: store name present in every review (missing ${nameMissing})`);
   assert(forced.every((k) => kwFreq[k] === N), `SEO: forced GEO keywords woven in 100% of reviews`);
   assert(guest.every((k) => kwFreq[k] === N), `selection: every guest-selected keyword appears in EVERY review (no vanishing)`);

@@ -6,7 +6,7 @@
  * Seeded RNG + per-run nonce so outputs vary strongly across runs.
  */
 
-import { buildLocalizedReview } from "@/lib/review-engine";
+import { buildLocalizedReview, type ReviewEntity } from "@/lib/review-engine";
 import { resolveVertical, type ReviewLocale } from "@/lib/review-pools";
 import type { SupportedLocale } from "@/types/database";
 
@@ -30,6 +30,17 @@ export type GenerateReviewOptions = {
   forcedCount?: number;
   /** Guest's star rating (4-5 reach generation). 4 biases shorter/measured. */
   rating?: number;
+  /**
+   * Entity layer (AI visibility): branch area, city and per-locale business
+   * noun, woven once per review via dedicated sentences (never via {kw}).
+   * `categoryLabel` is the stores.entity_category_label jsonb; the label for
+   * the review locale is resolved here (en fallback).
+   */
+  entity?: {
+    area?: string | null;
+    city?: string | null;
+    categoryLabel?: Record<string, string> | null;
+  } | null;
 };
 
 function toReviewLocale(locale?: SupportedLocale): ReviewLocale {
@@ -89,7 +100,17 @@ export function generateReview(
   const seed = computeReviewSeed(store, cleaned, nonce, `${outlet}\0${locale}\0${vertical}`);
   const forcedCount = Math.max(0, Math.min(options?.forcedCount ?? 0, cleaned.length));
   const rating = Math.min(5, Math.max(1, Math.round(options?.rating ?? 5)));
-  return buildLocalizedReview(store, cleaned, seed, locale, vertical, forcedCount, rating);
+  const entity: ReviewEntity | undefined = options?.entity
+    ? {
+        area: options.entity.area ?? null,
+        city: options.entity.city ?? null,
+        cat:
+          options.entity.categoryLabel?.[locale]?.trim() ||
+          options.entity.categoryLabel?.en?.trim() ||
+          null,
+      }
+    : undefined;
+  return buildLocalizedReview(store, cleaned, seed, locale, vertical, forcedCount, rating, entity);
 }
 
 /** Call once per generated review (client). Each call must be unique for visible shuffle in demos. */

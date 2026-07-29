@@ -320,6 +320,159 @@ function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => num
   return "";
 }
 
+// ------------------------------------------------------------ entity layer ----
+
+/**
+ * Entity layer (AI visibility). The review text is the only surface LocalReach
+ * controls, and AI answer engines + Google's local ranking both match reviews
+ * against "<category> in <area>" language. The {kw}/{list} slots are OBJECT
+ * slots (dishes, things), so entity terms must never route through them —
+ * "Definitely try Motor City" was caught on live-store E2E 2026-07-29.
+ *
+ * Instead each review gets AT MOST ONE dedicated entity sentence, built from
+ * whichever parts are not already present verbatim (a forced keyword may
+ * already carry the area). Parts:
+ *   area — branch neighbourhood ("Motor City")   → woven whenever provided
+ *   city — occasionally appended to the area     → ~1 in 3 reviews
+ *   cat  — locale-resolved business noun ("udon restaurant") → woven whenever provided
+ */
+export type ReviewEntity = {
+  area?: string | null;
+  city?: string | null;
+  /** Locale-resolved natural noun (assembler picks the label for the locale). */
+  cat?: string | null;
+};
+
+function fillEntity(tpl: string, loc: string, cat: string): string {
+  return tpl.replace(/\{loc\}/g, loc).replace(/\{cat\}/g, cat);
+}
+
+// EN templates never place an indefinite article directly before {cat} ("a
+// udon restaurant" would need "an") — only "a good/better {cat}" forms are
+// safe. All templates are number-neutral; superlative ones are filtered out
+// for 4-star reviews.
+const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
+  en: [
+    "Easily my favourite {cat} in {loc}.",
+    "Best {cat} I've found around {loc}.",
+    "My go-to {cat} in {loc} now.",
+    "Hard to find a better {cat} in {loc}.",
+    "Glad to have this {cat} in {loc}.",
+    "If you're near {loc}, this is the {cat} to try.",
+    "Solid {cat} right in {loc}.",
+  ],
+  ja: [
+    "{loc}で{cat}を探しているなら、ここをおすすめします。",
+    "{loc}の{cat}ではいちばんのお気に入りです。",
+    "{loc}でこの{cat}に出会えてよかったです。",
+    "{loc}に来たらまた寄りたい{cat}です。",
+    "{loc}にあるのがうれしい{cat}です。",
+  ],
+  ar: [
+    "من أفضل ما جربت من {cat} في {loc}.",
+    "أفضل {cat} وجدته في {loc} حتى الآن.",
+    "إن كنت في {loc} وتبحث عن {cat} فهذا هو المكان.",
+    "صار {cat} المفضل لدي في {loc}.",
+    "وجود {cat} بهذا المستوى في {loc} شيء جميل.",
+  ],
+};
+
+const ENTITY_LOC_ONLY: Record<ReviewLocale, string[]> = {
+  en: [
+    "Worth the trip out to {loc}.",
+    "Great addition to {loc}.",
+    "If you're around {loc}, stop by.",
+    "Nice to have a place like this in {loc}.",
+  ],
+  ja: [
+    "{loc}という場所も便利です。",
+    "{loc}に行くときはまた寄ります。",
+    "{loc}にこういうお店があるのはうれしいです。",
+  ],
+  ar: [
+    "يستحق الزيارة إن كنت قرب {loc}.",
+    "موقعه في {loc} مناسب جداً.",
+    "جميل أن يوجد مكان كهذا في {loc}.",
+  ],
+};
+
+const ENTITY_CAT_ONLY: Record<ReviewLocale, string[]> = {
+  en: [
+    "Exactly what a good {cat} should be.",
+    "One of the better {cat} options around.",
+  ],
+  ja: [
+    "{cat}としては文句なしです。",
+    "いい{cat}を見つけました。",
+  ],
+  ar: [
+    "{cat} ممتاز بكل المقاييس.",
+    "من أفضل خيارات {cat} التي جربتها.",
+  ],
+};
+
+/** Superlative markers unsuitable for a measured 4-star review. */
+const SUPERLATIVE_RE = /favourite|Best \{cat\}|いちばん|أفضل|المفضل/;
+
+/**
+ * Compose the location slot. City rides along ~1 in 3 times so "Dubai" reaches
+ * a share of reviews without every single one carrying the full "area, city"
+ * pair (which would itself read as a pattern).
+ */
+function entityLoc(
+  area: string | null,
+  city: string | null,
+  locale: ReviewLocale,
+  rng: () => number,
+): string | null {
+  if (area && city && rng() < 0.35) {
+    if (locale === "ja") return `${city}の${area}`;
+    if (locale === "ar") return `${area} في ${city}`;
+    return `${area}, ${city}`;
+  }
+  return area ?? city ?? null;
+}
+
+/**
+ * Weave the entity sentence into `text`. Returns the new text plus every
+ * entity term now present, so callers extend the verbatim-protect list.
+ */
+function weaveEntity(
+  text: string,
+  entity: ReviewEntity | undefined,
+  locale: ReviewLocale,
+  cfg: LocaleCfg,
+  seed: number,
+  rating: number,
+): { text: string; protect: string[] } {
+  const area = entity?.area?.trim() || null;
+  const city = entity?.city?.trim() || null;
+  const cat = entity?.cat?.trim() || null;
+  if (!area && !city && !cat) return { text, protect: [] };
+
+  const rng = forkRng(seed, 0xe171);
+  const loc = entityLoc(area, city, locale, rng);
+  const missLoc = !!loc && !text.includes(area ?? loc);
+  const missCat = !!cat && !text.includes(cat);
+  const protect = [area, city, cat].filter((s): s is string => !!s);
+  if (!missLoc && !missCat) return { text, protect };
+
+  let pool: string[];
+  if (missLoc && missCat) {
+    pool = ENTITY_BOTH[locale];
+  } else if (missLoc) {
+    pool = ENTITY_LOC_ONLY[locale];
+  } else {
+    pool = ENTITY_CAT_ONLY[locale];
+  }
+  if (rating < 5) {
+    const measured = pool.filter((t) => !SUPERLATIVE_RE.test(t));
+    if (measured.length > 0) pool = measured;
+  }
+  const sentence = fillEntity(pick(pool, rng), loc ?? "", cat ?? "");
+  return { text: appendSpread(text, sentence, cfg.glue, rng), protect };
+}
+
 /** True when trimming would delete a verbatim keyword the review must keep. */
 function trimLosesKeyword(before: string, after: string, protect: readonly string[]): boolean {
   return protect.some((k) => k && before.includes(k) && !after.includes(k));
@@ -557,6 +710,7 @@ export function buildLocalizedReview(
   vertical: Vertical,
   forcedCount = 0,
   rating = 5,
+  entity?: ReviewEntity,
 ): string {
   const pool = resolvePoolSet(locale, vertical);
   const name =
@@ -566,8 +720,10 @@ export function buildLocalizedReview(
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
-    let t0 = normalizeDashes(capStoreMentions(reviewNoKeywords(name, pool, cfg0, seed), name, locale, forkRng(seed, 0xca9)));
-    if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name]);
+    let t0 = reviewNoKeywords(name, pool, cfg0, seed);
+    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating);
+    t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9)));
+    if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
     return t0;
   }
 
@@ -628,13 +784,19 @@ export function buildLocalizedReview(
     ti++;
   }
 
-  text = tuneLength(text, name, pool, cfg, seed, 0x302, shuffled);
+  // Entity sentence goes in BEFORE the final length pass so trimming can never
+  // delete it (its terms join the verbatim-protect list).
+  const woven = weaveEntity(text, entity, locale, cfg, seed, rating);
+  text = woven.text;
+  const protectAll = [...shuffled, ...woven.protect];
+
+  text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll);
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
   // itself contains the name, so the verbatim-keyword guarantee is never broken.
-  if (!shuffled.some((k) => k.includes(name))) {
+  if (!protectAll.some((k) => k.includes(name))) {
     text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9));
   }
   text = normalizeDashes(text);
-  if (locale === "en") text = capitalizeSentenceStartsEn(text, [...shuffled, name]);
+  if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);
   return text;
 }

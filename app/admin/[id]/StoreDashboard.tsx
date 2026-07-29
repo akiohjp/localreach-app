@@ -6,7 +6,7 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
-  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone,
+  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone, MapPin,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
@@ -650,6 +650,178 @@ function LanguageSelectorSection({
         >
           Save Language
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Entity (AI visibility) — area / city / category noun
+// ─────────────────────────────────────────────
+
+/**
+ * The engine weaves ONE natural sentence per review carrying "<category> in
+ * <area>" (city rides along occasionally). This is what AI answers and local
+ * ranking match against — keywords are dish/object slots and must not carry
+ * place names. "Fetch from Google" resolves the store's own review-link place
+ * id via /api/place-entity (EN labels; JA/AR are optional manual refinements).
+ */
+function EntitySection({
+  storeId,
+  initialArea,
+  initialCity,
+  initialCategoryLabel,
+  googleReviewUrl,
+}: {
+  storeId: string
+  initialArea: string | null
+  initialCity: string | null
+  initialCategoryLabel: Record<string, string> | null
+  googleReviewUrl: string
+}) {
+  const [area, setArea] = useState(initialArea ?? '')
+  const [city, setCity] = useState(initialCity ?? '')
+  const [catEn, setCatEn] = useState(initialCategoryLabel?.en ?? '')
+  const [catJa, setCatJa] = useState(initialCategoryLabel?.ja ?? '')
+  const [catAr, setCatAr] = useState(initialCategoryLabel?.ar ?? '')
+  const [state, setState] = useState<SaveState>('idle')
+  const [fetching, setFetching] = useState(false)
+  const [fetchMsg, setFetchMsg] = useState<string | null>(null)
+
+  const placeId = /[?&]placeid=([A-Za-z0-9_-]{10,200})/i.exec(googleReviewUrl)?.[1] ?? null
+
+  async function handleFetch() {
+    if (!placeId) return
+    setFetching(true)
+    setFetchMsg(null)
+    try {
+      const res = await fetch(`/api/place-entity?placeId=${encodeURIComponent(placeId)}`)
+      if (res.status === 501) {
+        setFetchMsg('Auto-fill is not configured on this server — please type the values below.')
+        return
+      }
+      if (!res.ok) {
+        setFetchMsg('Could not read this place from Google — please type the values below.')
+        return
+      }
+      const data = (await res.json()) as { area: string | null; city: string | null; category: string | null }
+      if (data.area) setArea(data.area)
+      if (data.city) setCity(data.city)
+      if (data.category) setCatEn(data.category)
+      if (!data.area && !data.city && !data.category) {
+        setFetchMsg('Google returned no usable fields for this place — please type the values below.')
+      } else {
+        setFetchMsg('Filled from your Google listing — review, adjust, then Save.')
+      }
+      setState('idle')
+    } catch {
+      setFetchMsg('Network error — please type the values below.')
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  async function handleSave() {
+    setState('saving')
+    try {
+      const label: Record<string, string> = {}
+      if (catEn.trim()) label.en = catEn.trim()
+      if (catJa.trim()) label.ja = catJa.trim()
+      if (catAr.trim()) label.ar = catAr.trim()
+      await saveField(storeId, {
+        entity_area: area.trim() || null,
+        entity_city: city.trim() || null,
+        entity_category_label: label,
+      })
+      setState('saved')
+      setTimeout(() => setState('idle'), 2500)
+    } catch {
+      setState('error')
+    }
+  }
+
+  const inputCls =
+    'w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm ' +
+    'text-slate-900 outline-none focus:border-slate-400 focus:ring-2 ' +
+    'focus:ring-slate-100 transition'
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-600 leading-relaxed">
+        Each generated review naturally mentions <strong>what</strong> your business is and{' '}
+        <strong>where</strong> it is (e.g. &ldquo;best udon restaurant I&rsquo;ve found around
+        Motor City&rdquo;). This is what Google&rsquo;s local ranking and AI answers
+        (AI Overviews, ChatGPT) match against — leave it empty and your reviews stay
+        location-blind.
+      </p>
+
+      {placeId && (
+        <button
+          type="button"
+          onClick={handleFetch}
+          disabled={fetching}
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200
+            bg-white px-3.5 py-2 text-xs font-semibold text-slate-700
+            hover:border-slate-400 transition disabled:opacity-50 cursor-pointer"
+        >
+          {fetching ? <Loader2 size={12} className="animate-spin" /> : <MapPin size={12} />}
+          Fetch from your Google listing
+        </button>
+      )}
+      {fetchMsg && <p className="text-[11px] text-slate-500">{fetchMsg}</p>}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+            Area / neighbourhood
+          </label>
+          <input value={area} onChange={(e) => { setArea(e.target.value); setState('idle') }}
+            placeholder="e.g. Motor City" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+            City
+          </label>
+          <input value={city} onChange={(e) => { setCity(e.target.value); setState('idle') }}
+            placeholder="e.g. Dubai" className={inputCls} />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+          Business type — as it should read in a review (English)
+        </label>
+        <input value={catEn} onChange={(e) => { setCatEn(e.target.value); setState('idle') }}
+          placeholder="e.g. udon restaurant" className={inputCls} />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+            日本語 (optional)
+          </label>
+          <input value={catJa} onChange={(e) => { setCatJa(e.target.value); setState('idle') }}
+            placeholder="例: うどん店" className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+            العربية (optional)
+          </label>
+          <input dir="rtl" value={catAr} onChange={(e) => { setCatAr(e.target.value); setState('idle') }}
+            placeholder="مثال: مطعم ياباني" className={inputCls} />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={state === 'saving'}
+          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white
+            hover:bg-slate-700 transition disabled:opacity-50 cursor-pointer"
+        >
+          Save
+        </button>
+        <SaveFeedback state={state} />
       </div>
     </div>
   )
@@ -1428,6 +1600,16 @@ export default function StoreDashboard({
                 <BusinessCategorySelectorSection storeId={store.id} initial={store.business_category} />
               </SectionCard>
             </div>
+
+            <SectionCard label="Location & business type (AI visibility)" icon={<MapPin size={14} />}>
+              <EntitySection
+                storeId={store.id}
+                initialArea={store.entity_area ?? null}
+                initialCity={store.entity_city ?? null}
+                initialCategoryLabel={(store.entity_category_label as Record<string, string> | null) ?? null}
+                googleReviewUrl={store.google_review_url}
+              />
+            </SectionCard>
 
             <SectionCard label="Google Review Link" icon={<Link2 size={14} />}>
               <ReviewUrlEditor storeId={store.id} initial={store.google_review_url} />

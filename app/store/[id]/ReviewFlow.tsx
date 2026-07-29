@@ -63,6 +63,10 @@ type Props = {
   locale: SupportedLocale // resolved locale — drives UI copy (en/ja/ar)
   logoUrl?: string | null
   businessCategory?: string | null
+  /** Entity layer (AI visibility) — woven once per review by the engine. */
+  entityArea?: string | null
+  entityCity?: string | null
+  entityCategoryLabel?: Record<string, string> | null
 }
 
 export default function ReviewFlow({
@@ -77,7 +81,15 @@ export default function ReviewFlow({
   locale,
   logoUrl,
   businessCategory,
+  entityArea,
+  entityCity,
+  entityCategoryLabel,
 }: Props) {
+  const entity = {
+    area: entityArea ?? null,
+    city: entityCity ?? null,
+    categoryLabel: entityCategoryLabel ?? null,
+  }
   const t = getUiStrings(locale)
   const [step, setStep] = useState<Step>('rating')
   const [rating, setRating] = useState(0)
@@ -145,6 +157,7 @@ export default function ReviewFlow({
         category: businessCategory,
         forcedCount,
         rating: ratingValue,
+        entity,
       }),
     )
     setStep('result')
@@ -163,6 +176,7 @@ export default function ReviewFlow({
       category: businessCategory,
       forcedCount,
       rating,
+      entity,
     })
     setReviewText(next)
     return next
@@ -292,6 +306,7 @@ export default function ReviewFlow({
                   category: businessCategory,
                   forcedCount,
                   rating,
+                  entity,
                 })}
             />
           )}

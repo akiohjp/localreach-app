@@ -66,6 +66,7 @@ export default function ReviewPage() {
     setReviewText(
       generateReview(STORE_CONFIG.storeName, selected, {
         nonce: createReviewNonce(),
+        entity: STORE_CONFIG.entity,
         outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
         locale: reviewLocale,
         category: "restaurant",
@@ -78,6 +79,7 @@ export default function ReviewPage() {
     setReviewLocale(loc);
     const next = generateReview(STORE_CONFIG.storeName, selectedKeywords, {
       nonce: createReviewNonce(),
+        entity: STORE_CONFIG.entity,
       outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
       locale: loc,
       category: "restaurant",
@@ -177,6 +179,7 @@ export default function ReviewPage() {
                 onRegenerate={() =>
                   generateReview(STORE_CONFIG.storeName, selectedKeywords, {
                     nonce: createReviewNonce(),
+        entity: STORE_CONFIG.entity,
                     outletKey: `${RESULT_STORE_ID}|demo|${STORE_CONFIG.storeName}`,
                     locale: reviewLocale,
                     category: "restaurant",

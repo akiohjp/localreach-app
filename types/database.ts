@@ -71,6 +71,12 @@ export type Database = {
           is_active: boolean;
           /** Contract end (UTC). NULL = no expiry. Effective active = is_active AND not expired. */
           subscription_expires_at: string | null;
+          /** Entity layer (AI visibility): branch area woven once into reviews, e.g. "Motor City". */
+          entity_area?: string | null;
+          /** Entity layer: city occasionally appended after the area, e.g. "Dubai". */
+          entity_city?: string | null;
+          /** Entity layer: per-locale natural business noun, e.g. {"en":"udon restaurant"}. */
+          entity_category_label?: LocalizedText;
           /** Review-reply generator defaults. NULL = built-in defaults. */
           reply_settings?: ReplySettings | null;
 
@@ -95,6 +101,9 @@ export type Database = {
           business_category?: string | null;
           is_active?: boolean;
           subscription_expires_at?: string | null;
+          entity_area?: string | null;
+          entity_city?: string | null;
+          entity_category_label?: LocalizedText;
           reply_settings?: ReplySettings | null;
 
           created_at?: string;
@@ -118,6 +127,9 @@ export type Database = {
           business_category?: string | null;
           is_active?: boolean;
           subscription_expires_at?: string | null;
+          entity_area?: string | null;
+          entity_city?: string | null;
+          entity_category_label?: LocalizedText;
           reply_settings?: ReplySettings | null;
 
           created_at?: string;
@@ -225,6 +237,10 @@ export type Database = {
           is_active: boolean;
           logo_url: string | null;
           business_category: string | null;
+          /** Entity layer (AI visibility): branch area, e.g. "Motor City". */
+          entity_area: string | null;
+          entity_city: string | null;
+          entity_category_label: LocalizedText;
         };
         Relationships: [];
       };

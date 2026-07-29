@@ -1,5 +1,11 @@
 export const STORE_CONFIG = {
   storeName: "Dubai Marina Sushi",
+  /** Entity layer (AI visibility) — woven once per generated review. */
+  entity: {
+    area: "Dubai Marina",
+    city: "Dubai",
+    categoryLabel: { en: "sushi restaurant", ja: "寿司店", ar: "مطعم سوشي" },
+  },
   greetingText:
     "Thank you for dining with us! Your feedback means the world to us.",
   keywords: [
