@@ -419,6 +419,72 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
   ],
 };
 
+/**
+ * Non-visit verticals (you hire them; you don't "pop in"). Visit-shaped entity
+ * lines read wrong for these — "If you're near Dubai, this is the AI SEO agency
+ * to try" was caught on our own live store 2026-07-29. Same slots, client voice.
+ */
+const NON_VISIT_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>([
+  "agency",
+  "legal",
+  "realestate",
+  "home",
+]);
+
+const ENTITY_BOTH_B2B: Record<ReviewLocale, string[]> = {
+  en: [
+    "Best {cat} we've worked with in {loc}.",
+    "If you need a {cat} in {loc}, start here.",
+    "The {cat} I'd recommend to anyone in {loc}.",
+    "Glad we found a {cat} like this in {loc}.",
+    "Reliable {cat} for anyone based in {loc}.",
+    "Hard to find a better {cat} in {loc}.",
+  ],
+  ja: [
+    "{loc}で{cat}を探しているなら、ここをおすすめします。",
+    "{loc}の{cat}の中では間違いなく良い選択でした。",
+    "{loc}で{cat}を頼むならここだと思います。",
+    "{loc}でこの{cat}に出会えてよかったです。",
+  ],
+  ar: [
+    "أفضل {cat} تعاملنا معه في {loc}.",
+    "إن كنت تبحث عن {cat} في {loc} فابدأ من هنا.",
+    "{cat} أنصح به لأي شركة في {loc}.",
+    "سعداء أننا وجدنا {cat} بهذا المستوى في {loc}.",
+  ],
+};
+
+const ENTITY_LOC_ONLY_B2B: Record<ReviewLocale, string[]> = {
+  en: [
+    "Great to have them working in {loc}.",
+    "Worth knowing about if you're based in {loc}.",
+    "A real asset for businesses in {loc}.",
+  ],
+  ja: [
+    "{loc}で事業をしているなら知っておいて損はありません。",
+    "{loc}で頼れる先が見つかったのは大きいです。",
+  ],
+  ar: [
+    "من الجيد وجودهم في {loc}.",
+    "يستحق المعرفة إن كان عملك في {loc}.",
+  ],
+};
+
+const ENTITY_CAT_ONLY_B2B: Record<ReviewLocale, string[]> = {
+  en: [
+    "Exactly what you want from a {cat}.",
+    "One of the better {cat} options out there.",
+  ],
+  ja: [
+    "{cat}としては文句なしです。",
+    "良い{cat}に依頼できたと思います。",
+  ],
+  ar: [
+    "{cat} بالمستوى الذي تتوقعه تماماً.",
+    "من أفضل خيارات {cat} المتاحة.",
+  ],
+};
+
 const ENTITY_LOC_ONLY: Record<ReviewLocale, string[]> = {
   en: [
     "Worth the trip out to {loc}.",
@@ -454,7 +520,7 @@ const ENTITY_CAT_ONLY: Record<ReviewLocale, string[]> = {
 };
 
 /** Superlative markers unsuitable for a measured 4-star review. */
-const SUPERLATIVE_RE = /favourite|Best \{cat\}|いちばん|أفضل|المفضل/;
+const SUPERLATIVE_RE = /favourite|Best \{cat\}|間違いなく|いちばん|أفضل|المفضل/;
 
 /**
  * Compose the location slot. City rides along ~1 in 3 times so "Dubai" reaches
@@ -488,6 +554,7 @@ function weaveEntity(
   cfg: LocaleCfg,
   seed: number,
   rating: number,
+  vertical: Vertical = "generic",
 ): { text: string; protect: string[] } {
   const area = entity?.area?.trim() || null;
   const city = entity?.city?.trim() || null;
@@ -501,13 +568,14 @@ function weaveEntity(
   const protect = [area, city, cat].filter((s): s is string => !!s);
   if (!missLoc && !missCat) return { text, protect };
 
+  const b2b = NON_VISIT_VERTICALS.has(vertical);
   let pool: string[];
   if (missLoc && missCat) {
-    pool = ENTITY_BOTH[locale];
+    pool = b2b ? ENTITY_BOTH_B2B[locale] : ENTITY_BOTH[locale];
   } else if (missLoc) {
-    pool = ENTITY_LOC_ONLY[locale];
+    pool = b2b ? ENTITY_LOC_ONLY_B2B[locale] : ENTITY_LOC_ONLY[locale];
   } else {
-    pool = ENTITY_CAT_ONLY[locale];
+    pool = b2b ? ENTITY_CAT_ONLY_B2B[locale] : ENTITY_CAT_ONLY[locale];
   }
   if (rating < 5) {
     const measured = pool.filter((t) => !SUPERLATIVE_RE.test(t));
@@ -785,7 +853,7 @@ export function buildLocalizedReview(
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
     let t0 = reviewNoKeywords(name, pool, cfg0, seed);
-    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating);
+    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical);
     t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9)));
     if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
     return t0;
@@ -883,7 +951,7 @@ export function buildLocalizedReview(
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
-  const woven = weaveEntity(text, entity, locale, cfg, seed, rating);
+  const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical);
   text = woven.text;
   const protectAll = [...shuffled, ...woven.protect];
 

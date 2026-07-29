@@ -208,8 +208,22 @@ async function main() {
     if (!ATTR_KWS.every((k) => t.includes(k))) attrMissing++;
   }
 
+  // ---- non-visit verticals get B2B entity lines, not "pop in" wording ----
+  const VISIT_SHAPED = /(if you're near|stop by|worth the trip|pop in|nice to have a place)/i;
+  let b2bVisit = 0, b2bMissing = 0;
+  for (let i = 0; i < 200; i++) {
+    const t = generateReview("mirAIreach", ["GEO strategy", "AI visibility report"], {
+      nonce: createReviewNonce(), outletKey: "b2b|agency|#000", locale: "en", category: "agency",
+      entity: { area: null, city: "Dubai", categoryLabel: { en: "AI SEO agency" } },
+    });
+    if (VISIT_SHAPED.test(t)) b2bVisit++;
+    if (!t.includes("AI SEO agency") || !t.includes("Dubai")) b2bMissing++;
+  }
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
+  assert(b2bVisit === 0, `B2B verticals: no visit-shaped entity wording (got ${b2bVisit})`);
+  assert(b2bMissing === 0, `B2B verticals: entity still woven every time (missing ${b2bMissing})`);
   assert(attrMisuse === 0, `EN: attribute keywords never land in an object slot (got ${attrMisuse})`);
   assert(attrMissing === 0, `EN: attribute keywords still appear verbatim (missing in ${attrMissing})`);
   assert(punctName === 0, `EN: store name ending in "!"/"." does not capitalize the next word (got ${punctName})`);
