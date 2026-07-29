@@ -18,7 +18,7 @@
 
 import { forkRng } from "@/lib/review-rng";
 import type { ReviewLocale, Vertical, PoolSet } from "@/lib/review-pools";
-import { resolvePoolSet } from "@/lib/review-pools";
+import { resolvePoolSet, NON_VISIT_VERTICALS } from "@/lib/review-pools";
 
 // ---------------------------------------------------------------- helpers ----
 
@@ -424,13 +424,6 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
  * lines read wrong for these — "If you're near Dubai, this is the AI SEO agency
  * to try" was caught on our own live store 2026-07-29. Same slots, client voice.
  */
-const NON_VISIT_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>([
-  "agency",
-  "legal",
-  "realestate",
-  "home",
-]);
-
 const ENTITY_BOTH_B2B: Record<ReviewLocale, string[]> = {
   en: [
     "Best {cat} we've worked with in {loc}.",
@@ -705,9 +698,25 @@ const STANDINS: Record<ReviewLocale, string[]> = {
   ar: ["هذا المكان", "المكان"],
 };
 
-function capStoreMentions(text: string, name: string, locale: ReviewLocale, rng: () => number): string {
+/**
+ * You don't call a law firm "the spot". Non-visit verticals get stand-ins that
+ * refer to the provider, not to premises — same slots, so grammar is unchanged.
+ */
+const STANDINS_NON_VISIT: Record<ReviewLocale, string[]> = {
+  en: ["them", "the team", "this team"],
+  ja: ["こちら", "こちらの担当者", "担当の方"],
+  ar: ["هذا الفريق", "الفريق"],
+};
+
+function capStoreMentions(
+  text: string,
+  name: string,
+  locale: ReviewLocale,
+  rng: () => number,
+  vertical: Vertical = "generic",
+): string {
   if (!name) return text;
-  const variants = STANDINS[locale];
+  const variants = NON_VISIT_VERTICALS.has(vertical) ? STANDINS_NON_VISIT[locale] : STANDINS[locale];
   let vi = Math.floor(rng() * variants.length);
   let out = "";
   let rest = text;
@@ -854,7 +863,7 @@ export function buildLocalizedReview(
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
     let t0 = reviewNoKeywords(name, pool, cfg0, seed);
     const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical);
-    t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9)));
+    t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9), vertical));
     if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
     return t0;
   }
@@ -959,7 +968,7 @@ export function buildLocalizedReview(
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
   // itself contains the name, so the verbatim-keyword guarantee is never broken.
   if (!protectAll.some((k) => k.includes(name))) {
-    text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9));
+    text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9), vertical);
   }
   text = normalizeDashes(text);
   if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);

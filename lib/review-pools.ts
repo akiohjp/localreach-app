@@ -1260,13 +1260,51 @@ const VERTICAL: Record<ReviewLocale, Partial<Record<Vertical, Partial<PoolSet>>>
   ar: AR_VERTICAL,
 };
 
+/**
+ * Verticals where the customer is NOT a guest on the premises: you hire them,
+ * they come to you, or it is an engagement rather than a visit. GENERIC is
+ * written in visit voice, so merging it unfiltered leaked "Popped into Gulf
+ * Legal on the weekend" into law-firm reviews (18-vertical sweep 2026-07-29).
+ * `agency` stays fully exclusive; the others keep GENERIC minus visit-only lines.
+ */
+export const NON_VISIT_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>([
+  "agency",
+  "legal",
+  "realestate",
+  "home",
+]);
+
+/** Lines that only make sense if you physically dropped in somewhere. */
+const VISIT_ONLY_RE: Record<ReviewLocale, RegExp> = {
+  en: /\b(popped into|stopped by|visited|visit to|the visit|next visit|made the trip|the trip worth|walked out|settle in|relaxed atmosphere|clean and comfortable|came to|kind of place|little visit|grabbed a coffee|give it a go)\b/i,
+  ja: /(立ち寄|また行きます|店内|入ってから帰るまで)/,
+  ar: /(زيار|زرت|مررت على)/,
+};
+
+/**
+ * Drop visit-only lines from a pool. A slot is filtered only when something
+ * survives — an empty slot would break assembly, so a slightly off line beats
+ * no line at all.
+ */
+function stripVisitVoice(pool: PoolSet, locale: ReviewLocale): PoolSet {
+  const re = VISIT_ONLY_RE[locale];
+  const out = { ...pool } as PoolSet;
+  (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
+    const kept = pool[k].filter((line) => !re.test(line));
+    out[k] = kept.length > 0 ? kept : pool[k];
+  });
+  return out;
+}
+
 /** Resolve the merged pool for a locale + vertical (generic base + flavour).
  * Exception: "agency" is exclusive — a B2B client is not a guest at premises,
  * so merging GENERIC would leak visit/place phrasing ("went to", "the kind of
- * place") into service-provider reviews. */
+ * place") into service-provider reviews. Other non-visit verticals keep GENERIC
+ * with its visit-only lines stripped. */
 export function resolvePoolSet(locale: ReviewLocale, vertical: Vertical): PoolSet {
   if (vertical === "agency") return AGENCY[locale] ?? AGENCY.en;
-  const base = GENERIC[locale] ?? GENERIC.en;
+  const raw = GENERIC[locale] ?? GENERIC.en;
+  const base = NON_VISIT_VERTICALS.has(vertical) ? stripVisitVoice(raw, locale) : raw;
   if (vertical === "generic") return base;
   const flavour = VERTICAL[locale]?.[vertical];
   return flavour ? mergePool(base, flavour) : base;

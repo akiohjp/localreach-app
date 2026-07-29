@@ -116,6 +116,44 @@ async function main() {
   }
   assert(agreementErr === 0, `no "<plural> has/is/was" disagreement over 400 runs (got ${agreementErr})`);
 
+  // ── TEST 11: entity layer parity with the review generator (2026-07-29) ──
+  // A reply is public text under the business profile, so it must be able to say
+  // WHAT the business is and WHERE — and must never decorate an apology.
+  console.log("\nTEST 11 - entity (category + area) in replies");
+  const ENT = { geoPhrase: "Motor City, Dubai", categoryNoun: "udon restaurant", geoKeywords: ["handmade udon", "tempura"] };
+  let catHits = 0, entGeoHits = 0;
+  for (let i = 0; i < 200; i++) {
+    const t = generateReply("Maru Udon", { rating: i % 2 ? 5 : 4, reviewText: "Great udon and lovely staff.", locale: "en", ...ENT, nonce: createReplyNonce() });
+    if (t.includes("udon restaurant")) catHits++;
+    if (t.includes("Motor City")) entGeoHits++;
+  }
+  assert(catHits >= 60, `category noun woven in a healthy share of positive replies (${catHits}/200)`);
+  assert(entGeoHits >= 120, `area woven in most positive replies (${entGeoHits}/200)`);
+
+  let apologyLeak = 0;
+  for (let i = 0; i < 200; i++) {
+    const t = generateReply("Maru Udon", { rating: i % 2 ? 1 : 2, reviewText: "Cold food and slow service.", locale: "en", ...ENT, nonce: createReplyNonce() });
+    if (/Motor City|udon restaurant|handmade udon|tempura/.test(t)) apologyLeak++;
+  }
+  assert(apologyLeak === 0, `negative replies never carry area/category/keyword (got ${apologyLeak})`);
+
+  let silentEntity = 0;
+  for (let i = 0; i < 150; i++) {
+    const t = generateReply("Maru Udon", { rating: 5, reviewText: "", locale: "en", ...ENT, nonce: createReplyNonce() });
+    if (/Motor City|udon restaurant|handmade udon|tempura/.test(t)) silentEntity++;
+  }
+  assert(silentEntity >= 120, `silent 5-star replies still carry an entity signal (${silentEntity}/150)`);
+
+  let jaEnt = 0, arEnt = 0;
+  for (let i = 0; i < 120; i++) {
+    const tj = generateReply("Maru Udon", { rating: 5, reviewText: "うどんが美味しかったです。", locale: "ja", geoPhrase: "Motor City", categoryNoun: "うどん店", geoKeywords: ["手打ちうどん"], nonce: createReplyNonce() });
+    if (tj.includes("Motor City") || tj.includes("うどん店")) jaEnt++;
+    const ta = generateReply("Pitfire Pizza", { rating: 5, reviewText: "بيتزا ممتازة.", locale: "ar", geoPhrase: "Souk Al Bahar", categoryNoun: "مطعم بيتزا", geoKeywords: ["Pitfire Primo"], nonce: createReplyNonce() });
+    if (ta.includes("Souk Al Bahar") || ta.includes("مطعم بيتزا")) arEnt++;
+  }
+  assert(jaEnt >= 96, `JA replies weave the JA entity (${jaEnt}/120)`);
+  assert(arEnt >= 96, `AR replies weave the AR entity (${arEnt}/120)`);
+
   console.log("\n─── SAMPLES (EN, warm, geo+kw like Let It Dough) ───");
   const reviews = [
     [5, "The matcha croissant was incredible and the staff were so warm. Cosy spot too."],

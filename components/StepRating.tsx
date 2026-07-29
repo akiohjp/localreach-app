@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   Star, Utensils, Coffee, Wine, Building2,
-  ShoppingBag, Scissors, Dumbbell, Car, BookOpen, Plus,
+  ShoppingBag, Scissors, Dumbbell, Car, BookOpen, Plus, MapPin,
 } from "lucide-react";
 import type { UiStrings } from "@/lib/ui-strings";
 
@@ -13,6 +13,13 @@ type Props = {
   onSelect: (rating: number) => void;
   logoUrl?: string | null;
   businessCategory?: string | null;
+  /**
+   * Branch this QR belongs to (entity area + city). Shown as a badge under the
+   * store name: the store name itself stays the brand alone so generated review
+   * text reads naturally, so without this a chain cannot tell two branches'
+   * QR codes apart and can print the wrong one for a location.
+   */
+  branchLabel?: string | null;
 };
 
 function getCategoryIcon(category: string | null | undefined) {
@@ -40,7 +47,7 @@ function getCategoryIcon(category: string | null | undefined) {
   return <Star size={24} strokeWidth={1.5} />;
 }
 
-export default function StepRating({ t, storeName, greetingText, onSelect, logoUrl, businessCategory }: Props) {
+export default function StepRating({ t, storeName, greetingText, onSelect, logoUrl, businessCategory, branchLabel }: Props) {
   const [hovered, setHovered] = useState(0);
   const [selected, setSelected] = useState(0);
   const active = hovered || selected;
@@ -66,6 +73,13 @@ export default function StepRating({ t, storeName, greetingText, onSelect, logoU
           <h1 className="text-base font-bold text-slate-900 tracking-tight">
             {storeName}
           </h1>
+          {branchLabel && (
+            <p className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1
+              text-[11px] font-semibold text-slate-600 tracking-tight">
+              <MapPin size={11} strokeWidth={2.2} />
+              {branchLabel}
+            </p>
+          )}
           <p className="text-sm text-slate-600 leading-relaxed max-w-[17rem]">
             {greetingText}
           </p>

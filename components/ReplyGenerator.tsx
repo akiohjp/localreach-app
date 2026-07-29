@@ -17,6 +17,12 @@ type Props = {
   initialSettings?: ReplySettings | null
   /** Forced GEO keywords — one is woven (quoted) into positive/mixed replies. */
   forcedKeywords?: string[]
+  /** Guest keyword list — used when no forced keywords are set, so replies are never keyword-less. */
+  keywords?: string[]
+  /** Entity fields (single source of truth for the area — see the Location section). */
+  entityArea?: string | null
+  entityCity?: string | null
+  entityCategoryLabel?: Record<string, string> | null
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -35,13 +41,32 @@ const TONES: { code: ReplyTone; label: string }[] = [
 /** What the guest actually left. Rating-only is a distinct writing job, not an empty field. */
 type ReviewKind = 'text' | 'rating-only'
 
-export default function ReplyGenerator({ storeId, storeName, defaultLocale, initialSettings, forcedKeywords = [] }: Props) {
+export default function ReplyGenerator({
+  storeId,
+  storeName,
+  defaultLocale,
+  initialSettings,
+  forcedKeywords = [],
+  keywords = [],
+  entityArea,
+  entityCity,
+  entityCategoryLabel,
+}: Props) {
+  // The area now lives on the store row (Location & business type). The old
+  // reply-only `locality` stays as an override so saved settings keep working,
+  // but an owner who filled the Location section must not have to type it twice.
+  const entityGeo = [entityArea, entityCity].filter(Boolean).join(', ')
+  // Replies must never go out keyword-less: moving place names out of
+  // forced_keywords left some stores with an empty forced list.
+  const replyKeywords = forcedKeywords.length > 0 ? forcedKeywords : keywords
+  const categoryNounFor = (loc: SupportedLocale) =>
+    entityCategoryLabel?.[loc]?.trim() || entityCategoryLabel?.en?.trim() || ''
   const [rating, setRating] = useState<number>(5)
   const [kind, setKind] = useState<ReviewKind>('text')
   const [reviewText, setReviewText] = useState('')
   const [locale, setLocale] = useState<SupportedLocale>(defaultLocale)
   const [tone, setTone] = useState<ReplyTone>(initialSettings?.tone === 'professional' ? 'professional' : 'warm')
-  const [geoPhrase, setGeoPhrase] = useState<string>(initialSettings?.locality ?? '')
+  const [geoPhrase, setGeoPhrase] = useState<string>(initialSettings?.locality || entityGeo)
   const [weaveGeo, setWeaveGeo] = useState<boolean>(initialSettings?.weaveGeo !== false)
   const [weaveKw, setWeaveKw] = useState<boolean>(initialSettings?.weaveKw !== false)
   const [signature, setSignature] = useState<string>(initialSettings?.signature ?? '')
@@ -76,8 +101,9 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
         locale,
         tone,
         geoPhrase,
+        categoryNoun: categoryNounFor(defaultLocale),
         weaveGeo,
-        geoKeywords: weaveKw ? forcedKeywords : [],
+        geoKeywords: weaveKw ? replyKeywords : [],
         signature,
         nonce: createReplyNonce(),
       }),
@@ -105,7 +131,8 @@ export default function ReplyGenerator({ storeId, storeName, defaultLocale, init
           locale,
           tone,
           geoPhrase: weaveGeo ? geoPhrase : '',
-          geoKeywords: weaveKw ? forcedKeywords : [],
+          categoryNoun: weaveGeo ? categoryNounFor(locale) : '',
+          geoKeywords: weaveKw ? replyKeywords : [],
           signature,
         }),
       })

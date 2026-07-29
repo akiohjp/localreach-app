@@ -24,6 +24,7 @@ type GenerateReplyRequest = {
   tone?: string;          // 'warm' | 'professional'
   geoPhrase?: string;     // neighbourhood, e.g. "WAFI Mall, Dubai"
   geoKeywords?: string[]; // forced GEO keywords
+  categoryNoun?: string;  // natural business noun, e.g. "udon restaurant"
   signature?: string;     // custom sign-off ({store} replaced client-side display)
 };
 
@@ -143,6 +144,7 @@ export async function POST(req: Request) {
     language: LANGUAGE_NAME[clip(body.locale, 5)] ?? LANGUAGE_NAME.en,
     tone: clip(body.tone, 20),
     geoPhrase: clip(body.geoPhrase, 120),
+    categoryNoun: clip(body.categoryNoun, 60),
     geoKeywords: Array.isArray(body.geoKeywords)
       ? body.geoKeywords.map((k) => clip(k, 80)).filter(Boolean).slice(0, 8)
       : [],

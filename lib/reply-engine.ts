@@ -30,6 +30,12 @@ export type GenerateReplyOptions = {
   tone?: ReplyTone;
   /** A real locality/area to weave for Local SEO (e.g. "Dubai Marina"). */
   geoPhrase?: string;
+  /**
+   * Natural business noun ("udon restaurant"). Woven together with the area so
+   * the fallback reply carries the same "<category> in <area>" phrasing the AI
+   * answer engines match on — the Gemini path gets it via the prompt.
+   */
+  categoryNoun?: string;
   /** Set false to suppress geo weaving. Default true. */
   weaveGeo?: boolean;
   /**
@@ -276,8 +282,17 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   // Locality: near-always when the owner set one (each reply answers a
   // different review, so repetition across replies is fine and desirable).
   const geo = (options.geoPhrase ?? "").trim();
+  const cat = (options.categoryNoun ?? "").trim();
+  // "Motor City" becomes "Motor City as an udon restaurant"? No — the templates
+  // are place-framed ("being part of {geo}"), so the category rides as an
+  // apposition on the AREA itself, which keeps every template grammatical:
+  // "part of Motor City" -> "part of Motor City as your local udon restaurant".
+  const geoValue = geo;
   const geoOn = options.weaveGeo !== false && geo && geoPool.length && notNegative && r(0x120)() < 0.9;
-  const geoSentence = geoOn ? pick(geoPool, r(0x121)).replace(/\{geo\}/g, geo).replace(/\{store\}/g, store) : "";
+  const catTail = cat && r(0x123)() < 0.55 ? CATEGORY_TAIL[locale].replace(/\{cat\}/g, cat) : "";
+  const geoSentence = geoOn
+    ? pick(geoPool, r(0x121)).replace(/\{geo\}/g, geoValue).replace(/\{store\}/g, store) + catTail
+    : "";
 
   // One forced GEO keyword, seed-rotated across the store's list, quoted in-template.
   // Suppressed on a silent 3-star: quoting a marketing phrase at a guest who was
@@ -330,6 +345,17 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   const bodyText = joinSentences(segments, locale);
   return normalizeDashes(`${bodyText}\n\n${collapse(signoff)}`).trim();
 }
+
+/**
+ * Sentence appended after the locality beat so a reply states WHAT the business
+ * is. Kept as a short follow-on rather than its own beat: a standalone "We are a
+ * udon restaurant" reads like an advert, an apposition reads like an owner.
+ */
+const CATEGORY_TAIL: Record<string, string> = {
+  en: " That's what we set out to be as a {cat} here.",
+  ja: "{cat}として、これからも大事にしていきます。",
+  ar: " هذا ما نسعى إليه بصفتنا {cat} هنا.",
+};
 
 /** Fresh entropy per "Regenerate" (client). */
 export function createReplyNonce(): string {

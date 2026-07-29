@@ -90,6 +90,9 @@ export default function ReviewFlow({
     city: entityCity ?? null,
     categoryLabel: entityCategoryLabel ?? null,
   }
+  // Shown on every screen so staff (and the guest) can see at a glance WHICH
+  // branch this QR belongs to. Falls back to the city when no area is set.
+  const branchLabel = [entityArea, entityCity].filter(Boolean).join(', ') || null
   const t = getUiStrings(locale)
   const [step, setStep] = useState<Step>('rating')
   const [rating, setRating] = useState(0)
@@ -234,6 +237,11 @@ export default function ReviewFlow({
               <p className="text-sm font-bold text-slate-900 tracking-tight">
                 {storeName}
               </p>
+              {branchLabel && (
+                <p className="mt-0.5 text-[11px] font-semibold text-slate-500 tracking-tight">
+                  {branchLabel}
+                </p>
+              )}
             </div>
             {progressIdx > 0 && (
               <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
@@ -266,6 +274,7 @@ export default function ReviewFlow({
             <StepRating
               t={t}
               storeName={storeName}
+              branchLabel={branchLabel}
               greetingText={greetingText}
               onSelect={handleRating}
               logoUrl={logoUrl}

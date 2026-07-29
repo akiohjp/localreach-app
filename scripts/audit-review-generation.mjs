@@ -220,8 +220,47 @@ async function main() {
     if (!t.includes("AI SEO agency") || !t.includes("Dubai")) b2bMissing++;
   }
 
+  // ---- every vertical's STARTER KEYWORDS must generate cleanly ----
+  // The presets ship to every new customer, so a bad phrase there is a defect in
+  // every store of that industry. Each vertical x locale is generated with its
+  // own preset list and checked for object-slot misuse + verbatim survival.
+  const { keywordPresetsFor } = await import("../lib/keyword-presets.ts");
+  const { resolveVertical } = await import("../lib/review-pools.ts");
+  const VERT_CATS = [
+    "restaurant", "cafe", "hair salon", "aesthetic clinic", "dental clinic", "medical clinic",
+    "real estate agency", "law firm", "renovation contractor", "language school",
+    "veterinary clinic", "boutique shop", "gym", "hotel", "car garage", "agency", "cleaning service", "",
+  ];
+  let presetMisuse = 0, presetDrop = 0, presetAttr = 0, presetCases = 0;
+  const badPresetSamples = [];
+  for (const cat of VERT_CATS) {
+    const v = resolveVertical(cat);
+    for (const loc of ["en", "ja", "ar"]) {
+      const kws = keywordPresetsFor(v, loc);
+      if (kws.length === 0) { presetDrop++; continue; }
+      // Attribute-shaped presets would be our own authoring mistake.
+      for (const k of kws) {
+        if (loc === "en" && /^(great|good|perfect|ideal|nice)\s+(for|to)\b/i.test(k)) presetAttr++;
+      }
+      for (let i = 0; i < 12; i++) {
+        presetCases++;
+        const picked = kws.slice(i % 3, (i % 3) + 3);
+        const t = generateReview("Test Business", picked, {
+          nonce: createReviewNonce(), outletKey: `preset|${v}|${loc}`, locale: loc, category: cat,
+          entity: { area: "Business Bay", city: "Dubai", categoryLabel: { en: "local business" } },
+        });
+        if (!picked.every((k) => t.includes(k))) { presetDrop++; if (badPresetSamples.length < 3) badPresetSamples.push(`${v}/${loc}: ${t.slice(0, 120)}`); }
+        if (/\bthe the\b/i.test(t)) { presetMisuse++; if (badPresetSamples.length < 3) badPresetSamples.push(`${v}/${loc}: ${t.slice(0, 120)}`); }
+      }
+    }
+  }
+  if (badPresetSamples.length) console.log("preset problem samples:\n  " + badPresetSamples.join("\n  "));
+
   let fail = 0;
   const assert = (c, m) => { if (!c) { console.error("  ✗", m); fail++; } else console.log("  ✓", m); };
+  assert(presetAttr === 0, `presets: no attribute-shaped starter keywords authored (got ${presetAttr})`);
+  assert(presetDrop === 0, `presets: every starter keyword survives verbatim across ${presetCases} cases (got ${presetDrop})`);
+  assert(presetMisuse === 0, `presets: no double-article breakage (got ${presetMisuse})`);
   assert(b2bVisit === 0, `B2B verticals: no visit-shaped entity wording (got ${b2bVisit})`);
   assert(b2bMissing === 0, `B2B verticals: entity still woven every time (missing ${b2bMissing})`);
   assert(attrMisuse === 0, `EN: attribute keywords never land in an object slot (got ${attrMisuse})`);

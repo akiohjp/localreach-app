@@ -6,13 +6,15 @@ import {
   ExternalLink, Palette, Tag, QrCode,
   CheckCircle, Loader2, X, Plus, Download,
   Globe, Link2, LogOut, Languages, Users, Lock,
-  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone, MapPin,
+  MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone, MapPin, Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import LogoUploader from '@/components/LogoUploader'
 import ReplyGenerator from '@/components/ReplyGenerator'
 import InstallAppButton from '@/components/InstallAppButton'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
+import { keywordPresetsFor } from '@/lib/keyword-presets'
+import { resolveVertical } from '@/lib/review-pools'
 import type { Store, LocalizedText, SupportedLocale, StoreUpdate } from '@/types/database'
 
 // ─────────────────────────────────────────────
@@ -242,9 +244,14 @@ function keywordShapeWarning(kw: string): string | null {
 function KeywordManager({
   storeId,
   initial,
+  businessCategory,
+  locale,
 }: {
   storeId: string
   initial: string[]
+  /** Free-text category from the store row — resolved to a vertical here. */
+  businessCategory?: string | null
+  locale?: SupportedLocale
 }) {
   const [keywords, setKeywords] = useState<string[]>(initial)
   const [input, setInput] = useState('')
@@ -261,6 +268,19 @@ function KeywordManager({
 
   function remove(kw: string) {
     setKeywords((prev) => prev.filter((k) => k !== kw))
+    setState('idle')
+  }
+
+  // Starter keywords for this industry. Every phrase is noun-shaped so it reads
+  // correctly in the review templates ("Definitely try the teeth whitening").
+  // Only phrases not already present are offered, so the button is a top-up
+  // rather than a reset.
+  const presets = keywordPresetsFor(resolveVertical(businessCategory ?? ''), locale ?? 'en')
+  const missingPresets = presets.filter((k) => !keywords.includes(k))
+
+  function addPresets() {
+    if (missingPresets.length === 0) return
+    setKeywords((prev) => [...prev, ...missingPresets])
     setState('idle')
   }
 
@@ -328,6 +348,34 @@ function KeywordManager({
       <p className="text-[10px] text-slate-400">
         Press <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">Enter</kbd> or <kbd className="rounded border border-gray-200 bg-white px-1 py-0.5 font-mono">,</kbd> to add · {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}
       </p>
+
+      {missingPresets.length > 0 && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5">
+          <p className="text-[11px] text-sky-900 mb-2 leading-relaxed">
+            <strong>Suggested for your industry.</strong> These are the phrases customers in your
+            category actually search for — add them, then swap in your own dishes and services.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {missingPresets.slice(0, 8).map((k) => (
+              <span key={k} className="rounded-md bg-white border border-sky-200 px-2 py-0.5 text-[10px] text-sky-800">
+                {k}
+              </span>
+            ))}
+            {missingPresets.length > 8 && (
+              <span className="text-[10px] text-sky-700 self-center">+{missingPresets.length - 8} more</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={addPresets}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5
+              text-[11px] font-semibold text-white hover:bg-sky-700 transition cursor-pointer"
+          >
+            <Sparkles size={11} />
+            Add all {missingPresets.length}
+          </button>
+        </div>
+      )}
 
       {keywords.some((k) => keywordShapeWarning(k)) && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
@@ -1589,6 +1637,10 @@ export default function StoreDashboard({
                 defaultLocale={store.default_language}
                 initialSettings={store.reply_settings ?? null}
                 forcedKeywords={store.forced_keywords ?? []}
+                keywords={store.keywords}
+                entityArea={store.entity_area ?? null}
+                entityCity={store.entity_city ?? null}
+                entityCategoryLabel={(store.entity_category_label as Record<string, string> | null) ?? null}
               />
             </SectionCard>
         </div>
@@ -1669,7 +1721,12 @@ export default function StoreDashboard({
                 and highlights guests are likely to mention. (Your always-include keywords above are
                 added on top automatically.)
               </p>
-              <KeywordManager storeId={store.id} initial={store.keywords} />
+              <KeywordManager
+                storeId={store.id}
+                initial={store.keywords}
+                businessCategory={store.business_category}
+                locale={store.default_language}
+              />
             </SectionCard>
         </div>
 

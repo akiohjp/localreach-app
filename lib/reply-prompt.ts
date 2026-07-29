@@ -18,6 +18,8 @@ export function clip(s: unknown, max: number): string {
 export function buildPrompt(p: {
   storeName: string; rating: number; reviewText: string; language: string;
   tone: string; geoPhrase: string; geoKeywords: string[]; signature: string;
+  /** Natural business noun, e.g. "udon restaurant" — lets the reply say WHAT it is. */
+  categoryNoun?: string;
 }): string {
   const sentiment = p.rating >= 4 ? "positive" : p.rating <= 2 ? "negative" : "mixed";
   const kwList = p.geoKeywords.slice(0, 8).map((k) => `"${k}"`).join(", ");
@@ -58,6 +60,7 @@ ${sentiment === "negative"
       : `- Local SEO (weave these in NATURALLY, never as a list, never forced):
   * Mention the business name "${p.storeName}" once inside the body text.
 ${p.geoPhrase ? `  * Mention the area "${p.geoPhrase}" once, in a natural place-framed way.` : ""}
+${p.categoryNoun ? `  * Refer to the business as a "${p.categoryNoun}" once if it fits (e.g. describing yourselves${p.geoPhrase ? ` as a ${p.categoryNoun} in ${p.geoPhrase}` : ""}). This is what AI assistants quote when recommending a business, but never force it.` : ""}
 ${kwList ? `  * Work in exactly ONE of these brand phrases, quoted or unquoted, where it fits naturally: ${kwList}.` : ""}
   * If any of these would read awkwardly in context, prioritise natural flow over inclusion.${ratingOnly ? `\n  * This reply is the ONLY text under this rating, so these signals matter here, but a forced-sounding reply is still worse than a plain one.` : ""}
 - End the body by inviting them back (vary the wording; not always "see you soon").`}
