@@ -9,6 +9,32 @@ import ReviewFlow from './ReviewFlow'
 const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ja', 'ar']
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
 
+/**
+ * Locales this particular store actually offers.
+ *
+ * Why not the full list: the switcher used to hardcode EN/JA/AR because every
+ * store was in the UAE. A Japanese store showing an Arabic tab (and an Arabic
+ * option in the review-language picker) reads as a template nobody configured,
+ * and a guest who taps it lands on a page the owner never wrote. So we derive
+ * the list from what the owner filled in — the store's default language plus
+ * any locale key present in store_name / greeting_text — keeping the canonical
+ * EN → JA → AR order. Falls back to the default language alone.
+ */
+function localesForStore(store: {
+  default_language: SupportedLocale
+  store_name: Record<string, string> | null
+  greeting_text: Record<string, string> | null
+}): SupportedLocale[] {
+  const filled = new Set<string>([store.default_language])
+  for (const src of [store.store_name, store.greeting_text]) {
+    for (const [k, v] of Object.entries(src ?? {})) {
+      if (typeof v === 'string' && v.trim()) filled.add(k)
+    }
+  }
+  const list = SUPPORTED_LOCALES.filter((l) => filled.has(l))
+  return list.length > 0 ? list : [store.default_language]
+}
+
 // React cache deduplicates the Supabase query between generateMetadata and Page.
 // Reads the anon-safe VIEW (not the base table) so the public anon key can never
 // pull owner_id / notification_email of any store. See migration
@@ -62,8 +88,9 @@ export default async function StorePage({ params, searchParams }: Props) {
   if (!store) notFound()
   if (!store.is_active) redirect('/inactive')
 
-  // Locale resolution: ?lang= override → store default → 'en'
-  const locale: SupportedLocale = SUPPORTED_LOCALES.includes(lang as SupportedLocale)
+  // Locale resolution: ?lang= override (only if this store offers it) → store default
+  const storeLocales = localesForStore(store)
+  const locale: SupportedLocale = storeLocales.includes(lang as SupportedLocale)
     ? (lang as SupportedLocale)
     : store.default_language
 
@@ -88,7 +115,7 @@ export default async function StorePage({ params, searchParams }: Props) {
             LocalReach
           </span>
           <div className="flex gap-1.5">
-            {SUPPORTED_LOCALES.map((l) => (
+            {(storeLocales.length > 1 ? storeLocales : []).map((l) => (
               <a
                 key={l}
                 href={`?lang=${l}`}
@@ -116,6 +143,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           brandColor={store.brand_color}
           isRtl={isRtl}
           locale={locale}
+          availableLocales={storeLocales}
           logoUrl={logoSignedUrl}
           businessCategory={store.business_category}
           entityArea={store.entity_area ?? null}

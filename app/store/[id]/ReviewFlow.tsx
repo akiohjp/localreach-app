@@ -61,6 +61,12 @@ type Props = {
   brandColor: string      // hex, e.g. "#f59e0b" — drives card accent + progress bar
   isRtl: boolean          // true when locale === 'ar'
   locale: SupportedLocale // resolved locale — drives UI copy (en/ja/ar)
+  /**
+   * Locales this store actually offers (derived from what the owner filled in).
+   * The review-language picker used to always add EN + AR because every store
+   * was in the UAE; a Japanese store must not offer Arabic.
+   */
+  availableLocales?: SupportedLocale[]
   logoUrl?: string | null
   businessCategory?: string | null
   /** Entity layer (AI visibility) — woven once per review by the engine. */
@@ -79,6 +85,7 @@ export default function ReviewFlow({
   brandColor,
   isRtl,
   locale,
+  availableLocales,
   logoUrl,
   businessCategory,
   entityArea,
@@ -99,13 +106,14 @@ export default function ReviewFlow({
   const [reviewText, setReviewText] = useState('')
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
   // The guest picks which language the REVIEW is generated in (independent of the
-  // page UI). Defaults to the page locale; UAE guests can switch English <-> العربية.
+  // page UI). Defaults to the page locale.
   const [reviewLocale, setReviewLocale] = useState<SupportedLocale>(locale)
 
-  // Options for the review-language picker: the page default first, then always
-  // offer English + Arabic (the UAE market). Deduped, order-preserving.
+  // Options for the review-language picker: the page locale first, then the other
+  // locales THIS store offers. It used to always append EN + AR (a UAE-only
+  // assumption) — a Japanese store must not offer Arabic. Deduped, order-preserving.
   const reviewLocaleOptions = Array.from(
-    new Set<SupportedLocale>([locale, 'en', 'ar']),
+    new Set<SupportedLocale>([locale, ...(availableLocales ?? [locale])]),
   ).map((code) => ({ code, label: LANG_LABEL[code] }))
 
   // Survive an accidental reload so a generated review isn't lost back to rating.

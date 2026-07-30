@@ -674,7 +674,10 @@ const JA_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     ],
     openersShort: ["{store}、また食べに行きたいです。", "手短に{store}の感想を。良い食事で、印象的な一皿もありました。"],
     coresLong: [
-      "{list}が特に美味しかったです。",
+      // {list} には料理名以外（カウンター席・明朗会計・丁寧な接客など）も入るため、
+      // 「美味しかった」のような食べ物専用の述語を {list} に直接付けない。
+      // 食のニュアンスは {list} に係らない別の節で出す。
+      "特に良かったのは{list}です。料理も一つひとつ丁寧でした。",
       "{list}が最高で、また食べに来たいです。",
     ],
     bridgesLong: ["量の割に価格も良心的で、料理もテンポよく出てきました。"],
@@ -845,7 +848,10 @@ const AR_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     ],
     openersShort: ["{store}؟ نعم، سنعود لتناول الطعام هناك.", "انطباع سريع بعد {store}: وجبة جيدة، مع أطباق مميزة."],
     coresLong: [
-      "{list} كان لذيذاً بالفعل.",
+      // Same rule as the JA restaurant pool: {list} can hold non-dish keywords
+      // (seating, pricing, service), so never attach a food-only predicate
+      // ("delicious") directly to {list}.
+      "{list} كان مميزاً بالفعل.",
       "{list} كان الأفضل في الوجبة، وسأعود من أجله.",
     ],
     bridgesLong: ["الأسعار عادلة مقابل الكميات، والأطباق وصلت بسرعة."],
