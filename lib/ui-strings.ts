@@ -42,6 +42,16 @@ export interface UiStrings {
     subtitle: string;
     reviewAria: string;
     whatsappOptional: string;
+    /**
+     * SMS variants of the capture block, used when the store's contact_channel
+     * is 'sms'. WhatsApp is not the messaging app everywhere — a Japanese guest
+     * shown a "WhatsApp" field just leaves it blank and the store loses the
+     * lead. Separate keys (not a rename) so UAE stores keep today's wording.
+     */
+    smsOptional: string;
+    smsPhoneAria: string;
+    smsOptIn: string;
+    smsSavedLive: string;
     previewBanner: string;
     namePlaceholder: string;
     phonePlaceholder: string;
@@ -78,6 +88,15 @@ export interface UiStrings {
     ratingAria: string;
     /** shown when the feedback POST fails; keep the guest on the form to retry. */
     sendError: string;
+    /**
+     * Public-review option offered alongside the private one. A guest who rates
+     * low must see the same Google path a happy guest sees — routing only happy
+     * guests to Google is "selectively solicit positive reviews", which Google
+     * prohibits. No draft is generated here: whatever the guest wrote is their
+     * own words, copied so they can paste it.
+     */
+    postOnGoogle: string;
+    eitherNote: string;
   };
   feedbackSent: {
     title: string;
@@ -85,6 +104,8 @@ export interface UiStrings {
     body: string;
     closing: string;
     backToStart: string;
+    /** The public path stays open after sending privately — never a dead end. */
+    alsoOnGoogle: string;
   };
 }
 
@@ -120,6 +141,10 @@ const en: UiStrings = {
     subtitle: "Edit freely before submitting.",
     reviewAria: "Your review text",
     whatsappOptional: "WhatsApp (Optional)",
+    smsOptional: "Phone number (optional)",
+    smsPhoneAria: "Phone number",
+    smsOptIn: "I agree to receive offers and news from this business by SMS.",
+    smsSavedLive: "Number registered. Thank you!",
     previewBanner:
       "Preview mode. The form below matches your live review page. Save here is a demo — use your venue's link from the dashboard to capture contacts in the database.",
     namePlaceholder: "Your name (optional)",
@@ -161,16 +186,20 @@ const en: UiStrings = {
     ],
     placeholder: "Describe your experience...",
     describeAria: "Describe your experience",
-    send: "Send Feedback",
+    send: "Send privately to the team",
     sending: "Sending…",
     ratingAria: "{n} out of 5 stars",
     sendError: "Couldn't send. Please check your connection and try again.",
+    postOnGoogle: "Post on Google",
+    eitherNote:
+      "Either one is fine — or both. If you post on Google, what you wrote above is copied so you can paste it in your own words.",
   },
   feedbackSent: {
     title: "Thank you for your feedback.",
     body: "The team at {store} will review your comments and work to improve.",
     closing: "We hope to welcome you back and give you a better experience.",
     backToStart: "Back to start",
+    alsoOnGoogle: "You're also welcome to post your review publicly on Google.",
   },
 };
 
@@ -207,6 +236,10 @@ const ja: UiStrings = {
     subtitle: "投稿前に自由に編集できます。",
     reviewAria: "レビュー本文",
     whatsappOptional: "WhatsApp（任意）",
+    smsOptional: "電話番号（任意）",
+    smsPhoneAria: "電話番号",
+    smsOptIn: "お店からのお得な情報・お知らせをSMSで受け取ることに同意します。",
+    smsSavedLive: "登録しました。ありがとうございます！",
     previewBanner:
       "プレビューモード。下のフォームは実際のレビューページと同じです。ここでの保存はデモです — 連絡先をデータベースに保存するには、ダッシュボードのお店のリンクをご利用ください。",
     namePlaceholder: "お名前（任意）",
@@ -242,10 +275,13 @@ const ja: UiStrings = {
     quickTags: ["料理の質", "接客", "待ち時間", "価格", "清潔さ", "その他"],
     placeholder: "ご体験の内容をお書きください…",
     describeAria: "ご体験の内容",
-    send: "フィードバックを送信",
+    send: "お店に直接送る（非公開）",
     sending: "送信中…",
     ratingAria: "5つ星中{n}つ",
     sendError: "送信できませんでした。接続を確認してもう一度お試しください。",
+    postOnGoogle: "Googleに投稿する",
+    eitherNote:
+      "どちらでも、両方でも構いません。Googleに投稿する場合は、上にお書きの内容をコピーしますので、ご自身の言葉で貼り付けてください。",
   },
   feedbackSent: {
     title: "フィードバックをありがとうございます。",
@@ -253,6 +289,7 @@ const ja: UiStrings = {
     closing:
       "またのご来店を心よりお待ちしております。次回はより良い体験をお約束します。",
     backToStart: "最初に戻る",
+    alsoOnGoogle: "Googleに公開のクチコミとして投稿していただくこともできます。",
   },
 };
 
@@ -288,6 +325,10 @@ const ar: UiStrings = {
     subtitle: "عدّلها بحرية قبل الإرسال.",
     reviewAria: "نص مراجعتك",
     whatsappOptional: "واتساب (اختياري)",
+    smsOptional: "رقم الهاتف (اختياري)",
+    smsPhoneAria: "رقم الهاتف",
+    smsOptIn: "أوافق على تلقّي العروض والأخبار من هذا المتجر عبر الرسائل النصية.",
+    smsSavedLive: "تم تسجيل الرقم. شكرًا لك!",
     previewBanner:
       "وضع المعاينة. النموذج أدناه مطابق لصفحة مراجعتك المباشرة. الحفظ هنا تجريبي — استخدم رابط متجرك من لوحة التحكم لحفظ جهات الاتصال في قاعدة البيانات.",
     namePlaceholder: "اسمك (اختياري)",
@@ -328,16 +369,20 @@ const ar: UiStrings = {
     ],
     placeholder: "صف تجربتك…",
     describeAria: "صف تجربتك",
-    send: "إرسال الملاحظات",
+    send: "إرسال إلى الفريق (خاص)",
     sending: "جارٍ الإرسال…",
     ratingAria: "{n} من 5 نجوم",
     sendError: "تعذّر الإرسال. يرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+    postOnGoogle: "النشر على Google",
+    eitherNote:
+      "أيهما شئت، أو كلاهما. إن اخترت النشر على Google فسنسخ ما كتبته أعلاه لتلصقه بكلماتك أنت.",
   },
   feedbackSent: {
     title: "شكرًا على ملاحظاتك.",
     body: "سيراجع فريق {store} تعليقاتك ويعمل على التحسين.",
     closing: "نتطلّع إلى الترحيب بك مجددًا وتقديم تجربة أفضل.",
     backToStart: "العودة إلى البداية",
+    alsoOnGoogle: "يمكنك أيضًا نشر مراجعتك علنًا على Google.",
   },
 };
 

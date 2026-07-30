@@ -40,7 +40,9 @@ async function main() {
   let shortest = Infinity;
   for (let i = 0; i < 300; i++) {
     const t = generateReply(store, { rating: 5, reviewText: "amazing brownies and lovely staff, great coffee too", locale: "en", geoPhrase: "Dubai Marina", geoKeywords: KWS, nonce: createReplyNonce() });
-    const n = t.replace(/\n\n[\s\S]*$/, "").split(/\s+/).length;
+    // Body = every paragraph except the sign-off (the draft is now laid out in
+    // paragraphs, so "cut at the first blank line" would measure one of them).
+    const n = t.split(/\n{2,}/).slice(0, -1).join(" ").split(/\s+/).filter(Boolean).length;
     lens.push(n);
     if (n < shortest) shortest = n;
     set.add(t);

@@ -114,8 +114,8 @@ function withArt(phrase: string): string {
  * Owners will always type these, so the engine absorbs them instead of relying
  * on perfect data entry: attribute phrases are pushed out of the {list} core
  * and rendered through appositive tails ("Another plus: great for groups.")
- * which accept ANY phrase shape. Latin-script only — JA/AR pools take these
- * phrases naturally already.
+ * which accept ANY phrase shape. JA has its own detector + tails (see
+ * ATTRIBUTE_SHAPED_JA); AR pools take these phrases naturally already.
  */
 const ATTRIBUTE_SHAPED: RegExp[] = [
   /^(great|good|perfect|ideal|nice|excellent)\s+(for|to)\b/i,
@@ -126,10 +126,65 @@ const ATTRIBUTE_SHAPED: RegExp[] = [
   /^(no|not)\s/i,
 ];
 
-function isAttributeShaped(phrase: string): boolean {
+/**
+ * JA equivalent. Japanese pills are usually noun phrases ("丁寧な接客", "気軽に
+ * 行けるカウンター") which sit fine in an object slot, but owners also type
+ * predicates and clauses ("一人でも入りやすい", "ランチが手頃", "リーズナブル").
+ * Those break the object slots outright: "ランチが手頃が目当てでした" (double が),
+ * "一人でも入りやすいに不満はありません" — both from a live 20-keyword store
+ * (2026-07-30). Detected by predicate ENDING, so it stays data-independent (no
+ * food/thing lexicon to maintain). Katakana-final nouns ("フライ", "パイ") are
+ * untouched because the adjective endings listed are hiragana.
+ */
+const ATTRIBUTE_SHAPED_JA: RegExp[] = [
+  // い-adjective ending the phrase.
+  /(やすい|づらい|にくい|しい|安い|多い|早い|速い|広い|近い|軽い|明るい|温かい|暖かい|強い|旨い)$/,
+  // Potential-form verb ("1貫から頼める", "子どもと入れる") — a predicate, not a thing.
+  /[えけげせてねべめれ]る$/,
+  // Owner shorthand for a condition ("子連れOK", "時価なし", "予約可").
+  /(なし|OK|ＯＫ|可)$/,
+  // Clause: "<noun>が/も<predicate>" — a whole sentence, not a thing.
+  /[がも][^、。]{0,12}(手頃|豊富|充実|新鮮|丁寧|親切|清潔|静か|便利|快適|安心|お得|良し|多い|安い|早い|できる|しやすい)$/,
+  // Bare na-adjective / katakana adjective describing the place.
+  /^(リーズナブル|フレンドリー|カジュアル|アットホーム|コスパ|コスパ良し|清潔|静か|快適|便利|豊富|充実|新鮮|丁寧|親切|お得|安心)$/,
+];
+
+function isAttributeShaped(phrase: string, locale: ReviewLocale): boolean {
   const t = phrase.trim();
-  if (!t || !/^[\x20-\x7E]+$/.test(t)) return false; // non-Latin → leave alone
+  if (!t) return false;
+  if (locale === "ja") return ATTRIBUTE_SHAPED_JA.some((re) => re.test(t));
+  if (!/^[\x20-\x7E]+$/.test(t)) return false; // non-Latin → leave alone
   return ATTRIBUTE_SHAPED.some((re) => re.test(t));
+}
+
+/**
+ * Taste/try-flavoured templates ("{list}が特に美味しかったです", "{kw}はぜひ試して
+ * ほしいです", "{list}にやられました", "{list}目当てでぜひ") only work when the
+ * keyword IS something you eat or order. Stores mix dishes with service, price
+ * and atmosphere pills, which produced "明朗会計と丁寧な接客が最高で、また食べに
+ * 来たいです" on a live sushi store (2026-07-30).
+ *
+ * Detection is by NON-consumable marker (service / room / price / place / people)
+ * rather than by a food lexicon: the marker list is small and closed, a food
+ * lexicon never is. A phrase we cannot classify counts as consumable, so a real
+ * dish never loses its food voice.
+ */
+const NON_CONSUMABLE_JA =
+  /(接客|対応|サービス|スタッフ|店員|店主|大将|職人|板前|店内|内装|雰囲気|空間|カウンター|座席|個室|会計|価格|値段|料金|コスパ|予約|清潔|立地|場所|駐車|アクセス|支払|屋$|店$|さん$)/;
+
+/** Templates whose voice assumes the keyword is food/drink. */
+const TASTE_TEMPLATE_JA = /(美味し|食べ|試して|目当て|やられ)/;
+
+/**
+ * Drop taste-voiced templates when any keyword going into the slot is not a
+ * consumable. Falls back to the unfiltered pool if nothing survives — an empty
+ * slot would break assembly.
+ */
+function filterTasteVoice(pool: string[], locale: ReviewLocale, kws: string[]): string[] {
+  if (locale !== "ja" || pool.length === 0) return pool;
+  if (!kws.some((k) => NON_CONSUMABLE_JA.test(k))) return pool;
+  const kept = pool.filter((t) => !TASTE_TEMPLATE_JA.test(t));
+  return kept.length > 0 ? kept : pool;
 }
 
 function oxford(p: string[]): string {
@@ -366,17 +421,33 @@ function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => num
  */
 /**
  * Appositive tails that accept ANY phrase shape (noun, adjective, "great for
- * groups"). Used for attribute-shaped EN keywords so they never enter an object
- * slot. Deliberately colon/"plus"-led: no article, no verb agreement to break.
+ * groups"). Used for attribute-shaped keywords so they never enter an object
+ * slot. Deliberately colon/"plus"-led (EN) or sentence-closed (JA): no article,
+ * no particle, no verb agreement to break.
  */
-const ATTRIBUTE_TAILS_EN: string[] = [
-  "Another plus: {kw}.",
-  "Also worth mentioning: {kw}.",
-  "One more thing: {kw}.",
-  "Plus {kw}, which I appreciated.",
-  "Same goes for {kw}.",
-  "And {kw}, which counts for a lot.",
-];
+const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
+  en: [
+    "Another plus: {kw}.",
+    "Also worth mentioning: {kw}.",
+    "One more thing: {kw}.",
+    "Plus {kw}, which I appreciated.",
+    "Same goes for {kw}.",
+    "And {kw}, which counts for a lot.",
+  ],
+  // JA: the phrase is closed off with 。or 、before the frame continues, so no
+  // particle ever attaches to the keyword — grammatical for a noun, an adjective
+  // or a whole clause alike ("ランチが手頃。この点も良かったです。").
+  ja: [
+    "{kw}という点も良かったです。",
+    "あと{kw}、これも嬉しいポイントでした。",
+    "{kw}というのも嬉しいところです。",
+    "{kw}。この点は大きいと思います。",
+    "{kw}。これも良いところだと思います。",
+    "{kw}、この点は特に嬉しかったです。",
+  ],
+  // AR has no attribute detector, so this slot is never reached.
+  ar: [],
+};
 
 export type ReviewEntity = {
   area?: string | null;
@@ -641,24 +712,25 @@ function joinKeywordDual(store: string, kws: string[], pool: PoolSet, cfg: Local
   return fill(pick(pool.dualBlocks, rng), { store, a, b });
 }
 
-function buildCore(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, compact: boolean, seed: number): string {
+function buildCore(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, compact: boolean, seed: number, locale: ReviewLocale): string {
   const rDual = forkRng(seed, 0x33);
   if (!compact) {
     const dual = joinKeywordDual(store, kws, pool, cfg, rDual, seed);
     if (dual) return dual;
   }
   const list = cfg.joinList(kws, forkRng(seed, 0xaa11));
-  const corePool = compact && pool.coresCompact.length > 0 ? pool.coresCompact : pool.coresLong;
+  const rawPool = compact && pool.coresCompact.length > 0 ? pool.coresCompact : pool.coresLong;
+  const corePool = filterTasteVoice(rawPool, locale, kws);
   return fill(pick(corePool, forkRng(seed, compact ? 0x103 : 0x102)), { store, list });
 }
 
-function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, compact: boolean, seed: number): string {
+function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, compact: boolean, seed: number, locale: ReviewLocale): string {
   const openerPool = compact && pool.openersShort.length > 0 ? pool.openersShort : pool.openersLong;
   const bridgePool = compact && pool.bridgesShort.length > 0 ? pool.bridgesShort : pool.bridgesLong;
   const closerPool = compact && pool.closersShort.length > 0 ? pool.closersShort : pool.closersLong;
 
   const opener = fill(pick(openerPool, forkRng(seed, 0x101)), { store });
-  const core = buildCore(store, kws, pool, cfg, compact, seed);
+  const core = buildCore(store, kws, pool, cfg, compact, seed, locale);
   const bridge = bridgePool.length ? fill(pick(bridgePool, forkRng(seed, 0x104)), { store }) : "";
   const closer = fill(pick(closerPool, forkRng(seed, 0x105)), { store });
 
@@ -694,7 +766,7 @@ const STANDINS: Record<ReviewLocale, string[]> = {
   // repeats the same stand-in twice, which itself reads as a bot tell. Deliberately
   // no bare "here" — it breaks after prepositions ("back to here").
   en: ["this place", "the place", "the spot"],
-  ja: ["こちら", "このお店", "お店", "こちらのお店"],
+  ja: ["こちら", "このお店", "ここ", "こちらのお店"],
   ar: ["هذا المكان", "المكان"],
 };
 
@@ -878,10 +950,10 @@ export function buildLocalizedReview(
   // object slot, so sort them to the back — the core takes nouns, and they come
   // out through the appositive tails below. Stable within each group, so the
   // shuffle still drives variety.
-  const shuffled =
-    locale === "en"
-      ? [...shuffledRaw.filter((k) => !isAttributeShaped(k)), ...shuffledRaw.filter(isAttributeShaped)]
-      : shuffledRaw;
+  const shuffled = [
+    ...shuffledRaw.filter((k) => !isAttributeShaped(k, locale)),
+    ...shuffledRaw.filter((k) => isAttributeShaped(k, locale)),
+  ];
 
   // Only a small CORE of keywords goes into the {list} sentence (see LIST_CAP);
   // the rest are appended as natural single-keyword tails below. This is the
@@ -891,7 +963,7 @@ export function buildLocalizedReview(
   // The core {list} sentence is an object slot, so it takes NOUNS only. With
   // few nouns the core simply gets shorter (or empty) and the attribute phrases
   // all leave through the appositive tails — never "Loved the family friendly".
-  const coreNouns = locale === "en" ? shuffled.filter((k) => !isAttributeShaped(k)) : shuffled;
+  const coreNouns = shuffled.filter((k) => !isAttributeShaped(k, locale));
   const coreKws = coreNouns.slice(0, coreCount);
   const longPhrases =
     coreKws.reduce((n, k) => n + k.length, 0) > 90 ||
@@ -905,7 +977,7 @@ export function buildLocalizedReview(
   let text =
     coreKws.length === 0
       ? reviewNoKeywords(name, pool, cfg, seed)
-      : buildInner(name, coreKws, pool, cfg, compact, seed);
+      : buildInner(name, coreKws, pool, cfg, compact, seed, locale);
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
   text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled);
 
@@ -924,8 +996,8 @@ export function buildLocalizedReview(
   const leftovers = shuffled.filter((kw) => kw.length > 0 && !text.includes(kw));
   // Attribute phrases get appositive tails; nouns keep the rich object tails.
   // Pairing only ever joins same-kind phrases so a pair never mixes the two.
-  const nounLeft = locale === "en" ? leftovers.filter((k) => !isAttributeShaped(k)) : leftovers;
-  const attrLeft = locale === "en" ? leftovers.filter(isAttributeShaped) : [];
+  const nounLeft = leftovers.filter((k) => !isAttributeShaped(k, locale));
+  const attrLeft = leftovers.filter((k) => isAttributeShaped(k, locale));
   const slots: { text: string; attr: boolean }[] = [];
   const pushGroup = (group: string[], attr: boolean) => {
     if (group.length >= 4 && !attr) {
@@ -948,12 +1020,14 @@ export function buildLocalizedReview(
   pushGroup(nounLeft, false);
   pushGroup(attrLeft, true);
 
-  const attrOrder = shuffle([...ATTRIBUTE_TAILS_EN], forkRng(seed, 0x7a22));
+  const attrOrder = shuffle([...ATTRIBUTE_TAILS[locale]], forkRng(seed, 0x7a22));
   let ti = 0;
   let ai = 0;
   for (const slot of slots) {
-    const order = slot.attr ? attrOrder : tailOrder;
-    if (order.length === 0) break;
+    // Noun tails additionally drop taste voice when this phrase is not something
+    // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30).
+    const order = slot.attr ? attrOrder : filterTasteVoice(tailOrder, locale, [slot.text]);
+    if (order.length === 0) continue;
     const tpl = slot.attr ? order[ai++ % order.length]! : order[ti++ % order.length]!;
     text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread);
   }

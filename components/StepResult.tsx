@@ -2,10 +2,21 @@
 import { useState } from "react";
 import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
+import { copyToClipboard, isUsableReviewUrl } from "@/lib/copy-text";
 import type { UiStrings } from "@/lib/ui-strings";
-import type { SupportedLocale } from "@/types/database";
+import { DEFAULT_DIAL_CODE, type ContactChannel, type SupportedLocale } from "@/types/database";
 
 type ReviewLocaleOption = { code: SupportedLocale; label: string };
+
+/**
+ * Example number shown in the field, per dial code. A UAE-shaped example under
+ * a "+81" prefix tells a Japanese guest nothing, so the hint follows the code.
+ * Unknown codes fall back to the locale string rather than a wrong country.
+ */
+const PHONE_EXAMPLE: Record<string, string> = {
+  "+971": "50 123 4567",
+  "+81": "90 1234 5678",
+};
 
 type Props = {
   t: UiStrings;
@@ -24,6 +35,10 @@ type Props = {
   onRegenerate?: () => string;
   /** Lift edited/regenerated text so reload-persistence keeps the latest wording. */
   onReviewTextChange?: (text: string) => void;
+  /** Store's guest contact channel — drives the label + consent wording. */
+  contactChannel?: ContactChannel;
+  /** Store's E.164 prefix, pre-filled in the country-code box (e.g. "+81"). */
+  contactDialCode?: string;
 };
 
 type WaState = "idle" | "saving" | "saved" | "error";
@@ -46,6 +61,8 @@ export default function StepResult({
   onRetry,
   onRegenerate,
   onReviewTextChange,
+  contactChannel = "whatsapp",
+  contactDialCode,
 }: Props) {
   const [text, setText] = useState(reviewText);
   const [copied, setCopied] = useState(false);
@@ -60,9 +77,13 @@ export default function StepResult({
     onReviewTextChange?.(next);
   }
 
-  // WhatsApp capture state
+  // Guest contact capture state. The channel and dial code come from the store,
+  // never from a constant: "+971 / WhatsApp" for every venue was a UAE-only
+  // assumption that made the block unanswerable for the first Japan store.
+  const isSms = contactChannel === "sms";
+  const dialCode = (contactDialCode ?? "").trim() || DEFAULT_DIAL_CODE;
   const [customerName, setCustomerName] = useState("");
-  const [countryCode, setCountryCode] = useState("+971");
+  const [countryCode, setCountryCode] = useState(dialCode);
   const [phone, setPhone] = useState("");
   const [optIn, setOptIn] = useState(true);
   const [waState, setWaState] = useState<WaState>("idle");
@@ -70,40 +91,6 @@ export default function StepResult({
   const [waSavedWasPreview, setWaSavedWasPreview] = useState(false);
 
   const canSaveWhatsApp = isValidUuid(storeId);
-
-  /**
-   * Legacy-path copy for contexts where the async Clipboard API is blocked —
-   * QR scans routinely open inside Instagram/Facebook/LINE in-app webviews and
-   * older iOS Safari, where clipboard.writeText rejects. A hidden textarea +
-   * execCommand('copy') still works there. Must run inside the user gesture.
-   */
-  function execCommandCopy(value: string): boolean {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = value;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      ta.setSelectionRange(0, value.length);
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch {
-      return false;
-    }
-  }
-
-  async function copyToClipboard(value: string): Promise<boolean> {
-    // clipboard.writeText can reject in iOS WebViews / non-secure contexts.
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {
-      return execCommandCopy(value);
-    }
-  }
 
   /** Select the visible review textarea so a guest can long-press → Copy. */
   function selectReviewText() {
@@ -129,8 +116,7 @@ export default function StepResult({
     setTimeout(() => setCopied(false), 2500);
   }
 
-  /** A usable Google review target = absolute http(s) URL. */
-  const hasValidReviewUrl = /^https?:\/\/.+/i.test((gbpReviewUrl ?? "").trim());
+  const hasValidReviewUrl = isUsableReviewUrl(gbpReviewUrl);
 
   function handlePostOnGoogle() {
     // The owner hasn't configured the Google review link yet — never open a
@@ -275,7 +261,11 @@ export default function StepResult({
           <Check size={13} className="text-green-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <p className="text-xs font-semibold text-green-800">
-              {waSavedWasPreview ? t.result.savedPreview : t.result.savedLive}
+              {waSavedWasPreview
+                ? t.result.savedPreview
+                : isSms
+                  ? t.result.smsSavedLive
+                  : t.result.savedLive}
             </p>
             {waSavedWasPreview && (
               <p className="text-[11px] text-green-800/85 leading-relaxed">
@@ -287,7 +277,7 @@ export default function StepResult({
       ) : (
         <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
           <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500">
-            {t.result.whatsappOptional}
+            {isSms ? t.result.smsOptional : t.result.whatsappOptional}
           </p>
 
           {!canSaveWhatsApp && (
@@ -328,12 +318,12 @@ export default function StepResult({
             <input
               type="tel"
               value={phone}
-              aria-label={t.result.phoneAria}
+              aria-label={isSms ? t.result.smsPhoneAria : t.result.phoneAria}
               onChange={(e) => {
                 setWaState("idle");
                 setPhone(e.target.value.replace(/\D/g, ""));
               }}
-              placeholder={t.result.phonePlaceholder}
+              placeholder={PHONE_EXAMPLE[dialCode] ?? t.result.phonePlaceholder}
               maxLength={12}
               className="flex-1 min-w-0 px-3 py-2 text-base border border-gray-300 rounded-lg bg-white
                 focus:outline-none focus:border-slate-500 transition-colors"
@@ -360,7 +350,7 @@ export default function StepResult({
                 accent-slate-900 cursor-pointer"
             />
             <span className="text-xs text-slate-600 leading-relaxed">
-              {t.result.optIn}
+              {isSms ? t.result.smsOptIn : t.result.optIn}
             </span>
           </label>
 

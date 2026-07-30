@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send, ExternalLink } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
+import { copyToClipboard, isUsableReviewUrl } from "@/lib/copy-text";
 import type { UiStrings } from "@/lib/ui-strings";
 
 type Props = {
@@ -10,9 +11,16 @@ type Props = {
   rating: number;
   storeName: string;
   onSubmit: () => void;
+  /**
+   * Same Google target a 4–5 star guest gets. Offered here side by side with the
+   * private option: sending low raters down a private-only path is "selectively
+   * solicit positive reviews", which Google prohibits. No draft is generated —
+   * the guest's own words are copied so they can paste them.
+   */
+  googleReviewUrl: string;
 };
 
-export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }: Props) {
+export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, googleReviewUrl }: Props) {
   const [helpBefore, helpAfter = ""] = t.feedback.help.split("{store}");
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -55,6 +63,20 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }
     setSubmitting(false);
     onSubmit();
   }
+
+  /**
+   * Copy whatever the guest wrote (may be empty — they can write straight into
+   * Google) and open the review box in the same user-gesture tick so the popup
+   * isn't blocked. Deliberately does NOT submit the private feedback: which path
+   * to take is the guest's choice, not ours.
+   */
+  function handlePostOnGoogle() {
+    const message = text.trim();
+    if (message) void copyToClipboard(message);
+    window.open(googleReviewUrl, "_blank", "noopener,noreferrer");
+  }
+
+  const showGoogleOption = isUsableReviewUrl(googleReviewUrl);
 
   return (
     <div className="flex flex-col gap-6">
@@ -114,19 +136,41 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit }
         </p>
       )}
 
-      {/* CTA */}
-      <button
-        onClick={handleSubmit}
-        disabled={!text.trim() || submitting}
-        className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
-          hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
-          disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed
-          disabled:shadow-none disabled:translate-y-0
-          flex items-center justify-center gap-2"
-      >
-        <Send size={13} />
-        {submitting ? t.feedback.sending : t.feedback.send}
-      </button>
+      {/* CTA — private to the team, and the public Google path side by side.
+          Both are visible at the same moment: a low rater sees exactly the same
+          options a happy guest does, so no path is closed off by the rating. */}
+      <div className="flex flex-col gap-2.5">
+        <button
+          onClick={handleSubmit}
+          disabled={!text.trim() || submitting}
+          className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
+            hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
+            disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed
+            disabled:shadow-none disabled:translate-y-0
+            flex items-center justify-center gap-2"
+        >
+          <Send size={13} />
+          {submitting ? t.feedback.sending : t.feedback.send}
+        </button>
+
+        {showGoogleOption && (
+          <>
+            <button
+              type="button"
+              onClick={handlePostOnGoogle}
+              className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
+                text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
+                transition-all flex items-center justify-center gap-2"
+            >
+              <ExternalLink size={13} />
+              {t.feedback.postOnGoogle}
+            </button>
+            <p className="text-[11px] text-slate-500 leading-relaxed text-center">
+              {t.feedback.eitherNote}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

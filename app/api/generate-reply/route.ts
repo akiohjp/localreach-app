@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { buildPrompt, clip, LANGUAGE_NAME } from "@/lib/reply-prompt";
+import { paragraphize } from "@/lib/reply-format";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 
 /**
@@ -102,7 +103,9 @@ function cleanReply(raw: string): string {
     t = t.slice(1, -1).trim();
   }
   t = t.replace(/—/g, ", ").replace(/–/g, "-");
-  return t.trim();
+  // The prompt asks for paragraphs; this enforces them when the model answers in
+  // one block anyway, so the owner never has to break the text up by hand.
+  return paragraphize(t.trim());
 }
 
 export async function POST(req: Request) {

@@ -17,6 +17,7 @@ import {
   EN_POS_ADJ, EN_NEG_ADJ, SPEC_STOP,
   type ReplyLocale, type ReplyTone, type Sentiment, type Theme, type ReplyPool,
 } from "@/lib/reply-pools";
+import { joinParagraphs } from "@/lib/reply-format";
 import type { SupportedLocale } from "@/types/database";
 
 export type GenerateReplyOptions = {
@@ -208,9 +209,24 @@ function normalizeDashes(text: string): string {
 function collapse(s: string): string {
   return s.replace(/[ \t]+/g, " ").replace(/ *\n */g, " ").trim();
 }
-function joinSentences(parts: string[], locale: ReplyLocale): string {
+/**
+ * Shape the beats into paragraphs rather than one block: opening + reaction,
+ * then the SEO/human beats with the body, then the closer. Google keeps the line
+ * breaks, so this is what the owner pastes.
+ */
+function layoutParagraphs(
+  locale: ReplyLocale,
+  open: string, reaction: string, optional: string[], body: string, close: string,
+): string {
   const glue = locale === "ja" ? "" : " ";
-  return parts.map(collapse).filter(Boolean).join(glue);
+  const groups: string[][] = [[open, reaction]];
+  // 2 optional beats + body is a heavy middle: give the body its own paragraph.
+  if (optional.length >= 2) {
+    groups.push(optional, [body, close]);
+  } else {
+    groups.push([...optional, body], [close]);
+  }
+  return joinParagraphs(groups.map((g) => g.map(collapse)), glue);
 }
 
 /** Build the "react to what they said" sentence for this review + sentiment. */
@@ -339,10 +355,7 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   }
 
   const dropClose = r(0x131)() < 0.25;
-  const segments: string[] = [open, reaction, ...optional, body];
-  if (!dropClose) segments.push(close);
-
-  const bodyText = joinSentences(segments, locale);
+  const bodyText = layoutParagraphs(locale, open, reaction, optional, body, dropClose ? "" : close);
   return normalizeDashes(`${bodyText}\n\n${collapse(signoff)}`).trim();
 }
 

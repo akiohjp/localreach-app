@@ -1,9 +1,16 @@
-import { CheckCircle2, RotateCcw } from "lucide-react";
+import { CheckCircle2, RotateCcw, ExternalLink } from "lucide-react";
+import { isUsableReviewUrl } from "@/lib/copy-text";
 import type { UiStrings } from "@/lib/ui-strings";
 
-type Props = { t: UiStrings; storeName: string; onReset: () => void };
+type Props = {
+  t: UiStrings;
+  storeName: string;
+  onReset: () => void;
+  /** The public path stays open after sending privately — never a dead end. */
+  googleReviewUrl: string;
+};
 
-export default function StepFeedbackSent({ t, storeName, onReset }: Props) {
+export default function StepFeedbackSent({ t, storeName, onReset, googleReviewUrl }: Props) {
   const [bodyBefore, bodyAfter = ""] = t.feedbackSent.body.split("{store}");
   return (
     <div className="flex flex-col items-center gap-8 text-center py-6">
@@ -29,6 +36,25 @@ export default function StepFeedbackSent({ t, storeName, onReset }: Props) {
           {t.feedbackSent.closing}
         </p>
       </div>
+
+      {isUsableReviewUrl(googleReviewUrl) && (
+        <div className="max-w-xs w-full space-y-2.5">
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            {t.feedbackSent.alsoOnGoogle}
+          </p>
+          <a
+            href={googleReviewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
+              text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
+              transition-all flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={13} />
+            {t.feedback.postOnGoogle}
+          </a>
+        </div>
+      )}
 
       <button
         type="button"

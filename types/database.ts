@@ -24,6 +24,19 @@ export type SupportedLocale = "en" | "ja" | "ar";
 export type LocalizedText = Partial<Record<SupportedLocale, string>>;
 
 /**
+ * Channel the guest is asked for on the result screen.
+ *
+ * 'whatsapp' is the UAE default. 'sms' exists because WhatsApp is not the
+ * messaging app in every market — Japan uses LINE, which cannot be collected
+ * from a phone number (no public add-a-friend API), so a JP store takes a plain
+ * mobile number and the owner follows up by SMS/phone.
+ */
+export type ContactChannel = "whatsapp" | "sms";
+
+/** Fallback dial code when a store predates the contact_dial_code column. */
+export const DEFAULT_DIAL_CODE = "+971";
+
+/**
  * Owner defaults for the review-reply generator (stores.reply_settings JSONB).
  * All fields optional; NULL/missing = the generator's built-in defaults.
  */
@@ -77,6 +90,10 @@ export type Database = {
           entity_city?: string | null;
           /** Entity layer: per-locale natural business noun, e.g. {"en":"udon restaurant"}. */
           entity_category_label?: LocalizedText;
+          /** Guest contact channel on the result screen: 'whatsapp' (UAE) or 'sms' (e.g. Japan). */
+          contact_channel?: ContactChannel;
+          /** E.164 prefix pre-filled in the guest number field, e.g. "+971", "+81". */
+          contact_dial_code?: string;
           /** Review-reply generator defaults. NULL = built-in defaults. */
           reply_settings?: ReplySettings | null;
 
@@ -241,6 +258,10 @@ export type Database = {
           entity_area: string | null;
           entity_city: string | null;
           entity_category_label: LocalizedText;
+          /** Guest contact channel on the result screen: 'whatsapp' (UAE) or 'sms' (e.g. Japan). */
+          contact_channel: ContactChannel;
+          /** E.164 prefix pre-filled in the guest number field, e.g. "+971", "+81". */
+          contact_dial_code: string;
         };
         Relationships: [];
       };

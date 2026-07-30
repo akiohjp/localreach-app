@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Star, Sparkles, Copy, RefreshCw, CheckCircle, MapPin, Loader2, PenLine, MessageSquareOff, MessageSquareText } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { generateReply, createReplyNonce } from '@/lib/reply-engine'
@@ -76,6 +76,16 @@ export default function ReplyGenerator({
   const [generating, setGenerating] = useState(false)
   /** 'ai' = Gemini read the review; 'instant' = offline template fallback. */
   const [mode, setMode] = useState<'ai' | 'instant' | null>(null)
+  const draftRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-fit the draft box to its content (incl. blank lines between paragraphs)
+  // so the whole reply is visible without scrolling inside the box.
+  useEffect(() => {
+    const el = draftRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [draft])
 
   function defaultSignoff(): string {
     const sig = signature.trim()
@@ -459,14 +469,18 @@ export default function ReplyGenerator({
               </span>
             )}
           </div>
+          {/* Grows to fit the draft: a scrolling 7-row box hid the paragraphs
+              the owner is supposed to read and edit before posting. */}
           <textarea
+            ref={draftRef}
             value={draft}
             onChange={(e) => { setDraft(e.target.value); setCopied(false) }}
             dir={isRtl ? 'rtl' : 'ltr'}
             rows={7}
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2
-              text-sm text-slate-900 outline-none focus:border-slate-400
-              focus:ring-2 focus:ring-slate-100 transition resize-none leading-relaxed"
+            className="w-full min-h-[9rem] overflow-hidden rounded-xl border border-gray-200
+              bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400
+              focus:ring-2 focus:ring-slate-100 transition resize-y leading-relaxed
+              whitespace-pre-wrap"
           />
           <div className="flex items-center justify-between">
             <button

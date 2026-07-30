@@ -65,5 +65,6 @@ ${kwList ? `  * Work in exactly ONE of these brand phrases, quoted or unquoted, 
   * If any of these would read awkwardly in context, prioritise natural flow over inclusion.${ratingOnly ? `\n  * This reply is the ONLY text under this rating, so these signals matter here, but a forced-sounding reply is still worse than a plain one.` : ""}
 - End the body by inviting them back (vary the wording; not always "see you soon").`}
 - Language: ${p.language}.
+- FORMATTING: break the reply into ${ratingOnly ? "2" : "2 or 3"} short paragraphs of 2 to 3 sentences each, separated by ONE blank line. Never return a single unbroken block of text. No bullet points, no headings, no numbering.
 - Output ONLY the reply body text. No sign-off line (it is appended separately), no quotes around the whole thing, no markdown, no explanations.`;
 }

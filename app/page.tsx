@@ -192,11 +192,17 @@ export default function ReviewPage() {
                 storeId={RESULT_STORE_ID}
                 rating={rating}
                 storeName={STORE_CONFIG.storeName}
+                googleReviewUrl={STORE_CONFIG.gbpReviewUrl}
                 onSubmit={() => setStep("feedback_sent")}
               />
             )}
             {step === "feedback_sent" && (
-              <StepFeedbackSent t={t} storeName={STORE_CONFIG.storeName} onReset={reset} />
+              <StepFeedbackSent
+                t={t}
+                storeName={STORE_CONFIG.storeName}
+                googleReviewUrl={STORE_CONFIG.gbpReviewUrl}
+                onReset={reset}
+              />
             )}
           </div>
         </div>

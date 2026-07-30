@@ -44,7 +44,7 @@ const getStore = cache(async (id: string) => {
   const { data } = await supabase
     .from('public_store_review')
     .select(
-      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label',
+      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label, contact_channel, contact_dial_code',
     )
     .eq('id', id)
     .single()
@@ -149,6 +149,8 @@ export default async function StorePage({ params, searchParams }: Props) {
           entityArea={store.entity_area ?? null}
           entityCity={store.entity_city ?? null}
           entityCategoryLabel={(store.entity_category_label as Record<string, string> | null) ?? null}
+          contactChannel={store.contact_channel ?? 'whatsapp'}
+          contactDialCode={store.contact_dial_code ?? null}
         />
 
         <p className="text-center text-[10px] text-slate-400 mt-5 tracking-widest uppercase">

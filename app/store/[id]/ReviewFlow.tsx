@@ -9,7 +9,7 @@ import StepResult from '@/components/StepResult'
 import StepFeedback from '@/components/StepFeedback'
 import StepFeedbackSent from '@/components/StepFeedbackSent'
 import type { Step } from '@/lib/config'
-import type { SupportedLocale } from '@/types/database'
+import type { ContactChannel, SupportedLocale } from '@/types/database'
 import { getUiStrings } from '@/lib/ui-strings'
 import { useFlowPersistence } from '@/lib/use-flow-persistence'
 
@@ -69,6 +69,12 @@ type Props = {
   availableLocales?: SupportedLocale[]
   logoUrl?: string | null
   businessCategory?: string | null
+  /**
+   * Guest contact block: which channel to ask for and which dial code to
+   * pre-fill. Store-level because WhatsApp/+971 is not universal (JP = SMS/+81).
+   */
+  contactChannel?: ContactChannel
+  contactDialCode?: string | null
   /** Entity layer (AI visibility) — woven once per review by the engine. */
   entityArea?: string | null
   entityCity?: string | null
@@ -88,6 +94,8 @@ export default function ReviewFlow({
   availableLocales,
   logoUrl,
   businessCategory,
+  contactChannel,
+  contactDialCode,
   entityArea,
   entityCity,
   entityCategoryLabel,
@@ -196,6 +204,13 @@ export default function ReviewFlow({
   function handleRating(value: number) {
     setRating(value)
     if (value < 4) {
+      // Not a gate: the feedback step offers the SAME Google review link a happy
+      // guest gets, side by side with the private option, and keeps offering it
+      // after sending. What changes is only that no draft is assembled — a low
+      // rater writes their own words, because putting words in an unhappy
+      // guest's mouth is exactly what Google's solicitation policy forbids.
+      // Routing low raters to a private-only path would be "selectively solicit
+      // positive reviews" (support.google.com/business/answer/7400114).
       setStep('feedback')
       return
     }
@@ -315,6 +330,8 @@ export default function ReviewFlow({
               onReviewLocaleChange={generateInLocale}
               onRetry={reset}
               onReviewTextChange={setReviewText}
+              contactChannel={contactChannel}
+              contactDialCode={contactDialCode ?? undefined}
               onRegenerate={() =>
                 generateReview(storeName, selectedKeywords, {
                   nonce: createReviewNonce(),
@@ -334,6 +351,7 @@ export default function ReviewFlow({
               storeId={storeId}
               rating={rating}
               storeName={storeName}
+              googleReviewUrl={googleReviewUrl}
               onSubmit={() => setStep('feedback_sent')}
             />
           )}
@@ -342,6 +360,7 @@ export default function ReviewFlow({
             <StepFeedbackSent
               t={t}
               storeName={storeName}
+              googleReviewUrl={googleReviewUrl}
               onReset={reset}
             />
           )}
