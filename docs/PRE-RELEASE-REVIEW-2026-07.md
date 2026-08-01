@@ -1,5 +1,25 @@
 # LocalReach — 製品化前 全体レビュー & PWA化 (2026-07-01)
 
+---
+
+## 🏁 最終ステータス (2026-07-12 ハードニング完遂パス)
+
+**コード側の指摘は全消化済み**（B-1〜B-7・C-1・C-2・D-1〜D-5・E）。本日の全数再監査で確認:
+
+| 項目 | 状態 |
+|---|---|
+| B-1 view化 / B-2 middleware default-deny / B-3 owner絞込 / B-4 API一本化 / B-5 CSV / B-6 ロゴnull | ✅ 実装・デプロイ済み |
+| B-7 master認証 | ✅ **完了**: SHA-256ハッシュenv＋constant-time比較（`lib/master-session.ts`）・pw-version方式のセッション失効・IP鍵レート制限/15分ロックアウト（`lib/master-login-rate-limit.ts`） |
+| C-1 feedback保存 / C-2 i18n / D-1〜D-3 metadata/OG / D-4 LPデッドボタン(241016c) / D-5 コントラスト | ✅ 実装・デプロイ済み |
+| E: QRローカル生成（`qrcode`パッケージ）・0行更新検知（StoreDashboard/storage/ReplyGenerator）・flow persistence | ✅ 実装・デプロイ済み |
+
+**本日発見・修正した残穴 2件（オーナー承認待ちで停止中）:**
+
+1. **[P0] 本番DBに旧anonポリシー残存** — migration `20260701120000` が部分適用（view+grantは適用済み・`drop policy "public_review_page_select_store"` だけ未実行）。ベーステーブル `stores` が匿名キーで全行 SELECT 可能なまま（owner_id / notification_email / reply_settings 越境露出）。デプロイ済みコードに anon でベーステーブルを読む経路が無いことは検証済み＝drop は無影響。**→ 残す1文**: `drop policy if exists "public_review_page_select_store" on public.stores;`
+2. **[P1] 契約失効ゲートが匿名書込APIに未デプロイ** — `/api/customer-leads`・`/api/feedback` が `is_active` のみ判定で、期限切れ店舗への書込が通る。`isStoreCurrentlyActive()` ゲートを両routeに同期し localreach-app `4d51298` にコミット済み（tsc/eslint/build green）。**→ 残すは `git push origin main`**（Vercel本番デプロイ）
+
+適用後の検証: `pg_policies` に stores の anon ポリシー0本を確認 → 匿名で `/store/[id]` 表示・admin ログイン・返信設定保存の3点 E2E。
+
 対象: `02_execution_squad/review_app_nextjs`
 作業: PWA化（awa化） + 全デバイス対応 + 徹底レビュー。ビルドは green (`npm run build` exit 0)。
 

@@ -181,10 +181,145 @@ const TASTE_TEMPLATE_JA = /(美味し|食べ|試して|目当て|やられ)/;
  * slot would break assembly.
  */
 function filterTasteVoice(pool: string[], locale: ReviewLocale, kws: string[]): string[] {
-  if (locale !== "ja" || pool.length === 0) return pool;
-  if (!kws.some((k) => NON_CONSUMABLE_JA.test(k))) return pool;
-  const kept = pool.filter((t) => !TASTE_TEMPLATE_JA.test(t));
-  return kept.length > 0 ? kept : pool;
+  if (pool.length === 0) return pool;
+  if (locale === "ja") {
+    if (!kws.some((k) => NON_CONSUMABLE_JA.test(k))) return pool;
+    const kept = pool.filter((t) => !TASTE_TEMPLATE_JA.test(t));
+    return kept.length > 0 ? kept : pool;
+  }
+  if (locale === "en") {
+    if (!kws.some((k) => NON_CONSUMABLE_EN.test(k))) return pool;
+    const kept = pool.filter((t) => !TASTE_TEMPLATE_EN.test(t));
+    return kept.length > 0 ? kept : pool;
+  }
+  return pool;
+}
+
+/**
+ * EN equivalent of NON_CONSUMABLE_JA. Stores mix dishes with room/service/price
+ * pills exactly like JA stores do, and the food-voiced templates broke the same
+ * way on live Pitfire data (owner eye-check 2026-07-31): "The place absolutely
+ * nailed the friendly team", "The comfortable seating lived up to the hype",
+ * "Worth going back for the comfortable seating alone". Detection is by closed
+ * NON-consumable marker list, never by a food lexicon.
+ */
+const NON_CONSUMABLE_EN =
+  /\b(seating|seats|service|staff|team|crew|value|prices?|pricing|bill|atmosphere|ambien[ct]e|vibe|decor|interior|space|parking|wi-?fi|cleanliness|hygiene|location|hospitality|host|waiters?|queue|wait|booking|reservation|delivery|takeaway)\b/i;
+
+/** EN templates whose voice assumes the keyword is food or drink. */
+const TASTE_TEMPLATE_EN = /(nailed|lived up to the hype|go for |big yes to|try |first bite|tasted|hungry)/i;
+
+/**
+ * Rhetorical MOVES — the loudest tell in the owner eye-check of live output
+ * (2026-07-31). Each template is fine alone, but one review saying "was
+ * recommended to me" (opener), "took a friend's recommendation" (filler) and
+ * "is a solid choice, give it a go" (closer) makes the same move three times.
+ * No guest does that. Same for two "stood out"s in one review.
+ */
+const MOVE_RES: Record<ReviewLocale, [string, RegExp][]> = {
+  en: [
+    // Stems, not whole words: "recommend\b" never matches "recommended", which
+    // let the opener/filler pair slip through the first version of this guard.
+    ["recommend", /\b(recommend\w*|tell (?:people|everyone|friends)|telling everyone|give (?:it|\S+) a (?:go|try)|worth a visit|if you haven'?t|solid choice|shout-out)/i],
+    ["return", /\b(be back|come back|coming back|going back|go back|back again|next visit|regular\w*|again)\b/i],
+    ["value", /\b(value|price\w*|pricing|bill|worth (?:it|every)|fair)\b/i],
+    ["service", /\b(staff|service\w*|team|attentive|sorted|looked after)\b/i],
+    ["pace", /\b(rushed|wait\w*|quick\w*|smooth\w*|pace)\b/i],
+    ["hype", /\b(hype|rav\w+|did not disappoint|didn'?t disappoint)\b/i],
+    ["standout", /\b(stood out|standout|highlight\w*|can'?t say enough|nail\w+|won me over|made the (?:visit|trip))\b/i],
+    ["easy", /\b(felt easy|no notes|hard to fault|no complaints|straightforward|went smoothly)\b/i],
+    ["atmosphere", /\b(atmosphere|ambien[ct]e|relaxed|cos[yz]|vibe|clean and comfortable|settle in)\b/i],
+    ["firsttime", /\b(first time|been meaning to|finally made it)\b/i],
+    ["smalltouch", /\b(little things|small touches|details right|clearly run by)\b/i],
+  ],
+  ja: [
+    ["recommend", /(おすすめ|オススメ|勧め|人に教えたく|ぜひ)/],
+    ["return", /(また来|再訪|また行|通い|リピート)/],
+    ["value", /(価格|値段|コスパ|会計|お得|手頃)/],
+    ["service", /(接客|対応|スタッフ|店員|サービス)/],
+    ["atmosphere", /(雰囲気|落ち着|居心地|清潔|店内)/],
+  ],
+  ar: [],
+};
+
+function movesIn(text: string, locale: ReviewLocale): Set<string> {
+  const out = new Set<string>();
+  for (const [name, re] of MOVE_RES[locale]) if (re.test(text)) out.add(name);
+  return out;
+}
+
+/**
+ * Pick a template that does not repeat a move the text already makes. `render`
+ * turns the raw template into the sentence that would actually be inserted, so
+ * classification runs on the final wording. Falls back to a plain pick when
+ * nothing fresh exists: an empty slot would break assembly.
+ */
+function pickFreshMove(
+  pool: readonly string[],
+  text: string,
+  locale: ReviewLocale,
+  rng: () => number,
+  render: (tpl: string) => string = (t) => t,
+  /** Structural slots (opener/core/closer) must yield something; optional
+   *  padding (fillers, tails) is better dropped than repeated. */
+  required = true,
+): string {
+  if (pool.length === 0) return "";
+  const used = movesIn(text, locale);
+  for (const tpl of shuffle([...pool], rng)) {
+    const moves = movesIn(render(tpl), locale);
+    let clash = false;
+    for (const m of moves) if (used.has(m)) { clash = true; break; }
+    if (!clash) return tpl;
+  }
+  return required ? pick(pool, rng) : "";
+}
+
+/**
+ * Store names can END in sentence punctuation — "Let It Dough!" is a live
+ * client, "Smith & Co." is the other shape. Sentence-level operations that
+ * split on `.`/`!`/`?` therefore see a boundary INSIDE a real sentence, and the
+ * 2026-07-31 rewrite (which inserts padding between sentences instead of after
+ * the last one) shattered them:
+ *   "Adding Let It Dough! The kind of place ... To my regular list."
+ * Caught 2026-08-01 auditing that rewrite. Masking the name to a character that
+ * can never be a terminator fixes it once for every caller, rather than each
+ * call site re-deriving where the name sits.
+ */
+const NAME_MASK = "";
+function maskStore(text: string, store?: string): string {
+  if (!store || !/[.!?]/.test(store)) return text;
+  return text.split(store).join(NAME_MASK);
+}
+function unmaskStore(text: string, store?: string): string {
+  if (!store || !text.includes(NAME_MASK)) return text;
+  return text.split(NAME_MASK).join(store);
+}
+
+/** Sentence count, used for the per-review beat budget. */
+function countSentences(text: string, locale: ReviewLocale, store?: string): number {
+  const t = maskStore(text.trim(), store);
+  if (!t) return 0;
+  return locale === "ja"
+    ? ((t.match(/。/g) ?? []).length || 1)
+    : ((t.match(/[.!?](\s|$)/g) ?? []).length || 1);
+}
+
+/** Split into sentences, keeping terminators attached. */
+function splitSentences(text: string, locale: ReviewLocale, store?: string): string[] {
+  const re = locale === "ja" ? /[^。]*。|[^。]+$/g : /[^.!?]*[.!?]+(?:\s|$)|[^.!?]+$/g;
+  const masked = maskStore(text, store);
+  return (masked.match(re) ?? []).map((s) => unmaskStore(s.trim(), store)).filter(Boolean);
+}
+
+/**
+ * Total sentences a review may contain. Before 2026-07-31 there was no ceiling:
+ * opener + core + bridge + closer + one tail per leftover keyword + entity + up
+ * to 3 fillers could stack 10-12 disconnected one-liners. Real reviews of this
+ * length run 3-7 sentences.
+ */
+function sentenceBudget(kind: LenBucket["kind"]): number {
+  return kind === "short" ? 3 : kind === "medium" ? 5 : 8;
 }
 
 function oxford(p: string[]): string {
@@ -324,15 +459,16 @@ function pickLenBucket(locale: ReviewLocale, seed: number, rating: number, woven
 
 // -------------------------------------------------------------- assembly ----
 
-function weaveParagraphs(parts: string[], rng: () => number, compact: boolean, glue: string): string {
+/**
+ * Assembly now produces ONE block; paragraphing is decided once at the end from
+ * the finished text (layoutParagraphs). The old per-beat coin flip broke a
+ * 100-word review into six one-sentence paragraphs — the most visible tell in
+ * the owner eye-check of live output (2026-07-31).
+ */
+function weaveParagraphs(parts: string[], _rng: () => number, _compact: boolean, glue: string): string {
   const cleaned = parts.map(oneLineCollapse).filter(Boolean);
   if (cleaned.length === 0) return "";
-  const mergeProb = compact ? 0.5 : 0.36;
-  let acc = cleaned[0]!;
-  for (let i = 1; i < cleaned.length; i++) {
-    acc = rng() < mergeProb ? `${acc}${glue}${cleaned[i]}` : `${acc}${PARAGRAPH_GAP}${cleaned[i]}`;
-  }
-  return normalizeParagraphFormatting(acc);
+  return normalizeParagraphFormatting(cleaned.join(glue));
 }
 
 /**
@@ -343,26 +479,25 @@ function weaveParagraphs(parts: string[], rng: () => number, compact: boolean, g
  * occasionally stand alone before the closer, so padding reads as passing
  * remarks woven through the review.
  */
-function appendSpread(full: string, sentence: string, glue: string, rng: () => number): string {
-  const paras = normalizeParagraphFormatting(full).split(/\n\n+/).filter(Boolean);
+function appendSpread(full: string, sentence: string, glue: string, rng: () => number, locale: ReviewLocale = "en", store?: string): string {
+  const flat = oneLineCollapse(normalizeParagraphFormatting(full).replace(/\n+/g, locale === "ja" ? "" : " "));
   const frag = oneLineCollapse(sentence);
-  if (!frag) return normalizeParagraphFormatting(full);
-  if (paras.length === 0) return frag;
+  if (!frag) return flat;
+  if (!flat) return frag;
+  const parts = splitSentences(flat, locale, store);
+  if (parts.length < 3) return `${flat}${glue}${frag}`;
+  // Land the remark BEFORE the closing sentence most of the time: everything
+  // stacking after the closer was what produced the trailing wall of one-liners.
+  // Never before the opening sentence — a review has to start with the visit.
   const r = rng();
-  if (r < 0.15 && paras.length >= 2) {
-    paras.splice(paras.length - 1, 0, frag);
-  } else if (r < 0.5 && paras.length >= 2) {
-    // Mid-review remarks read most natural in an EARLIER paragraph; the last
-    // paragraph (usually the closer) takes the minority share so it never
-    // accretes into a checklist.
-    const back = 1 + Math.floor(rng() * Math.min(2, paras.length - 1));
-    const idx = paras.length - 1 - back;
-    paras[idx] = oneLineCollapse(`${paras[idx]}${glue}${frag}`);
-  } else {
-    const li = paras.length - 1;
-    paras[li] = oneLineCollapse(`${paras[li]}${glue}${frag}`);
-  }
-  return paras.join(PARAGRAPH_GAP);
+  const idx = r < 0.62 ? parts.length - 1 : r < 0.85 ? Math.max(1, parts.length - 2) : parts.length;
+  const next = [...parts.slice(0, idx), frag, ...parts.slice(idx)];
+  // Join with the locale's OWN glue. `glue || " "` looked harmless but JA glue
+  // is the empty string, so every insertion put a halfwidth space after 。 —
+  // "文句なしでした。 Hokkaido Curry目当てでぜひ。" (found 2026-08-01). Japanese
+  // never spaces after the full stop, and it is the kind of tell a Japanese
+  // owner spots instantly.
+  return oneLineCollapse(next.join(glue));
 }
 
 function appendToLast(full: string, sentence: string, glue: string): string {
@@ -395,12 +530,20 @@ function trimTailSentence(multiline: string, sentenceEnd: RegExp): string {
  * the padding loop samples with replacement) reads as an obvious bot tell.
  * Retry a few times for one the review doesn't contain yet; '' = none fresh.
  */
-function pickFreshFiller(t: string, store: string, pool: PoolSet, rng: () => number): string {
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const cand = fill(pick(pool.fillers, rng), { store });
-    if (!t.includes(cand)) return cand;
-  }
-  return "";
+function pickFreshFiller(
+  t: string,
+  store: string,
+  pool: PoolSet,
+  rng: () => number,
+  locale: ReviewLocale = "en",
+): string {
+  // Fresh means: not already present AND not repeating a rhetorical move the
+  // review already makes ("recommended to me" + "took a friend's recommendation"
+  // in one review — owner eye-check 2026-07-31).
+  const tpl = pickFreshMove(pool.fillers, t, locale, rng, (x) => fill(x, { store }), false);
+  if (!tpl) return "";
+  const cand = fill(tpl, { store });
+  return cand && !t.includes(cand) ? cand : "";
 }
 
 // ------------------------------------------------------------ entity layer ----
@@ -465,18 +608,20 @@ function fillEntity(tpl: string, loc: string, cat: string): string {
 // safe. All templates are number-neutral; superlative ones are filtered out
 // for 4-star reviews.
 const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
+  // Superlatives ("best", "favourite", "hard to find better") are OUT: they are
+  // the engine putting a rank in the guest's mouth, they read as planted, and
+  // they collide with the review-solicitation policy line on influencing
+  // content. Placement only — the guest says WHERE and WHAT, not "the best".
   en: [
-    "Easily my favourite {cat} in {loc}.",
-    "Best {cat} I've found around {loc}.",
     "My go-to {cat} in {loc} now.",
-    "Hard to find a better {cat} in {loc}.",
     "Glad to have this {cat} in {loc}.",
     "If you're near {loc}, this is the {cat} to try.",
     "Solid {cat} right in {loc}.",
+    "Good to have a {cat} like this around {loc}.",
+    "Handy spot if you're in {loc} and after a {cat}.",
   ],
   ja: [
     "{loc}で{cat}を探しているなら、ここをおすすめします。",
-    "{loc}の{cat}ではいちばんのお気に入りです。",
     "{loc}でこの{cat}に出会えてよかったです。",
     "{loc}に来たらまた寄りたい{cat}です。",
     "{loc}にあるのがうれしい{cat}です。",
@@ -597,13 +742,10 @@ function entityLoc(
   locale: ReviewLocale,
   rng: () => number,
 ): string | null {
-  if (area && city && rng() < 0.35) {
-    if (locale === "ja") return `${city}の${area}`;
-    // Arabic templates already carry "في" before {loc}; joining with another
-    // "في" produced "في Souk Al Bahar في Dubai". Arabic comma keeps it clean.
-    if (locale === "ar") return `${area}، ${city}`;
-    return `${area}, ${city}`;
-  }
+  // EN guests write "in Dubai Hills", never "in Dubai Hills, Dubai" — the pair
+  // reads like a directory entry (owner eye-check 2026-07-31). JA keeps the
+  // natural possessive form, which is how people actually speak there.
+  if (area && city && locale === "ja" && rng() < 0.35) return `${city}の${area}`;
   return area ?? city ?? null;
 }
 
@@ -619,6 +761,7 @@ function weaveEntity(
   seed: number,
   rating: number,
   vertical: Vertical = "generic",
+  store?: string,
 ): { text: string; protect: string[] } {
   const area = entity?.area?.trim() || null;
   const city = entity?.city?.trim() || null;
@@ -646,7 +789,7 @@ function weaveEntity(
     if (measured.length > 0) pool = measured;
   }
   const sentence = fillEntity(pick(pool, rng), loc ?? "", cat ?? "");
-  return { text: appendSpread(text, sentence, cfg.glue, rng), protect };
+  return { text: appendSpread(text, sentence, cfg.glue, rng, locale, store), protect };
 }
 
 /** True when trimming would delete a verbatim keyword the review must keep. */
@@ -662,6 +805,8 @@ function tuneLength(
   seed: number,
   salt: number,
   protect: readonly string[] = [],
+  locale: ReviewLocale = "en",
+  budget = Infinity,
 ): string {
   const rng = forkRng(seed, salt);
   let t = text;
@@ -680,16 +825,24 @@ function tuneLength(
   // bucket turns the review into a platitude wall (eye-check 2026-07-25) — an
   // honest shorter review beats a stuffed "long" one, so the bucket min yields.
   let added = 0;
-  while (n < cfg.min && added < 3 && pool.fillers.length > 0) {
-    const filler = pickFreshFiller(t, store, pool, rng);
+  // Beat budget outranks the length target: a review padded to its word count
+  // with platitudes is exactly what the owner flagged. Two fillers max, and
+  // never past the sentence ceiling.
+  while (n < cfg.min && added < 2 && pool.fillers.length > 0 && countSentences(t, locale, store) < budget) {
+    const filler = pickFreshFiller(t, store, pool, rng, locale);
     if (!filler) break;
-    t = appendSpread(t, filler, cfg.glue, rng);
+    t = appendSpread(t, filler, cfg.glue, rng, locale, store);
     n = cfg.measure(t);
     added++;
   }
-  if (added === 0 && n < cfg.target - Math.round(cfg.target * 0.06) && pool.fillers.length > 0) {
-    const filler = pickFreshFiller(t, store, pool, rng);
-    if (filler) t = appendSpread(t, filler, cfg.glue, rng);
+  if (
+    added === 0 &&
+    n < cfg.target - Math.round(cfg.target * 0.06) &&
+    pool.fillers.length > 0 &&
+    countSentences(t, locale, store) < budget
+  ) {
+    const filler = pickFreshFiller(t, store, pool, rng, locale);
+    if (filler) t = appendSpread(t, filler, cfg.glue, rng, locale, store);
   }
   if (cfg.measure(t) > cfg.max) {
     const trimmed = trimTailSentence(t, cfg.sentenceEnd);
@@ -729,10 +882,20 @@ function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg,
   const bridgePool = compact && pool.bridgesShort.length > 0 ? pool.bridgesShort : pool.bridgesLong;
   const closerPool = compact && pool.closersShort.length > 0 ? pool.closersShort : pool.closersLong;
 
+  // Picked SEQUENTIALLY so each beat can see what the review already said: the
+  // opener, bridge and closer pools all contain recommend/return/value moves,
+  // and picking them independently let one review make the same move three
+  // times (owner eye-check 2026-07-31).
   const opener = fill(pick(openerPool, forkRng(seed, 0x101)), { store });
   const core = buildCore(store, kws, pool, cfg, compact, seed, locale);
-  const bridge = bridgePool.length ? fill(pick(bridgePool, forkRng(seed, 0x104)), { store }) : "";
-  const closer = fill(pick(closerPool, forkRng(seed, 0x105)), { store });
+  const soFar = `${opener} ${core}`;
+  const bridge = bridgePool.length
+    ? fill(pickFreshMove(bridgePool, soFar, locale, forkRng(seed, 0x104), (t) => fill(t, { store })), { store })
+    : "";
+  const closer = fill(
+    pickFreshMove(closerPool, `${soFar} ${bridge}`, locale, forkRng(seed, 0x105), (t) => fill(t, { store })),
+    { store },
+  );
 
   const bridgeFirst = !compact && forkRng(seed, 0x106)() < 0.41;
   let segments = bridgeFirst ? [opener, bridge, core, closer] : [opener, core, bridge, closer];
@@ -765,7 +928,10 @@ const STANDINS: Record<ReviewLocale, string[]> = {
   // or object after a preposition like "back to ___"). Rotated so a review never
   // repeats the same stand-in twice, which itself reads as a bot tell. Deliberately
   // no bare "here" — it breaks after prepositions ("back to here").
-  en: ["this place", "the place", "the spot"],
+  // "the place" / "the spot" read like a bot narrating ("Will definitely be back
+  // to the place." — owner eye-check 2026-07-31). Guests say "this place", or
+  // "here" when no preposition is in the way (handled at the call site).
+  en: ["this place", "this spot"],
   ja: ["こちら", "このお店", "ここ", "こちらのお店"],
   ar: ["هذا المكان", "المكان"],
 };
@@ -805,6 +971,11 @@ function capStoreMentions(
       const sentenceStart = (out + before).trim() === "" || /[.!?。！？]/.test(prev);
       let sub = variants[vi % variants.length]!;
       vi++;
+      // "back to here" / "at here" are ungrammatical: after a preposition only a
+      // noun phrase works, so the bare adverb variant is swapped out.
+      if (locale === "en" && sub === "here" && /\b(to|at|in|from|near|about|of)\s*$/i.test(before)) {
+        sub = "this place";
+      }
       if (locale === "en" && sentenceStart) {
         sub = sub.charAt(0).toUpperCase() + sub.slice(1);
       }
@@ -858,6 +1029,20 @@ function capitalizeSentenceStartsEn(text: string, protect: readonly string[]): s
 }
 
 /** Typographic sentence dashes read "AI"; normalize any leak. Keeps `\n\n`. */
+/**
+ * A store name that already ends in sentence punctuation collides with the
+ * terminator of whatever template it closes: "Already planning my next visit to
+ * Let It Dough!." and "Adding Smith & Co.. to my list" (live client + the other
+ * name shape, found 2026-08-01). The name is verbatim-protected, so the fix is
+ * to drop the template's redundant terminator, never the name's own.
+ */
+function dedupeTerminators(text: string): string {
+  return text
+    .replace(/([.!?])[.!?]+/g, "$1")
+    .replace(/([.!?])\s*。/g, "$1")
+    .replace(/。。+/g, "。");
+}
+
 function normalizeDashes(text: string): string {
   return normalizeParagraphFormatting(
     text
@@ -934,7 +1119,7 @@ export function buildLocalizedReview(
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
     let t0 = reviewNoKeywords(name, pool, cfg0, seed);
-    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical);
+    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical, name);
     t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9), vertical));
     if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
     return t0;
@@ -979,7 +1164,10 @@ export function buildLocalizedReview(
       ? reviewNoKeywords(name, pool, cfg, seed)
       : buildInner(name, coreKws, pool, cfg, compact, seed, locale);
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
-  text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled);
+  // Reserve room for what still has to be woven after this pass: at least one
+  // keyword tail and the entity sentence. Without the reserve the filler pass
+  // ate the whole budget and the review ran two beats long anyway.
+  text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled, locale, Math.max(3, sentenceBudget(bucket.kind) - 2));
 
   if (!text.includes(name)) {
     text = appendToLast(text, `(${name})`, cfg.glue);
@@ -1021,30 +1209,80 @@ export function buildLocalizedReview(
   pushGroup(attrLeft, true);
 
   const attrOrder = shuffle([...ATTRIBUTE_TAILS[locale]], forkRng(seed, 0x7a22));
+  const budget = sentenceBudget(bucket.kind);
+  // The beat budget must NEVER drop a keyword — every selected phrase is a
+  // verbatim guarantee (the first cut of this guard broke it: 2 of 4 keywords
+  // silently disappeared). When leftovers outnumber the sentences left, the
+  // budget changes the GROUPING (more phrases per tail), never the coverage.
+  const roomForTails = Math.max(1, budget - countSentences(text, locale, name) - 1);
+  if (slots.length > roomForTails) {
+    const perTail = Math.ceil(slots.length / roomForTails);
+    const merged: { text: string; attr: boolean }[] = [];
+    for (const attr of [false, true]) {
+      const group = slots.filter((s) => s.attr === attr);
+      for (let i = 0; i < group.length; i += perTail) {
+        const chunk = group.slice(i, i + perTail).map((s) => s.text);
+        merged.push({
+          attr,
+          text: chunk.length === 1 ? chunk[0]! : cfg.joinList(chunk, forkRng(seed, 0x7d00 + i)),
+        });
+      }
+    }
+    slots.length = 0;
+    slots.push(...merged);
+  }
   let ti = 0;
   let ai = 0;
   for (const slot of slots) {
     // Noun tails additionally drop taste voice when this phrase is not something
-    // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30).
+    // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30; the EN
+    // equivalent "nailed the friendly team" — 2026-07-31).
     const order = slot.attr ? attrOrder : filterTasteVoice(tailOrder, locale, [slot.text]);
     if (order.length === 0) continue;
-    const tpl = slot.attr ? order[ai++ % order.length]! : order[ti++ % order.length]!;
-    text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread);
+    // Rotation keeps consecutive tails off the same template; the move check
+    // then rejects one that repeats a rhetorical beat already in the review.
+    const rotated = slot.attr ? order[ai++ % order.length]! : order[ti++ % order.length]!;
+    const tpl = movesIn(fill(rotated, { kw: slot.text }), locale).size === 0
+      ? rotated
+      : pickFreshMove(order, text, locale, tailSpread, (t) => fill(t, { kw: slot.text }));
+    text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name);
   }
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
-  const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical);
+  const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical, name);
   text = woven.text;
   const protectAll = [...shuffled, ...woven.protect];
 
-  text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll);
+  text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll, locale, sentenceBudget(bucket.kind));
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
   // itself contains the name, so the verbatim-keyword guarantee is never broken.
   if (!protectAll.some((k) => k.includes(name))) {
     text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9), vertical);
   }
   text = normalizeDashes(text);
+  text = dedupeTerminators(text);
   if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);
-  return text;
+  // Paragraphing decided ONCE, from the finished text: one block, or two when
+  // the review is genuinely long. See layoutParagraphs.
+  return layoutParagraphs(text, locale, forkRng(seed, 0x9a17), name);
+}
+
+/**
+ * Real guests write one block, and split into two only when the review runs
+ * long. The old engine flipped a coin between every beat, which turned a
+ * 100-word review into six one-sentence paragraphs (owner eye-check
+ * 2026-07-31) — the most visible tell in the whole output.
+ */
+function layoutParagraphs(text: string, locale: ReviewLocale, rng: () => number, store?: string): string {
+  const flat = oneLineCollapse(text.replace(/\n+/g, " "));
+  if (!flat) return "";
+  const size = locale === "ja" ? cjkCount(flat) : wordCount(flat);
+  const parts = splitSentences(flat, locale, store);
+  const longEnough = locale === "ja" ? size >= 130 : size >= 55;
+  if (!longEnough || parts.length < 4 || rng() < 0.3) return flat;
+  // Break near the middle, never orphaning the opening or closing sentence.
+  const at = Math.max(2, Math.min(parts.length - 2, Math.round(parts.length / 2)));
+  const joiner = locale === "ja" ? "" : " ";
+  return `${parts.slice(0, at).join(joiner).trim()}${PARAGRAPH_GAP}${parts.slice(at).join(joiner).trim()}`;
 }

@@ -166,15 +166,28 @@ async function main() {
   }
 
   // ---- store names ending in sentence punctuation (live client "Let It Dough!") ----
-  // The "!" belongs to the NAME, not to a sentence, so the following word must
-  // stay lowercase mid-sentence ("Came to Let It Dough! for the first time").
+  // The "!" belongs to the NAME, not to a sentence, so a word CONTINUING that
+  // sentence must stay lowercase ("Came to Let It Dough! for the first time").
+  //
+  // The word list is deliberately function words only. It used to include The /
+  // A / Absolutely, which made this a false positive once the engine started
+  // dropping the redundant terminator ("Let It Dough!." -> "Let It Dough!",
+  // 2026-08-01): after that, a filler genuinely DOES open a new sentence there
+  // ("...my next visit to Let It Dough! The kind of place you want to tell
+  // people about."), which is correct English, not the bug. Function words can
+  // never begin a pool sentence, so they still isolate the real defect.
   let punctName = 0;
-  const PUNCT_AFTER = /(Let It Dough!|Smith & Co\.)\s+(For|On|And|The|Absolutely|Has|A)\b/;
-  for (let i = 0; i < 200; i++) {
-    const t = generateReview("Let It Dough!", ["premium doughnuts", "Boston Cream"], {
-      nonce: createReviewNonce(), outletKey: "punct|cafe|#000", locale: "en", category: "cafe", forcedCount: 1,
-    });
-    if (PUNCT_AFTER.test(t)) punctName++;
+  const PUNCT_AFTER =
+    /(Let It Dough!|Smith & Co\.)\s+(For|On|And|Has|With|At|To|In|Was|Were|But|So|Then|Which|That)\b/;
+  for (let i = 0; i < 400; i++) {
+    for (const nm of ["Let It Dough!", "Smith & Co."]) {
+      const t = generateReview(nm, ["premium doughnuts", "Boston Cream"], {
+        nonce: createReviewNonce(), outletKey: "punct|cafe|#000", locale: "en", category: "cafe", forcedCount: 1,
+      });
+      if (PUNCT_AFTER.test(t)) punctName++;
+      // The name is verbatim-protected; its own terminator must never be doubled.
+      if (/[.!?]\s*[.!?]/.test(t)) punctName++;
+    }
   }
   // Arabic entity join must not double the preposition ("في X في Y").
   let arDoubleFi = 0;
@@ -271,7 +284,11 @@ async function main() {
   assert(entCatMiss === 0, `entity: category noun in every review (missing ${entCatMiss})`);
   assert(entDupe === 0, `entity: area never mentioned twice (got ${entDupe})`);
   assert(entMisuse === 0, `entity: never routed through {kw} object templates (got ${entMisuse})`);
-  assert(entCity > N * 0.15 && entCity < N * 0.6, `entity: city rides along ~1/3 of reviews (got ${entCity}/${N})`);
+  // EN no longer pairs area + city: "in Dubai Hills, Dubai" reads like a
+  // directory entry, not a guest (owner eye-check 2026-07-31). The area alone
+  // carries the local signal; the city rides along only in JA, where "ドバイの
+  // モーターシティ" is how people actually speak.
+  assert(entCity === 0, `EN entity: city never appended to the area (got ${entCity}/${N})`);
   assert(entForcedDupe === 0, `entity: forced keyword carrying the area → no double mention (got ${entForcedDupe})`);
   assert(entJaMiss === 0, `entity JA: area + JA category label woven (missed ${entJaMiss})`);
   assert(entArMiss === 0, `entity AR: area + AR category label woven (missed ${entArMiss})`);
