@@ -190,5 +190,99 @@ if (fail) {
     }
   }
 }
-console.log(fail ? `\n${fail} DETECTOR(S) FIRING ❌\n` : "\nALL CLEAN ✅\n");
-process.exit(fail ? 1 : 0);
+// -------------------------------------------------- diversity gate (100) ----
+// "A store's page must survive being READ" — 100 consecutive reviews of one
+// store, and no sentence may become a visible refrain. Owner requirement
+// 2026-08-03 ("50件で同じパターンが戻ってくると弱すぎる。100件かぶらなければ").
+//
+// Classification insight (2026-08-03, second iteration): {store}/{loc}/{cat}
+// are the SAME VALUE in every review of one store, so an entity sentence like
+// "A proper udon restaurant, right here in Motor City." is a CONSTANT on that
+// store's page even though it's templated in the source. Only guest/core
+// KEYWORDS actually vary between reviews. The gate therefore masks keywords
+// alone; store name, area and category stay literal, and repeats are judged as
+// what the reader actually sees.
+//
+// Thresholds are LENGTH-AWARE, because repetition visibility scales with how
+// distinctive the sentence is:
+//  - LONG constant repeated 9+ times = the classic bot refrain. Cap 8.
+//  - SHORT constant ("Zero hassle.", "また来ます。") repeating is what real
+//    review pages do — "great service" appears dozens of times on any genuine
+//    page. Cap 12.
+//  - KEYWORD-VARYING sentences read differently each time (different dish /
+//    treatment inside). Cap 12.
+// Floors: >=200 distinct sentences and >=25 distinct openers per 100 reviews
+// (agency runs an exclusive pool, so the floor sits below the generic-pool
+// stores' typical 350+).
+const GATE = { longConstantMax: 8, shortConstantMax: 12, keywordVaryingMax: 12, minDistinct: 200, minOpeners: 25 };
+const LONG_LEN = { en: 45, ja: 22, ar: 40 };
+
+function normalizeForGate(s, phrases) {
+  let t = s;
+  for (const p of phrases) if (p) t = t.split(p).join("‹›");
+  return t.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+let gateFail = 0;
+console.log("─── diversity gate: 100 reviews per store, primary locale ───");
+for (const store of STORES) {
+  const locale = store.locale[0];
+  // Keywords are the only content that varies between one store's reviews —
+  // they get masked to ‹›. The store name is replaced with a punctuation-free
+  // token purely so names like "Let It Dough!" don't break sentence splitting;
+  // it still counts as constant text, which is what it is to the reader.
+  const kwPhrases = [...store.forced, ...store.keywords].filter(Boolean);
+  const constPhrases = [
+    [store.name, "STORENAME"],
+  ].filter(([p]) => Boolean(p));
+  const splitRe = locale === "ja" ? /[^。]*。|[^。]+$/g : /[^.!?]*[.!?]+(?:\s|$)|[^.!?]+$/g;
+  // Mask BEFORE splitting: a store name ending in "!" ("Let It Dough!") would
+  // otherwise split mid-sentence here and each half would register as its own
+  // repeated refrain — a bench artifact; the engine itself handles punctuated
+  // names correctly (it received the same fix on 2026-08-02).
+  const preMask = (t) => {
+    let out = t;
+    for (const [p, token] of constPhrases) out = out.split(p).join(token);
+    for (const p of kwPhrases) out = out.split(p).join("‹›");
+    return out;
+  };
+  const sentCount = new Map();
+  const openerSet = new Set();
+  for (let i = 0; i < 100; i++) {
+    const taps = 1 + (i % 3);
+    const start = (i * 5) % Math.max(1, store.keywords.length);
+    const guest = [];
+    for (let k = 0; k < taps; k++) guest.push(store.keywords[(start + k) % store.keywords.length]);
+    // Mirror production: two rotating core phrases offered, most guests keep them.
+    const f = store.forced.length
+      ? [store.forced[i % store.forced.length], store.forced[(i + 1) % store.forced.length]].filter((v, ix, a) => a.indexOf(v) === ix)
+      : [];
+    const text = generateReview(store.name, [...f, ...guest.filter((g) => !f.includes(g))], {
+      // Deterministic nonce: the gate measures the same 100 reviews every run,
+      // so a pass is a stable guarantee rather than a lucky draw from the
+      // balls-in-bins tail (and a fail is always reproducible).
+      nonce: `gate|${store.name}|${i}`, outletKey: `gate|${store.name}`, locale,
+      category: store.category, rating: i % 6 === 0 ? 4 : 5, entity: store.entity,
+    });
+    const sents = (preMask(text.replace(/\n+/g, " ")).match(splitRe) ?? []).map((s) => s.trim()).filter(Boolean);
+    sents.forEach((s, idx) => {
+      const key = s.replace(/\s+/g, " ").trim().toLowerCase();
+      if (!key || key === "‹›" || key === "‹›。") return;
+      sentCount.set(key, (sentCount.get(key) ?? 0) + 1);
+      if (idx === 0) openerSet.add(key);
+    });
+  }
+  const longLen = LONG_LEN[locale] ?? 45;
+  const offenders = [...sentCount.entries()].filter(([s, n]) => {
+    if (s.includes("‹›")) return n > GATE.keywordVaryingMax;
+    return n > (s.length >= longLen ? GATE.longConstantMax : GATE.shortConstantMax);
+  });
+  const ok = offenders.length === 0 && sentCount.size >= GATE.minDistinct && openerSet.size >= GATE.minOpeners;
+  if (!ok) gateFail++;
+  console.log(`  ${ok ? "✓" : "✗"} ${store.name} / ${locale}: distinct=${sentCount.size} openers=${openerSet.size}${offenders.length ? " offenders: " + offenders.slice(0, 3).map(([s, n]) => `${n}x "${s.slice(0, 48)}"`).join(" | ") : ""}`);
+}
+
+const anyFail = fail + gateFail;
+console.log(anyFail ? `\n${fail} DETECTOR(S) + ${gateFail} DIVERSITY GATE(S) FIRING ❌\n` : "\nALL CLEAN ✅\n");
+process.exitCode = anyFail ? 1 : 0;
+

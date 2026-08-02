@@ -141,6 +141,10 @@ export default function ReviewFlow({
       if (s.reviewLocale === 'en' || s.reviewLocale === 'ja' || s.reviewLocale === 'ar') {
         setReviewLocale(s.reviewLocale)
       }
+      // A reload mid-flow restored the keywords step with no core phrases
+      // offered (forcedOffered is not persisted) — safe-direction failure, but
+      // the store silently lost its discoverability phrases. Re-rotate.
+      if ((s.step as Step) === 'keywords') rotateForced()
     },
   )
 
@@ -233,16 +237,22 @@ export default function ReviewFlow({
       void proceedToGenerate([], value)
       return
     }
-    // Rotate here (a click handler) rather than in render: picking at random
-    // during render would not match what the server sent, and this is the first
-    // client-only moment where the guest is about to see the pills.
+    rotateForced()
+    setStep('keywords')
+  }
+
+  /**
+   * Pick which core phrases this guest is offered. Runs from event handlers and
+   * the persistence-restore callback (both client-only), never during render —
+   * a random pick in render would not match what the server sent.
+   */
+  function rotateForced() {
     const pool = [...cleanForced]
     const picked: string[] = []
     while (pool.length > 0 && picked.length < FORCED_OFFERED_MAX) {
       picked.push(...pool.splice(Math.floor(Math.random() * pool.length), 1))
     }
     setForcedOffered(picked)
-    setStep('keywords')
   }
 
   async function handleKeywords(guestSelected: string[]) {

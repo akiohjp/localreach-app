@@ -569,24 +569,40 @@ function pickFreshFiller(
  * no particle, no verb agreement to break.
  */
 const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
+  // Single-sentence ONLY. Two-sentence templates ("{kw}。この点は大きいと思い
+  // ます。") split at the terminator, and each half became its own repeated
+  // refrain on stores with many attribute keywords — measured 2026-08-03 on the
+  // live Tsukasa config: the bare "‹›。" half 20x/100, the constant half 11x.
+  // Stores whose keyword lists are attribute-heavy draw this slot constantly,
+  // so it carries choice groups like the other hot slots.
   en: [
     "Another plus: {kw}.",
-    "Also worth mentioning: {kw}.",
-    "One more thing: {kw}.",
-    "Plus {kw}, which I appreciated.",
-    "Same goes for {kw}.",
+    "{Also worth mentioning|Worth flagging too}: {kw}.",
+    "One more thing{ I liked|}: {kw}.",
+    "Plus {kw}, which I {appreciated|rate|didn't take for granted}.",
+    "{Same goes|That goes} for {kw} {too|as well}.",
     "And {kw}, which counts for a lot.",
+    "And {kw}, too, which {helps|matters|makes a difference}.",
+    "It's also {kw}, {for what that's worth|and that helps|no small thing}.",
+    "Add {kw} to the plus column.",
+    "On top of that, {kw}.",
+    "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
+    "Small detail, but a {good|welcome|nice} one: {kw}.",
   ],
-  // JA: the phrase is closed off with 。or 、before the frame continues, so no
+  // JA: the phrase is closed off with 、before the frame continues, so no
   // particle ever attaches to the keyword — grammatical for a noun, an adjective
-  // or a whole clause alike ("ランチが手頃。この点も良かったです。").
+  // or a whole clause alike ("ランチが手頃、という点も良かったです。").
   ja: [
-    "{kw}という点も良かったです。",
-    "あと{kw}、これも嬉しいポイントでした。",
-    "{kw}というのも嬉しいところです。",
-    "{kw}。この点は大きいと思います。",
-    "{kw}。これも良いところだと思います。",
+    "{kw}という点も{良かった|ありがたかった|評価したい}です。",
+    "あと{kw}、これも{嬉しい|大事な|地味に効く}ポイントでした。",
+    "{kw}というのも{嬉しい|助かる|ポイントが高い}ところです。",
+    "{kw}、この点は{大きい|見逃せない|かなり効く}と思います。",
+    "{kw}、これも良いところだと思います。",
     "{kw}、この点は特に嬉しかったです。",
+    "{kw}なのも{良かった|続けやすそう|通いやすい理由}です。",
+    "個人的には{kw}という部分も刺さりました。",
+    "{kw}、こういうところが効いてきます。",
+    "{地味ですが|意外と|なにげに}{kw}という点、{大事|効いてくる|ありがたい}と思います。",
   ],
   // AR has no attribute detector, so this slot is never reached.
   ar: [],
@@ -600,7 +616,86 @@ export type ReviewEntity = {
 };
 
 function fillEntity(tpl: string, loc: string, cat: string): string {
-  return tpl.replace(/\{loc\}/g, loc).replace(/\{cat\}/g, cat);
+  const filled = tpl.replace(/\{loc\}/g, loc).replace(/\{cat\}/g, cat);
+  // "a" → "an" when the substituted category starts with a vowel LETTER:
+  // "a Asian supermarket" reached production output (caught 2026-08-03).
+  // Letter heuristic over sound is right for this domain: "an udon restaurant"
+  // is also correct (oo-sound), and vowel-letter-consonant-sound words
+  // ("university") don't occur as business categories here.
+  if (/^[AEIOUaeiou]/.test(cat)) {
+    const esc = cat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return filled.replace(new RegExp("\\b([Aa]) (" + esc + ")", "g"), (_m, a, c) => `${a}n ${c}`);
+  }
+  return filled;
+}
+
+/**
+ * Inline choice groups: "{friendly|warm|genuinely kind}" resolves to ONE of the
+ * options, seeded. This is the combinatorial layer on top of template pools —
+ * a single template with two 3-way groups has 9 surface forms, so the pool's
+ * effective size multiplies without writing (and reviewing) 9 near-duplicates.
+ * Introduced 2026-08-03 after measuring sentence-level repetition across 100
+ * reviews per store: pool growth alone left constant bridge/filler sentences
+ * at 9-11 appearances per 100, because a hot slot draws ~150 times per 100
+ * reviews and balls-in-bins guarantees a lopsided max. Choices cut the surface
+ * repetition multiplicatively where adding templates cuts it only linearly.
+ *
+ * Runs BEFORE placeholder substitution. Safe against the named placeholders
+ * ({store} {list} {a} {b} {kw} {loc} {cat}): a group only matches when its
+ * body contains "|", which the named placeholders never do.
+ */
+function expandChoices(tpl: string, rng: () => number): string {
+  return tpl.replace(/\{([^{}]*\|[^{}]*)\}/g, (_m, body: string) => {
+    const opts = body.split("|");
+    return opts[Math.floor(rng() * opts.length)]!;
+  });
+}
+
+/** Resolve every choice group in a PoolSet once per review (seeded). */
+function expandPoolChoices(pool: PoolSet, rng: () => number): PoolSet {
+  const out = {} as PoolSet;
+  (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
+    out[k] = pool[k].map((t) => expandChoices(t, rng));
+  });
+  return out;
+}
+
+/**
+ * Medical verticals: a treatment is not a dish. The generic keyword templates
+ * include command/consumption voice ("Go for {list}", "Definitely try {kw}",
+ * "Save room for {kw}") that reads like product promotion when the keyword is
+ * a medical procedure — "Go for Exosome Therapy." on the live Kotobuki demo
+ * (owner-flagged 2026-08-01). Recommending a clinic is a normal thing patients
+ * do; urging strangers toward a specific procedure is not, and on a medical
+ * profile it also reads as planted marketing.
+ *
+ * Vertical-keyed rather than keyword-keyed: every keyword a clinic configures
+ * is a procedure or programme, so per-keyword detection would only be a worse
+ * spelling of "vertical is medical".
+ */
+const MEDICAL_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>(["aesthetic", "clinic", "dental"]);
+
+const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
+  en: /\b(go for|definitely try|don't skip|save room|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b/i,
+  ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方)/,
+  ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
+};
+
+function filterMedicalVoice(pool: PoolSet, locale: ReviewLocale, vertical: Vertical): PoolSet {
+  if (!MEDICAL_VERTICALS.has(vertical)) return pool;
+  const re = MEDICAL_UNFIT[locale];
+  const strip = (arr: string[]) => {
+    const kept = arr.filter((t) => !re.test(t));
+    return kept.length > 0 ? kept : arr; // an empty slot would break assembly
+  };
+  // Every slot is filtered, not just the keyword slots: closers and fillers
+  // carry consumption voice too ("今度は別の楽しみ方で{store}を試してみるつもり
+  // です" reads absurd for a clinic — caught 2026-08-03 in verification).
+  const out = {} as PoolSet;
+  (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
+    out[k] = strip(pool[k]);
+  });
+  return out;
 }
 
 // EN templates never place an indefinite article directly before {cat} ("a
@@ -612,19 +707,52 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
   // the engine putting a rank in the guest's mouth, they read as planted, and
   // they collide with the review-solicitation policy line on influencing
   // content. Placement only — the guest says WHERE and WHAT, not "the best".
+  // Pool size is a naturalness constraint, not padding: this sentence appears
+  // ONCE IN EVERY REVIEW, so with N templates the most-used one shows up
+  // ~100/N times per hundred reviews. At the original 6 templates the top
+  // entity line hit 20-23x per 100 (measured 2026-08-03) — the loudest repeat
+  // on a store's whole page. Structural variety matters more than count: these
+  // deliberately mix recommendation, discovery, habit and plain-statement
+  // shapes rather than reshuffling one sentence.
   en: [
-    "My go-to {cat} in {loc} now.",
-    "Glad to have this {cat} in {loc}.",
-    "If you're near {loc}, this is the {cat} to try.",
-    "Solid {cat} right in {loc}.",
-    "Good to have a {cat} like this around {loc}.",
-    "Handy spot if you're in {loc} and after a {cat}.",
+    "My {go-to|default|first-choice} {cat} in {loc} now.",
+    "Glad to have this {cat} {in|here in|right in} {loc}.",
+    "If you're {near|around|anywhere near} {loc}, this is the {cat} to try.",
+    "{Solid|Dependable|Quality} {cat} right in {loc}.",
+    "{Good|Great|Reassuring} to have a {cat} like this {around|near} {loc}.",
+    "Handy {spot|place|stop} if you're {in|around} {loc} and after a {cat}.",
+    "Didn't expect to find a {cat} {this good|of this standard|this solid} in {loc}.",
+    "{loc} {needed|was missing|has been waiting for} a {cat} like this.",
+    "A {proper|real|genuinely good} {cat}, right here in {loc}.",
+    "We're {lucky|fortunate|glad} to have this {cat} in {loc}.",
+    "If you {live|work|spend time} around {loc}, keep this {cat} {on your list|in mind|bookmarked}.",
+    "Nice surprise to {come across|find|stumble on} a {cat} like this in {loc}.",
+    "Whenever I'm {in|around|passing through} {loc}, this is my {cat} of choice.",
+    "Anyone around {loc} should give this {cat} a {look|try|chance}.",
+    "It's become our {regular|default|usual} {cat} whenever we're in {loc}.",
+    "A {cat} in {loc} that actually {delivers|comes through|holds up}.",
+    "Happy to finally have a {decent|good|proper} {cat} close by in {loc}.",
+    "You don't come across a {cat} like this in {loc} {every day|often|all that often}.",
+    "Ended up here {looking|hunting|searching} for a {cat} in {loc} and {got lucky|struck gold|found a keeper}.",
+    "Between the {cat} options {in|around} {loc}, this is the one I'd {pick again|go back to|stick with}.",
   ],
   ja: [
-    "{loc}で{cat}を探しているなら、ここをおすすめします。",
+    "{loc}で{cat}を探しているなら、ここを{おすすめします|推します|すすめたいです}。",
     "{loc}でこの{cat}に出会えてよかったです。",
-    "{loc}に来たらまた寄りたい{cat}です。",
+    "{loc}に来たらまた{寄りたい|立ち寄りたい|行きたい}{cat}です。",
     "{loc}にあるのがうれしい{cat}です。",
+    "{loc}でこの水準の{cat}は貴重だと思います。",
+    "{loc}{周辺|近く|エリア}で{cat}に行くなら、{まずここ|ここが第一候補|最初にここ}です。",
+    "{loc}に{こんな|これほどの|この水準の}{cat}があったとは{知りませんでした|気づいていませんでした|思いませんでした}。",
+    "{loc}の中でも通いたくなる{cat}です。",
+    "{loc}あたりで{cat}を探している人にはぜひ教えたいお店です。",
+    "この{cat}が{loc}にあるのはありがたいです。",
+    "{loc}方面に行くときは、この{cat}に寄るのが{楽しみ|恒例|お決まり}になりました。",
+    "{cat}としても、{loc}という立地としても文句なしです。",
+    "近所に欲しかったタイプの{cat}が{loc}にありました。",
+    "{loc}でこの{cat}を知ってから、他に行かなくなりました。",
+    "{友人|周り|同僚}にも{loc}の{cat}ならここと伝えています。",
+    "{loc}で{cat}選びに迷ったら、{ここでいい|ここを選べば安心|まずここでいい}と思います。",
   ],
   ar: [
     "من أفضل ما جربت من {cat} في {loc}.",
@@ -632,6 +760,15 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
     "إن كنت في {loc} وتبحث عن {cat} فهذا هو المكان.",
     "صار {cat} المفضل لدي في {loc}.",
     "وجود {cat} بهذا المستوى في {loc} شيء جميل.",
+    "لم أتوقع أن أجد {cat} بهذا المستوى في {loc}.",
+    "مكان يستحق الزيارة لكل من يبحث عن {cat} في {loc}.",
+    "أصبح وجهتي عندما أريد {cat} في {loc}.",
+    "خيار موثوق لمن يبحث عن {cat} في {loc}.",
+    "يسعدني وجود {cat} كهذا في {loc}.",
+    "لمن يسأل عن {cat} في {loc}، هذا هو المكان.",
+    "خيار ممتاز لمن يريد {cat} في {loc}.",
+    "سأعود إليه كلما احتجت {cat} في {loc}.",
+    "المكان الذي أنصح به عندما يُذكر {cat} في {loc}.",
   ],
 };
 
@@ -642,24 +779,33 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
  */
 const ENTITY_BOTH_B2B: Record<ReviewLocale, string[]> = {
   en: [
-    "Best {cat} we've worked with in {loc}.",
-    "If you need a {cat} in {loc}, start here.",
-    "The {cat} I'd recommend to anyone in {loc}.",
-    "Glad we found a {cat} like this in {loc}.",
-    "Reliable {cat} for anyone based in {loc}.",
-    "Hard to find a better {cat} in {loc}.",
+    "Best {cat} we've {worked with|dealt with|hired} in {loc}.",
+    "If you {need|are looking for|are hunting for} a {cat} in {loc}, {start here|this is the place to start|look here first}.",
+    "The {cat} I'd {recommend|point out|suggest} to {anyone|any owner|any business} in {loc}.",
+    "Glad we {found|came across|landed on} a {cat} like this in {loc}.",
+    "{Reliable|Dependable|Trustworthy} {cat} for anyone {based|operating|doing business} in {loc}.",
+    "Hard to find a {better|more reliable|more straightforward} {cat} in {loc}.",
+    "For a business in {loc}, having a {cat} you can {trust|rely on|count on} matters, and this is one.",
+    "We compared a few {cat} options in {loc} and landed here, {no regrets|glad we did|good call}.",
+    "A {cat} in {loc} that {does what it says it will|delivers what it promises|keeps its word}.",
+    "Other {companies|owners|businesses} in {loc} keep asking who our {cat} is.",
   ],
   ja: [
-    "{loc}で{cat}を探しているなら、ここをおすすめします。",
+    "{loc}で{cat}を探しているなら、ここを{おすすめします|推します|すすめたいです}。",
     "{loc}の{cat}の中では間違いなく良い選択でした。",
     "{loc}で{cat}を頼むならここだと思います。",
     "{loc}でこの{cat}に出会えてよかったです。",
+    "{loc}で複数の{cat}を比較して、ここに決めて正解でした。",
+    "{loc}で信頼できる{cat}が見つかって助かっています。",
+    "同じ{loc}の経営者にも、この{cat}を紹介しています。",
   ],
   ar: [
     "أفضل {cat} تعاملنا معه في {loc}.",
     "إن كنت تبحث عن {cat} في {loc} فابدأ من هنا.",
     "{cat} أنصح به لأي شركة في {loc}.",
     "سعداء أننا وجدنا {cat} بهذا المستوى في {loc}.",
+    "قارنا عدة خيارات {cat} في {loc} واخترنا هذا، ولم نندم.",
+    "{cat} في {loc} يفي بما يعد به.",
   ],
 };
 
@@ -668,14 +814,21 @@ const ENTITY_LOC_ONLY_B2B: Record<ReviewLocale, string[]> = {
     "Great to have them working in {loc}.",
     "Worth knowing about if you're based in {loc}.",
     "A real asset for businesses in {loc}.",
+    "If your company operates around {loc}, keep them in mind.",
+    "Being local to {loc} makes working with them easy.",
+    "Plenty of options in {loc}, but these are the ones we stayed with.",
   ],
   ja: [
     "{loc}で事業をしているなら知っておいて損はありません。",
     "{loc}で頼れる先が見つかったのは大きいです。",
+    "{loc}の会社なのでやり取りも早くて助かります。",
+    "{loc}で商売をしている知人にも紹介しました。",
   ],
   ar: [
     "من الجيد وجودهم في {loc}.",
     "يستحق المعرفة إن كان عملك في {loc}.",
+    "كونهم في {loc} يجعل التعامل معهم سهلاً.",
+    "خيارات كثيرة في {loc}، لكننا بقينا معهم.",
   ],
 };
 
@@ -683,33 +836,59 @@ const ENTITY_CAT_ONLY_B2B: Record<ReviewLocale, string[]> = {
   en: [
     "Exactly what you want from a {cat}.",
     "One of the better {cat} options out there.",
+    "A {cat} that communicates clearly and delivers on time.",
+    "The rare {cat} that makes things simpler, not more complicated.",
+    "As a {cat}, they hold themselves to a high standard.",
+    "You can tell this {cat} cares about long-term clients, not one-off jobs.",
   ],
   ja: [
     "{cat}としては文句なしです。",
     "良い{cat}に依頼できたと思います。",
+    "報告が分かりやすい{cat}です。",
+    "長く付き合える{cat}だと感じています。",
+    "仕事の丁寧さは{cat}として信頼できます。",
   ],
   ar: [
     "{cat} بالمستوى الذي تتوقعه تماماً.",
     "من أفضل خيارات {cat} المتاحة.",
+    "{cat} يتواصل بوضوح ويلتزم بالمواعيد.",
+    "من النادر أن تجد {cat} يجعل الأمور أبسط لا أعقد.",
   ],
 };
 
 const ENTITY_LOC_ONLY: Record<ReviewLocale, string[]> = {
   en: [
-    "Worth the trip out to {loc}.",
+    "Worth the {trip|drive|detour} out to {loc}.",
     "Great addition to {loc}.",
     "If you're around {loc}, stop by.",
     "Nice to have a place like this in {loc}.",
+    "One more reason to like {loc}.",
+    "Handy if you work around {loc}.",
+    "We were in {loc} anyway and I'm glad we {stopped|came in|made the stop}.",
+    "Being in {loc} makes it an easy stop for us.",
+    "Easy to get to if you're in {loc}.",
+    "{loc} locals, take note.",
   ],
   ja: [
     "{loc}という場所も便利です。",
     "{loc}に行くときはまた寄ります。",
     "{loc}にこういうお店があるのはうれしいです。",
+    "{loc}に用事があるときの定番になりそうです。",
+    "{loc}での楽しみがひとつ増えました。",
+    "{loc}を通るたびに寄りたくなります。",
+    "{loc}まで足を延ばす価値があります。",
+    "{loc}周辺ではありがたい存在です。",
+    "場所は{loc}で、分かりやすかったです。",
   ],
   ar: [
     "يستحق الزيارة إن كنت قرب {loc}.",
     "موقعه في {loc} مناسب جداً.",
     "جميل أن يوجد مكان كهذا في {loc}.",
+    "سبب إضافي لزيارة {loc}.",
+    "كنت في {loc} على أي حال وسعدت بالتوقف هنا.",
+    "لمن يمر قرب {loc}، يستحق التوقف.",
+    "وجوده في {loc} نقطة قوة.",
+    "زيارته سهلة لمن يعمل قرب {loc}.",
   ],
 };
 
@@ -717,14 +896,30 @@ const ENTITY_CAT_ONLY: Record<ReviewLocale, string[]> = {
   en: [
     "Exactly what a good {cat} should be.",
     "One of the better {cat} options around.",
+    "You can tell this {cat} is run with care.",
+    "A {cat} that takes the details seriously.",
+    "As far as a {cat} goes, this one gets it right.",
+    "The kind of {cat} you hope to stumble on.",
+    "A {cat} doing the simple things properly.",
+    "If every {cat} ran like this, I'd complain a lot less.",
   ],
   ja: [
     "{cat}としては文句なしです。",
     "いい{cat}を見つけました。",
+    "{cat}に求めるものがきちんと揃っています。",
+    "こういう{cat}が近くに欲しかったです。",
+    "{cat}を探している人には自信を持っておすすめできます。",
+    "丁寧にやっている{cat}だと思います。",
+    "また利用したい{cat}です。",
+    "{cat}としての基本がしっかりしています。",
   ],
   ar: [
     "{cat} ممتاز بكل المقاييس.",
     "من أفضل خيارات {cat} التي جربتها.",
+    "{cat} يهتم بالتفاصيل.",
+    "من النوع الذي تتمنى أن تجده من {cat}.",
+    "كل شيء فيه يدل على {cat} يُدار بعناية.",
+    "سأكرر الزيارة بالتأكيد، فهو {cat} يستحق.",
   ],
 };
 
@@ -788,7 +983,7 @@ function weaveEntity(
     const measured = pool.filter((t) => !SUPERLATIVE_RE.test(t));
     if (measured.length > 0) pool = measured;
   }
-  const sentence = fillEntity(pick(pool, rng), loc ?? "", cat ?? "");
+  const sentence = fillEntity(expandChoices(pick(pool, rng), rng), loc ?? "", cat ?? "");
   return { text: appendSpread(text, sentence, cfg.glue, rng, locale, store), protect };
 }
 
@@ -1189,7 +1384,12 @@ export function buildLocalizedReview(
   rating = 5,
   entity?: ReviewEntity,
 ): string {
-  const pool = resolvePoolSet(locale, vertical);
+  // Choice groups resolve once per review with their own fork, so the same
+  // template lands with different surface wording from review to review.
+  const pool = expandPoolChoices(
+    filterMedicalVoice(resolvePoolSet(locale, vertical), locale, vertical),
+    forkRng(seed, 0xc401ce),
+  );
   const name =
     store.trim() ||
     (locale === "ja" ? "こちらのお店" : locale === "ar" ? "هذا المكان" : "this establishment");
@@ -1295,7 +1495,14 @@ export function buildLocalizedReview(
   pushGroup(nounLeft, false);
   pushGroup(attrLeft, true);
 
-  const attrOrder = shuffle([...ATTRIBUTE_TAILS[locale]], forkRng(seed, 0x7a22));
+  // Attribute tails bypass the PoolSet, so expandPoolChoices never sees them —
+  // resolve their choice groups here or the raw "{a|b}" braces reach the guest
+  // (caught 2026-08-03: the diversity gate printed an unexpanded group).
+  const attrChoiceRng = forkRng(seed, 0x7a2c);
+  const attrOrder = shuffle(
+    ATTRIBUTE_TAILS[locale].map((t) => expandChoices(t, attrChoiceRng)),
+    forkRng(seed, 0x7a22),
+  );
   const budget = sentenceBudget(bucket.kind);
   // The beat budget must NEVER drop a keyword — every selected phrase is a
   // verbatim guarantee (the first cut of this guard broke it: 2 of 4 keywords
