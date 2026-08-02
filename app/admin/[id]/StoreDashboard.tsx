@@ -505,7 +505,7 @@ function ForcedKeywordManager({
                 e.stopPropagation()
                 remove(kw)
               }}
-              aria-label={`Remove forced keyword ${kw}`}
+              aria-label={`Remove core phrase ${kw}`}
               className="text-slate-400 hover:text-amber-300 transition-colors"
             >
               <X size={10} strokeWidth={2.5} />
@@ -1599,7 +1599,7 @@ export default function StoreDashboard({
               <ol className="space-y-3 border-t border-gray-100 px-5 py-4">
                 {[
                   ['Show your QR code', 'Print it for your counter or table, or send your review link by WhatsApp (both are below).'],
-                  ['Guests leave a review in seconds', 'They scan, tap a few keywords, and post a 5-star Google review. Anyone unhappy is quietly routed to private feedback instead.'],
+                  ['Guests leave a review in seconds', 'They scan, tap what they liked, and post the draft on Google in their own words. Every guest gets the same path, whatever they rated you.'],
                   ['Reply to Google reviews with AI', 'Got a review on Google? Paste it into “Review replies” below and post the reply we write for you.'],
                 ].map(([title, body], i) => (
                   <li key={i} className="flex gap-3">
@@ -1710,7 +1710,14 @@ export default function StoreDashboard({
               <ReviewUrlEditor storeId={store.id} initial={store.google_review_url} />
             </SectionCard>
 
-            <SectionCard label="Always-include keywords (SEO)" icon={<Lock size={14} />}>
+            <SectionCard label="Core phrases (SEO)" icon={<Star size={14} />}>
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                The phrases you most want to be found for. Each guest is offered a couple of
+                them as pills that are already switched on, mixed in with the ones below — and
+                a guest can switch any of them off. Almost nobody does, so they reach most
+                reviews, but nothing is ever added to a review the guest did not agree to.
+                They rotate between guests, so your reviews do not all read the same.
+              </p>
               <ForcedKeywordManager storeId={store.id} initial={store.forced_keywords ?? []} />
             </SectionCard>
 
@@ -1718,8 +1725,8 @@ export default function StoreDashboard({
               <p className="text-xs text-slate-600 mb-4 leading-relaxed">
                 These appear as tappable buttons on your review page. Guests tap the ones that
                 match their visit, and we build a natural review from them. Add the dishes, services
-                and highlights guests are likely to mention. (Your always-include keywords above are
-                added on top automatically.)
+                and highlights guests are likely to mention. (Your core phrases above are mixed into this
+                same list, pre-selected.)
               </p>
               <KeywordManager
                 storeId={store.id}

@@ -13,16 +13,19 @@ import type { ContactChannel, SupportedLocale } from '@/types/database'
 import { getUiStrings } from '@/lib/ui-strings'
 import { useFlowPersistence } from '@/lib/use-flow-persistence'
 
-function mergeGuestAndForced(forced: string[], guest: string[]): string[] {
+/**
+ * Trim + de-duplicate the guest's selection, preserving order.
+ *
+ * This replaced mergeGuestAndForced() on 2026-08-03. That helper prepended the
+ * store's forced keywords to whatever the guest chose, which meant a phrase the
+ * guest had never been shown ended up in a review published under their name.
+ * Core phrases are now offered as pre-ticked, removable pills instead, so by the
+ * time selection reaches here it is entirely the guest's own.
+ */
+function dedupeKeywords(selected: string[]): string[] {
   const out: string[] = []
   const seen = new Set<string>()
-  for (const k of forced) {
-    const t = k.trim()
-    if (!t || seen.has(t)) continue
-    seen.add(t)
-    out.push(t)
-  }
-  for (const k of guest) {
+  for (const k of selected) {
     const t = k.trim()
     if (!t || seen.has(t)) continue
     seen.add(t)
@@ -55,7 +58,7 @@ type Props = {
   storeName: string       // pre-resolved by Server Component (locale-aware)
   greetingText: string    // pre-resolved
   keywords: string[]
-  /** Admin-only phrases always embedded in generated text (not shown as pills). */
+  /** The store's core phrases. Offered as pre-ticked, removable pills — never injected. */
   forcedKeywords: string[]
   googleReviewUrl: string
   brandColor: string      // hex, e.g. "#f59e0b" — drives card accent + progress bar
@@ -157,14 +160,28 @@ export default function ReviewFlow({
     )
   }
 
-  const forcedCount = new Set(
-    forcedKeywords.map((k) => k.trim()).filter(Boolean),
-  ).size
+  /**
+   * How many of the store's core phrases are offered to one guest. See the
+   * comment above `pillKeywords`: all of them in every review is a keyword dump,
+   * so they rotate.
+   */
+  const FORCED_OFFERED_MAX = 2
+
+  /**
+   * Which core phrases this guest is offered. Chosen on the client when the
+   * guest reaches the keyword step, NOT during render — a random pick in render
+   * would differ between the server and hydration.
+   */
+  const [forcedOffered, setForcedOffered] = useState<string[]>([])
 
   // ratingValue is passed explicitly because handleRating calls this right
   // after setRating — the `rating` state is still stale in that same tick.
   async function proceedToGenerate(guestSelected: string[], ratingValue: number = rating) {
-    const merged = mergeGuestAndForced(forcedKeywords, guestSelected)
+    // Exactly what the guest left switched on — nothing is appended here. The
+    // store's core phrases reach this point only because the guest kept them
+    // ticked in StepKeywords, which is what makes them the guest's own content
+    // rather than content we requested be included.
+    const merged = dedupeKeywords(guestSelected)
     setSelectedKeywords(merged)
     setStep('generating')
     await new Promise((r) => setTimeout(r, GENERATE_DELAY_MS))
@@ -174,7 +191,6 @@ export default function ReviewFlow({
         outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
         locale: reviewLocale,
         category: businessCategory,
-        forcedCount,
         rating: ratingValue,
         entity,
       }),
@@ -193,7 +209,6 @@ export default function ReviewFlow({
       outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
       locale: loc,
       category: businessCategory,
-      forcedCount,
       rating,
       entity,
     })
@@ -218,6 +233,15 @@ export default function ReviewFlow({
       void proceedToGenerate([], value)
       return
     }
+    // Rotate here (a click handler) rather than in render: picking at random
+    // during render would not match what the server sent, and this is the first
+    // client-only moment where the guest is about to see the pills.
+    const pool = [...cleanForced]
+    const picked: string[] = []
+    while (pool.length > 0 && picked.length < FORCED_OFFERED_MAX) {
+      picked.push(...pool.splice(Math.floor(Math.random() * pool.length), 1))
+    }
+    setForcedOffered(picked)
     setStep('keywords')
   }
 
@@ -225,13 +249,27 @@ export default function ReviewFlow({
     await proceedToGenerate(guestSelected)
   }
 
-  const forcedSet = new Set(
-    forcedKeywords.map((k) => k.trim()).filter(Boolean),
-  )
-  const pillKeywords = keywords.filter((k) => !forcedSet.has(k.trim()))
+  const cleanForced = [...new Set(forcedKeywords.map((k) => k.trim()).filter(Boolean))]
+  const forcedSet = new Set(cleanForced)
+  const guestPills = keywords.map((k) => k.trim()).filter((k) => k && !forcedSet.has(k))
 
-  const allowGuestKeywordSkip =
-    forcedKeywords.length > 0 && pillKeywords.length === 0
+  // The store's own core phrases are OFFERED, never injected: they render as
+  // ordinary pills, switched on by default, and the guest can switch any of them
+  // off — so what the guest sees selected is exactly what the draft contains.
+  //
+  // Google prohibits "request[ing] that specific content be included" and
+  // "attempting to influence ... the contents of the review"
+  // (support.google.com/business/answer/7400114, tightened 2026-04-17). Weaving
+  // in a phrase the guest was never shown is that; offering it pre-ticked and
+  // removable is not. Almost nobody switches them off, so the discoverability
+  // value is kept — this is not a trade of reach against safety.
+  //
+  // Only a rotating subset is offered per guest (FORCED_OFFERED_MAX): a store
+  // with four core phrases would otherwise put all four into every review,
+  // which reads as a keyword dump and is what a review-spam filter looks for.
+  // Rotating spreads the whole set across the corpus instead.
+  const pillKeywords = [...forcedOffered, ...guestPills]
+  const allowGuestKeywordSkip = pillKeywords.length === 0
 
   function reset() {
     setStep('rating')
@@ -310,6 +348,7 @@ export default function ReviewFlow({
               t={t}
               keywords={pillKeywords}
               allowGuestSkip={allowGuestKeywordSkip}
+              initialSelected={forcedOffered}
               onConfirm={handleKeywords}
             />
           )}
@@ -338,8 +377,7 @@ export default function ReviewFlow({
                   outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
                   locale: reviewLocale,
                   category: businessCategory,
-                  forcedCount,
-                  rating,
+                            rating,
                   entity,
                 })}
             />

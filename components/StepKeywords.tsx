@@ -7,8 +7,18 @@ type Props = {
   t: UiStrings;
   keywords: readonly string[];
   onConfirm: (selected: string[]) => void;
-  /** No guest pills — only admin forced terms; button generates without taps. */
+  /** No pills configured at all; the button generates without taps. */
   allowGuestSkip?: boolean;
+  /**
+   * Pills that start switched ON — the store's own core phrases.
+   *
+   * They render exactly like every other pill and can be switched off. Before
+   * 2026-08-03 these phrases were never shown to the guest and were appended to
+   * the draft behind them, which is what Google's policy calls "request[ing]
+   * that specific content be included". Offering them pre-ticked keeps the
+   * discoverability value while leaving the choice with the guest.
+   */
+  initialSelected?: readonly string[];
 };
 
 export default function StepKeywords({
@@ -16,8 +26,11 @@ export default function StepKeywords({
   keywords,
   onConfirm,
   allowGuestSkip = false,
+  initialSelected = [],
 }: Props) {
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(() =>
+    keywords.filter((k) => initialSelected.includes(k)),
+  );
 
   function toggle(kw: string) {
     setSelected((prev) =>
@@ -26,9 +39,9 @@ export default function StepKeywords({
   }
 
   // Never hard-block the flow: a guest who doesn't want to tag anything must
-  // still be able to generate (the engine handles zero keywords, and the
-  // store's always-include keywords arrive from the owner side regardless).
-  // Selecting pills stays encouraged via the counter copy, not a locked button.
+  // still be able to generate — including switching every pre-ticked pill off,
+  // which produces a review with none of the store's phrases in it. That has to
+  // stay possible for the pre-ticking to be an offer rather than a requirement.
   const canConfirm = true;
 
   return (
