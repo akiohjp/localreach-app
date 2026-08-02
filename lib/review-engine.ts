@@ -1372,26 +1372,45 @@ export function buildLocalizedReview(
   text = normalizeDashes(text);
   text = dedupeTerminators(text);
   if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);
-  // Paragraphing decided ONCE, from the finished text: one block, or two when
-  // the review is genuinely long. See layoutParagraphs.
+  // Paragraphing decided ONCE, from the finished text. See layoutParagraphs.
   return layoutParagraphs(text, locale, forkRng(seed, 0x9a17), name);
 }
 
 /**
- * Real guests write one block, and split into two only when the review runs
- * long. The old engine flipped a coin between every beat, which turned a
- * 100-word review into six one-sentence paragraphs (owner eye-check
- * 2026-07-31) — the most visible tell in the whole output.
+ * Paragraph breaks, decided once from the finished text.
+ *
+ * Two failure modes sit either side of this function. The old engine flipped a
+ * coin between every beat and turned a 100-word review into six one-sentence
+ * paragraphs (owner eye-check 2026-07-31) — the loudest bot tell in the output.
+ * The fix for that overshot: a break needed 55+ words AND 4+ sentences AND a 70%
+ * roll, so a typical 45-90 word review shipped as one dense wall and was hard to
+ * read in the edit box (owner eye-check 2026-08-02, live Sakura gift review).
+ *
+ * A guest writing 6 sentences on a phone does press return once. So the gate is
+ * now the length at which a block genuinely gets tiring rather than the length
+ * at which it is unarguably long, breaks are the common case rather than a
+ * minority roll, and a genuinely long review earns a second break. Single-block
+ * output survives as real variation, not as the default.
  */
+const PARA_MIN_SIZE = { en: 38, ja: 85 } as const; // one break above this
+const PARA_TWO_SIZE = { en: 95, ja: 210 } as const; // two breaks above this
 function layoutParagraphs(text: string, locale: ReviewLocale, rng: () => number, store?: string): string {
   const flat = oneLineCollapse(text.replace(/\n+/g, " "));
   if (!flat) return "";
   const size = locale === "ja" ? cjkCount(flat) : wordCount(flat);
   const parts = splitSentences(flat, locale, store);
-  const longEnough = locale === "ja" ? size >= 130 : size >= 55;
-  if (!longEnough || parts.length < 4 || rng() < 0.3) return flat;
-  // Break near the middle, never orphaning the opening or closing sentence.
-  const at = Math.max(2, Math.min(parts.length - 2, Math.round(parts.length / 2)));
+  const min = locale === "ja" ? PARA_MIN_SIZE.ja : PARA_MIN_SIZE.en;
+  if (size < min || parts.length < 3 || rng() < 0.12) return flat;
   const joiner = locale === "ja" ? "" : " ";
-  return `${parts.slice(0, at).join(joiner).trim()}${PARAGRAPH_GAP}${parts.slice(at).join(joiner).trim()}`;
+  const chunk = (from: number, to: number) => parts.slice(from, to).join(joiner).trim();
+  // Long enough for three paragraphs, with every one of them ≥2 sentences.
+  const two = locale === "ja" ? PARA_TWO_SIZE.ja : PARA_TWO_SIZE.en;
+  if (size >= two && parts.length >= 6 && rng() < 0.6) {
+    const a = Math.round(parts.length / 3);
+    const b = Math.round((parts.length * 2) / 3);
+    return [chunk(0, a), chunk(a, b), chunk(b, parts.length)].join(PARAGRAPH_GAP);
+  }
+  // Break near the middle, never orphaning the opening or closing sentence.
+  const at = Math.max(2, Math.min(parts.length - 1, Math.round(parts.length / 2)));
+  return `${chunk(0, at)}${PARAGRAPH_GAP}${chunk(at, parts.length)}`;
 }
