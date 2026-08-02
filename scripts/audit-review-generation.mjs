@@ -18,14 +18,24 @@ async function main() {
   const set = new Set();
   let dashLeak = 0, kwMiss = 0, nameOver = 0;
   for (let i = 0; i < N; i++) {
-    const t = generateReview(store, kws, opts());
+    // Sample the way production produces reviews: how many pills the guest taps
+    // is the single biggest driver of length. Holding the keyword count fixed
+    // (as this loop did until 2026-08-02) measured template/bucket variety with
+    // the CONTENT nailed down, which is not the distribution a store's Google
+    // page ends up with — and it made the spread guard read a narrower slice
+    // than reality.
+    const taps = 1 + (i % guest.length);
+    const sampled = [...forced, ...guest.slice(0, taps)];
+    const t = generateReview(store, sampled, opts());
     const words = t.split(/\s+/).filter(Boolean).length;
     lens.push(words);
     const first3 = t.split(/\s+/).slice(0, 3).join(" ");
     openers[first3] = (openers[first3] || 0) + 1;
     set.add(t);
     if (/[—–]/.test(t)) dashLeak++;
-    for (const k of forced) if (!t.toLowerCase().includes(k.toLowerCase())) { kwMiss++; break; }
+    // At least one core phrase must carry every review (the set rotates —
+    // see FORCED_PER_REVIEW), so this checks presence of ANY, not ALL.
+    if (!forced.some((k) => t.toLowerCase().includes(k.toLowerCase()))) kwMiss++;
     if (t.split(store).length - 1 > 2) nameOver++;
   }
   lens.sort((a, b) => a - b);
@@ -100,14 +110,17 @@ async function main() {
 
   // ---- selection completeness (real-store bug: guest's picks vanished) ----
   // A guest who taps several pills must see ALL of them in the draft, not a
-  // random subset. Probe a heavy 7-keyword selection.
+  // random subset. Probe a heavy 5-pick selection.
+  // Scoped to the GUEST picks: the store's own core phrases rotate by design
+  // (FORCED_PER_REVIEW), but nothing the guest chose may ever go missing —
+  // that is the promise the guest can actually check.
   const selForced = ["fresh doughnuts", "best doughnuts in Dubai"];
   const selGuest = ["Boston Cream", "gift box", "Karak and doughnuts", "matcha latte", "cinnamon roll"];
   const selKws = [...selForced, ...selGuest];
   let selDrop = 0;
   for (let i = 0; i < 150; i++) {
     const t = generateReview(store, selKws, { nonce: createReviewNonce(), outletKey: "sel|cafe|#f97316", locale: "en", category: "cafe", forcedCount: selForced.length });
-    if (!selKws.every((k) => t.includes(k))) selDrop++;
+    if (!selGuest.every((k) => t.includes(k))) selDrop++;
   }
 
   // ---- entity layer (AI visibility, 2026-07-29) ----
@@ -296,9 +309,22 @@ async function main() {
   assert(entLeak === 0, `entity: no leakage into stores without entity fields (got ${entLeak})`);
   assert(entSet.size === N, `entity: reviews still all unique (${entSet.size}/${N})`);
   assert(nameMissing === 0, `SEO: store name present in every review (missing ${nameMissing})`);
-  assert(forced.every((k) => kwFreq[k] === N), `SEO: forced GEO keywords woven in 100% of reviews`);
+  // The forced/core set ROTATES (FORCED_PER_REVIEW, 2026-08-02): weaving all of
+  // them into every review turned the text into a keyword dump once a store
+  // carried three or four. The SEO contract is therefore per-corpus, not
+  // per-review — and it is the stronger one: every review still carries a
+  // buyer-language phrase, and the corpus spreads the whole set instead of
+  // repeating the same three verbatim in every single review (which is what a
+  // review-spam filter looks for).
+  const anyForced = Math.max(...forced.map((k) => kwFreq[k]));
+  assert(
+    forced.every((k) => kwFreq[k] > N * 0.15),
+    `SEO: every core phrase surfaces across the corpus (${forced.map((k) => `${k}=${kwFreq[k]}/${N}`).join(", ")})`,
+  );
+  assert(anyForced > 0 && forced.reduce((s, k) => s + kwFreq[k], 0) >= N,
+    `SEO: at least one core phrase per review on average (${forced.reduce((s, k) => s + kwFreq[k], 0)}/${N})`);
   assert(guest.every((k) => kwFreq[k] === N), `selection: every guest-selected keyword appears in EVERY review (no vanishing)`);
-  assert(selDrop === 0, `selection: all 7 of a heavy selection present every time (got ${selDrop} with drops)`);
+  assert(selDrop === 0, `selection: every GUEST pick of a heavy selection present every time (got ${selDrop} with drops)`);
   assert(spread >= 30, `length spread >= 30 (got ${spread})`);
   assert(kwMiss === 0, "forced keywords always present");
   assert(nameOver === 0, "store name never mentioned more than twice");

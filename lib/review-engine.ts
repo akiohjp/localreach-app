@@ -1075,25 +1075,87 @@ const WOVEN_KEYWORD_CAP = 8;
 const LIST_CAP = 2;
 
 /**
- * Pick the phrases to weave: ALWAYS keep the forced/core ones, and weave EVERY
- * guest pick too — the guest deliberately tapped those, so dropping any of them
- * reads as "my keyword disappeared" (real-store feedback 2026-07-16). Only when a
- * selection is extreme (forced + guest exceeds WOVEN_KEYWORD_CAP) do we trim, and
- * even then forced win and a seed-shuffled slice of guest picks fills the rest.
- * Uniqueness across a store's reviews comes from the nonce, template rotation and
- * length buckets — not from hiding the guest's own choices.
+ * How many of the store's forced/core phrases may appear in ONE review.
+ *
+ * Forced phrases used to ALL be woven into EVERY review. With a store carrying
+ * three or four of them plus the guest's own taps, a single review had to carry
+ * six or seven verbatim phrases, and the text collapsed into a keyword dump
+ * (owner eye-check 2026-08-02, live Kotobuki demo):
+ *
+ *   "Japanese aesthetic medicine in Dubai plus Diabetes & Metabolism Programme
+ *    plus IV Drip and the aesthetic treatments in Dubai lived up to the hype."
+ *
+ * A real-config bench over every live store measured it: 52% of reviews crammed
+ * 3+ phrases into one sentence with all forced woven, 15% with one, 0.1% with
+ * none. So the forced set now ROTATES — each review carries one (two only when
+ * the guest tapped almost nothing, so a sparse review still has substance).
+ *
+ * This is also the better SEO/AIO outcome, not a trade against it. Every review
+ * still carries a buyer-language phrase, but the corpus ends up with all of the
+ * store's phrases spread across it instead of the same three repeated verbatim
+ * in every single review — which is what a review-spam filter looks for and
+ * what makes an LLM treat the text as boilerplate rather than testimony.
+ */
+const FORCED_PER_REVIEW = 1;
+
+/**
+ * An English buyer-language phrase ("aesthetic treatments in Dubai", "udon in
+ * Dubai") reads fine in an English review and reads like an advert inside a
+ * Japanese or Arabic one:
+ *
+ *   "IV Dripとaesthetic treatments in Dubaiは誰かに教えたくなる良さでした。"
+ *
+ * (found 2026-08-02 eye-checking the Kotobuki demo). Product and treatment
+ * names are different — a Japanese patient really does write "IV Drip" — so the
+ * test is for an English PHRASE, i.e. Latin text glued together by an English
+ * function word, not for Latin script itself.
+ *
+ * Dropping these in ja/ar costs no discoverability: the entity layer already
+ * writes the category and area in the review's own language ("Dubaiの
+ * Trade Centreで美容・再生医療クリニック"), which is the phrase a Japanese
+ * searcher actually types.
+ */
+const EN_PHRASE_GLUE = /\b(in|at|for|of|near|the|and|with|from|to)\b/i;
+function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
+  if (locale === "en") return false;
+  if (!/^[\x20-\x7E]+$/.test(kw)) return false; // not pure Latin/ASCII → leave alone
+  if (!/\s/.test(kw)) return false; // single token = a name, keep it
+  return EN_PHRASE_GLUE.test(kw);
+}
+
+/**
+ * Remove English-phrase forced keywords when the review is not in English.
+ * Guest picks are never touched — the guest tapped those and must see them.
+ */
+function dropForeignForced(
+  keywords: string[],
+  forcedCount: number,
+  locale: ReviewLocale,
+): { keywords: string[]; forcedCount: number } {
+  if (locale === "en" || forcedCount <= 0) return { keywords, forcedCount };
+  const fc = Math.max(0, Math.min(forcedCount, keywords.length));
+  const kept = keywords.slice(0, fc).filter((k) => !isForeignPhrase(k, locale));
+  return { keywords: [...kept, ...keywords.slice(fc)], forcedCount: kept.length };
+}
+
+/**
+ * Pick the phrases to weave. EVERY guest pick is woven — the guest deliberately
+ * tapped those, so dropping any reads as "my keyword disappeared" (real-store
+ * feedback 2026-07-16). The forced/core set rotates instead (FORCED_PER_REVIEW).
+ * Only when the total is extreme (> WOVEN_KEYWORD_CAP) do we trim guest picks.
  */
 function selectWovenKeywords(keywords: string[], forcedCount: number, seed: number): string[] {
   const fc = Math.max(0, Math.min(forcedCount, keywords.length));
-  const forced = keywords.slice(0, fc);
+  const allForced = keywords.slice(0, fc);
   const guest = keywords.slice(fc);
+  // A review the guest barely filled in can carry a second core phrase without
+  // reading as a dump; a busy one cannot.
+  const take = Math.min(allForced.length, guest.length <= 1 ? FORCED_PER_REVIEW + 1 : FORCED_PER_REVIEW);
+  // Rotate by seed so the corpus covers every forced phrase over time, and the
+  // same store never opens with the identical core phrase twice in a row.
+  const forced = allForced.length <= take ? allForced : shuffle(allForced, forkRng(seed, 0xc0ffe1)).slice(0, take);
   const room = Math.max(0, WOVEN_KEYWORD_CAP - forced.length);
-  if (room === 0 || guest.length === 0) {
-    // Forced alone meets/exceeds the cap; rotate which forced ones show if it overflows.
-    return forced.length <= WOVEN_KEYWORD_CAP
-      ? forced
-      : shuffle(forced, forkRng(seed, 0xc0ffe1)).slice(0, WOVEN_KEYWORD_CAP);
-  }
+  if (room === 0 || guest.length === 0) return forced;
   // Weave ALL guest picks; only a selection bigger than `room` gets trimmed.
   const guestWoven =
     guest.length <= room ? guest : shuffle(guest, forkRng(seed, 0xc0ffef)).slice(0, room);
@@ -1125,7 +1187,8 @@ export function buildLocalizedReview(
     return t0;
   }
 
-  const keywords = selectWovenKeywords(allKeywords, forcedCount, seed);
+  const { keywords: kwPool, forcedCount: fcUsable } = dropForeignForced(allKeywords, forcedCount, locale);
+  const keywords = selectWovenKeywords(kwPool, fcUsable, seed);
   // Length bucket is chosen AFTER keyword selection: the woven count decides
   // how short a review can honestly be while keeping every phrase verbatim.
   const bucket = pickLenBucket(locale, seed, rating, keywords.length);
@@ -1186,13 +1249,20 @@ export function buildLocalizedReview(
   // Pairing only ever joins same-kind phrases so a pair never mixes the two.
   const nounLeft = leftovers.filter((k) => !isAttributeShaped(k, locale));
   const attrLeft = leftovers.filter((k) => isAttributeShaped(k, locale));
-  const slots: { text: string; attr: boolean }[] = [];
+  // `n` = how many verbatim phrases this slot already carries, so the later
+  // budget merge cannot stack a pair onto a pair. Without it, pushGroup paired
+  // 4 leftovers into 2 slots and the merge then joined those 2 slots into ONE
+  // sentence carrying all four: "Definitely try the aesthetic treatments in
+  // Dubai and Weight Management Programme and Medical Wellness Check and
+  // Anti-Aging Treatment." (found 2026-08-02 by the live-config bench).
+  const slots: { text: string; attr: boolean; n: number }[] = [];
   const pushGroup = (group: string[], attr: boolean) => {
     if (group.length >= 4 && !attr) {
       for (let i = 0; i < group.length; i += 2) {
         const pair = group.slice(i, i + 2);
         slots.push({
           attr,
+          n: pair.length,
           text:
             pair.length === 2
               ? cfg.joinList(pair, forkRng(seed, 0x7c00 + i))
@@ -1202,7 +1272,7 @@ export function buildLocalizedReview(
       return;
     }
     for (const kw of group) {
-      slots.push({ attr, text: attr ? kw : locale === "en" ? withArt(kw) : kw });
+      slots.push({ attr, n: 1, text: attr ? kw : locale === "en" ? withArt(kw) : kw });
     }
   };
   pushGroup(nounLeft, false);
@@ -1216,16 +1286,38 @@ export function buildLocalizedReview(
   // budget changes the GROUPING (more phrases per tail), never the coverage.
   const roomForTails = Math.max(1, budget - countSentences(text, locale, name) - 1);
   if (slots.length > roomForTails) {
-    const perTail = Math.ceil(slots.length / roomForTails);
-    const merged: { text: string; attr: boolean }[] = [];
+    // HARD ceiling of 2 verbatim phrases per tail sentence. Before 2026-08-02
+    // this divided the leftovers by the room available, so a tight budget
+    // produced tails of three and four phrases ("A plus B plus C and D") — the
+    // keyword-dump the owner flagged. Naturalness outranks the sentence budget:
+    // when the two conflict the review simply runs a sentence longer, which a
+    // reader does not notice, rather than stacking a list a reader notices
+    // immediately. Merging is by PHRASE COUNT, not slot count, so a pair is
+    // never merged onto another pair.
+    const merged: { text: string; attr: boolean; n: number }[] = [];
     for (const attr of [false, true]) {
       const group = slots.filter((s) => s.attr === attr);
-      for (let i = 0; i < group.length; i += perTail) {
-        const chunk = group.slice(i, i + perTail).map((s) => s.text);
-        merged.push({
-          attr,
-          text: chunk.length === 1 ? chunk[0]! : cfg.joinList(chunk, forkRng(seed, 0x7d00 + i)),
-        });
+      let i = 0;
+      while (i < group.length) {
+        const head = group[i]!;
+        const next = group[i + 1];
+        // Attribute phrases are never merged. Their tails already read as an
+        // aside ("Another plus: {kw}."), so joining two produced "Another plus:
+        // the perfect for gifts plus the no artificial colors" — a doubled
+        // "plus" AND an article on a phrase that must not take one (withArt
+        // runs inside joinList). Found 2026-08-02 on the live Let It Dough
+        // config, which is the store that actually carries attribute keywords.
+        if (!attr && head.n === 1 && next && next.n === 1) {
+          merged.push({
+            attr,
+            n: 2,
+            text: cfg.joinList([head.text, next.text], forkRng(seed, 0x7d00 + i)),
+          });
+          i += 2;
+        } else {
+          merged.push(head);
+          i += 1;
+        }
       }
     }
     slots.length = 0;
