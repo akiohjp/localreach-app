@@ -1107,8 +1107,21 @@ const FORCED_PER_REVIEW = 1;
  *
  * (found 2026-08-02 eye-checking the Kotobuki demo). Product and treatment
  * names are different — a Japanese patient really does write "IV Drip" — so the
- * test is for an English PHRASE, i.e. Latin text glued together by an English
- * function word, not for Latin script itself.
+ * test is for an English PHRASE, not for Latin script itself.
+ *
+ * The first cut of this test looked only for an English function word gluing the
+ * phrase together. That let every glue-less phrase straight through, which is
+ * most of them — "premium doughnuts", "artisan pizza", "regenerative medicine",
+ * and (found 2026-08-02 while configuring Sakura's gift line) "Japanese tea gift
+ * boxes", which lands as「Japanese tea gift boxesにやられました。」— the same
+ * advert-shaped sentence the test was written to stop.
+ *
+ * So the real distinction is name vs. phrase, and English writes it in the
+ * capitalisation: a name is capitalised throughout ("IV Drip", "Matcha Suruga
+ * RG", "Diabetes & Metabolism Programme") while a descriptive phrase carries
+ * lowercase words ("premium doughnuts", "72-hour dough"). A lowercase word in a
+ * multi-word Latin phrase therefore means prose, and prose in the wrong language
+ * reads as an advert.
  *
  * Dropping these in ja/ar costs no discoverability: the entity layer already
  * writes the category and area in the review's own language ("Dubaiの
@@ -1116,11 +1129,15 @@ const FORCED_PER_REVIEW = 1;
  * searcher actually types.
  */
 const EN_PHRASE_GLUE = /\b(in|at|for|of|near|the|and|with|from|to)\b/i;
+/** Capitalised throughout (digits and `&` count) = a name, not English prose. */
+function looksLikeProperName(kw: string): boolean {
+  return kw.split(/[\s&]+/).filter(Boolean).every((w) => !/^[a-z]/.test(w));
+}
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
   if (locale === "en") return false;
   if (!/^[\x20-\x7E]+$/.test(kw)) return false; // not pure Latin/ASCII → leave alone
   if (!/\s/.test(kw)) return false; // single token = a name, keep it
-  return EN_PHRASE_GLUE.test(kw);
+  return EN_PHRASE_GLUE.test(kw) || !looksLikeProperName(kw);
 }
 
 /**

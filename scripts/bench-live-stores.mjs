@@ -67,6 +67,12 @@ const STORES = [
     entity: { area: "三鷹", city: "東京", categoryLabel: { en: "golf driving range", ja: "ゴルフ練習場" } },
   },
   {
+    name: "Ocha Cafe Sakura", locale: ["en", "ja", "ar"], category: "japanese tea house",
+    keywords: ["Matcha latte","Hojicha latte","Ceremonial matcha","Matcha Suruga RG","Fukamushi sencha","Genmaicha","Hojicha","Japanese tea gift set","Gift-wrapped tea set","Matcha bowl and whisk set","Assorted sweets box","Gift cheesecake","Tea and sweets gift box","Matcha roll cake","Hojicha roll cake","Souffle cheesecake","Matcha cheesecake","Yuzu cheesecake","Dates cheesecake","Strawberry daifuku","Fruit daifuku","Kinako mochi"],
+    forced: ["matcha gift sets in Abu Dhabi","Japanese tea gift boxes","ceremonial matcha in Abu Dhabi","matcha whisk and bowl sets","Japanese sweets gift boxes","gift-wrapped tea sets"],
+    entity: { area: "Al Maryah Island", city: "Abu Dhabi", categoryLabel: { en: "Japanese tea house", ja: "日本茶専門店", ar: "مقهى شاي ياباني" } },
+  },
+  {
     name: "mirAIreach", locale: ["en"], category: "agency",
     keywords: ["local SEO work","GEO strategy","AIO optimization","AI SEO audit","AEO content","AI visibility report","AI Overviews visibility","ChatGPT visibility","Google Business Profile setup","Google Maps ranking","Google review management","QR review system","AI business automation","website design","structured data setup","free AI visibility scan","monthly reporting","clear flat pricing","fast WhatsApp support","honest measurable results"],
     forced: [],
