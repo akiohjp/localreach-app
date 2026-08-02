@@ -69,7 +69,7 @@ const STORES = [
   {
     name: "Ocha Cafe Sakura", locale: ["en", "ja", "ar"], category: "japanese tea house",
     keywords: ["Matcha latte","Hojicha latte","Ceremonial matcha","Matcha Suruga RG","Fukamushi sencha","Genmaicha","Hojicha","Japanese tea gift set","Gift-wrapped tea set","Matcha bowl and whisk set","Assorted sweets box","Gift cheesecake","Tea and sweets gift box","Matcha roll cake","Hojicha roll cake","Souffle cheesecake","Matcha cheesecake","Yuzu cheesecake","Dates cheesecake","Strawberry daifuku","Fruit daifuku","Kinako mochi"],
-    forced: ["matcha gift sets in Abu Dhabi","Japanese tea gift boxes","ceremonial matcha in Abu Dhabi","matcha whisk and bowl sets","Japanese sweets gift boxes","gift-wrapped tea sets"],
+    forced: ["matcha gift sets in Abu Dhabi","Japanese tea gift boxes in Abu Dhabi","ceremonial matcha in Abu Dhabi","matcha whisk and bowl sets","Japanese sweets in a gift box","tea sets with gift wrapping"],
     entity: { area: "Al Maryah Island", city: "Abu Dhabi", categoryLabel: { en: "Japanese tea house", ja: "日本茶専門店", ar: "مقهى شاي ياباني" } },
   },
   {
