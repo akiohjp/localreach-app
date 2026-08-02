@@ -676,8 +676,11 @@ function expandPoolChoices(pool: PoolSet, rng: () => number): PoolSet {
 const MEDICAL_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>(["aesthetic", "clinic", "dental"]);
 
 const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
-  en: /\b(go for|definitely try|don't skip|save room|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b/i,
-  ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方)/,
+  // Walk-in-casual voice is filtered alongside command/consumption voice: a
+  // patient books an appointment, they don't wander in "with an hour to kill"
+  // (caught 2026-08-03 in the final eye-check).
+  en: /\b(go for|definitely try|don't skip|save room|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|time to spare|hour to kill|popped into|more or less by chance|quick stop/i,
+  ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方|たまたま通りかかって|立ち寄り)/,
   ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
 };
 
@@ -978,6 +981,13 @@ function weaveEntity(
     pool = b2b ? ENTITY_LOC_ONLY_B2B[locale] : ENTITY_LOC_ONLY[locale];
   } else {
     pool = b2b ? ENTITY_CAT_ONLY_B2B[locale] : ENTITY_CAT_ONLY[locale];
+  }
+  // Entity pools bypass filterMedicalVoice (they are not part of the PoolSet),
+  // so the medical-voice filter is applied here too — "また立ち寄りたい美容・
+  // 再生医療クリニック" slipped through this gap (caught 2026-08-03).
+  if (MEDICAL_VERTICALS.has(vertical)) {
+    const clinical = pool.filter((t) => !MEDICAL_UNFIT[locale].test(t));
+    if (clinical.length > 0) pool = clinical;
   }
   if (rating < 5) {
     const measured = pool.filter((t) => !SUPERLATIVE_RE.test(t));
