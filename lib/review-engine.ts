@@ -1346,18 +1346,32 @@ function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
 }
 
 /**
- * Remove English-phrase forced keywords when the review is not in English.
- * Guest picks are never touched — the guest tapped those and must see them.
+ * Remove English buyer-search phrases when the review is not in English.
+ *
+ * Applies to the WHOLE keyword list, not just the forced slice. The original
+ * version keyed on forcedCount — and the 2026-08-03 compliance change turned
+ * core phrases into pre-ticked guest pills, so forcedCount became 0 in
+ * production and "udon in Dubaiは特に印象に残りました" reached a live JA draft
+ * (owner-caught 2026-08-03).
+ *
+ * Guest picks use the NARROW test (English glue words only): "udon in Dubai"
+ * goes, but menu items stay even when lowercase — Dubai menus are written in
+ * English, so a Japanese guest genuinely writes "Niku Beef udonを頼みました".
+ * The forced slice keeps the stricter test (glue OR not-a-proper-name) for
+ * callers that still pass forcedCount, e.g. the bench.
  */
-function dropForeignForced(
+function dropForeignPhrases(
   keywords: string[],
   forcedCount: number,
   locale: ReviewLocale,
 ): { keywords: string[]; forcedCount: number } {
-  if (locale === "en" || forcedCount <= 0) return { keywords, forcedCount };
+  if (locale === "en") return { keywords, forcedCount };
   const fc = Math.max(0, Math.min(forcedCount, keywords.length));
-  const kept = keywords.slice(0, fc).filter((k) => !isForeignPhrase(k, locale));
-  return { keywords: [...kept, ...keywords.slice(fc)], forcedCount: kept.length };
+  const forcedKept = keywords.slice(0, fc).filter((k) => !isForeignPhrase(k, locale));
+  const guestKept = keywords
+    .slice(fc)
+    .filter((k) => !(/^[\x20-\x7E]+$/.test(k) && /\s/.test(k) && EN_PHRASE_GLUE.test(k)));
+  return { keywords: [...forcedKept, ...guestKept], forcedCount: forcedKept.length };
 }
 
 /**
@@ -1414,7 +1428,7 @@ export function buildLocalizedReview(
     return t0;
   }
 
-  const { keywords: kwPool, forcedCount: fcUsable } = dropForeignForced(allKeywords, forcedCount, locale);
+  const { keywords: kwPool, forcedCount: fcUsable } = dropForeignPhrases(allKeywords, forcedCount, locale);
   const keywords = selectWovenKeywords(kwPool, fcUsable, seed);
   // Length bucket is chosen AFTER keyword selection: the woven count decides
   // how short a review can honestly be while keeping every phrase verbatim.
