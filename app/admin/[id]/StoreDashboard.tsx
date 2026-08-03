@@ -53,6 +53,8 @@ type Props = {
   logoSignedUrl?: string | null
   /** Workspace to open first (from the URL's ?tab=). */
   initialTab?: TabId
+  /** Daily Google rating/review-count snapshots (oldest first). Empty = no place id or no data yet. */
+  reviewStats?: { captured_on: string; rating: number | null; review_count: number }[]
 }
 
 type TabId = 'grow' | 'customers' | 'settings'
@@ -1440,6 +1442,83 @@ function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEnt
   )
 }
 
+// ─────────────────────────────────────────────
+// Results panel (review count / rating over time)
+// ─────────────────────────────────────────────
+
+/**
+ * The retention argument for the monthly fee, stated by the product itself:
+ * current public review count + rating, the delta since tracking began, and a
+ * small trend bar. Facts only — no projections, no promises (rank or count
+ * guarantees are exactly what the sales rules forbid).
+ */
+function ResultsPanel({
+  stats,
+}: {
+  stats: { captured_on: string; rating: number | null; review_count: number }[]
+}) {
+  if (stats.length === 0) {
+    return (
+      <p className="text-xs text-slate-500 leading-relaxed">
+        Tracking starts automatically — your review count and rating will appear
+        here from the first daily snapshot.
+      </p>
+    )
+  }
+  const first = stats[0]
+  const last = stats[stats.length - 1]
+  const delta = last.review_count - first.review_count
+  const sinceLabel = new Date(first.captured_on + 'T00:00:00Z').toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'short',
+  })
+  // Trend bars over the last 30 snapshots, scaled between min and max so
+  // movement is visible even when counts are large.
+  const window = stats.slice(-30)
+  const counts = window.map((s) => s.review_count)
+  const min = Math.min(...counts)
+  const max = Math.max(...counts)
+  const range = Math.max(1, max - min)
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-slate-400">Google reviews</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">{last.review_count}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-slate-400">Rating</p>
+          <p className="text-2xl font-bold text-slate-900 tabular-nums">
+            {last.rating != null ? last.rating.toFixed(1) : '—'}
+            <span className="ml-1 align-middle text-amber-400">★</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-slate-400">Since {sinceLabel}</p>
+          <p className={`text-2xl font-bold tabular-nums ${delta > 0 ? 'text-green-600' : 'text-slate-900'}`}>
+            {delta > 0 ? `+${delta}` : delta}
+          </p>
+        </div>
+      </div>
+      {window.length >= 2 && (
+        <div className="flex h-10 items-end gap-[2px]" aria-hidden>
+          {window.map((snapshot, i) => (
+            <div
+              key={i}
+              title={`${snapshot.captured_on}: ${snapshot.review_count}`}
+              className="flex-1 rounded-t bg-slate-300"
+              style={{ height: `${20 + ((snapshot.review_count - min) / range) * 80}%` }}
+            />
+          ))}
+        </div>
+      )}
+      <p className="text-[11px] text-slate-400 leading-relaxed">
+        Public numbers from your Google listing, captured daily. Google moderates
+        reviews on its side, so counts can occasionally go down as well as up.
+      </p>
+    </div>
+  )
+}
+
 export default function StoreDashboard({
   store,
   storeName,
@@ -1452,6 +1531,7 @@ export default function StoreDashboard({
   feedbackCount = 0,
   logoSignedUrl,
   initialTab = 'grow',
+  reviewStats = [],
 }: Props) {
   const router = useRouter()
 
@@ -1614,6 +1694,12 @@ export default function StoreDashboard({
                 ))}
               </ol>
             </details>
+
+            {(store.google_place_id || reviewStats.length > 0) && (
+              <SectionCard label="Your results" icon={<Star size={14} />}>
+                <ResultsPanel stats={reviewStats} />
+              </SectionCard>
+            )}
 
             <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
               <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />

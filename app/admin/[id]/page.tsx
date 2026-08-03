@@ -7,6 +7,7 @@ import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { isStoreCurrentlyActive } from '@/lib/subscription'
 import { getLocalizedText } from '@/types/database'
 import { qrPngDataUrl } from '@/lib/qr'
+import { captureStoreStats } from '@/lib/review-stats'
 import StoreDashboard from './StoreDashboard'
 
 export const metadata: Metadata = { title: 'Store Dashboard — LocalReach' }
@@ -130,6 +131,36 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
   }
   const storeUrl = `${appUrl}/store/${store.id}`
 
+  // ---- Results (review count / rating over time) ----
+  // Freshness capture: if today's snapshot is missing, take it now so the
+  // owner never opens the dashboard to stale numbers and a brand-new store
+  // has a baseline from day one. The daily cron covers stores nobody opens.
+  let reviewStats = [] as { captured_on: string; rating: number | null; review_count: number }[]
+  if (store.google_place_id) {
+    const today = new Date().toISOString().slice(0, 10)
+    const latest = await admin
+      .from('review_stats')
+      .select('captured_on')
+      .eq('store_id', id)
+      .order('captured_on', { ascending: false })
+      .limit(1)
+    const hasToday = latest.data?.[0]?.captured_on === today
+    if (!hasToday && process.env.GOOGLE_MAPS_API_KEY) {
+      const r = await captureStoreStats(id, store.google_place_id)
+      if (!r.ok) console.error('[admin] review-stats capture failed for store', id, r.reason)
+    }
+    const statsRes = await admin
+      .from('review_stats')
+      .select('captured_on, rating, review_count')
+      .eq('store_id', id)
+      .order('captured_on', { ascending: true })
+      .limit(120)
+    if (statsRes.error) {
+      console.error('[admin] review_stats query failed for store', id, statsRes.error)
+    }
+    reviewStats = statsRes.data ?? []
+  }
+
   const logoSignedUrl = await resolveStoreLogoForViewer(store.logo_url)
   // Generated on the server so the store URL is never sent to a third-party QR API.
   const qrDataUrl = await qrPngDataUrl(storeUrl, 320)
@@ -146,6 +177,7 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       crmLoadError={crmLoadError}
       feedback={feedback}
       feedbackCount={feedbackCount}
+      reviewStats={reviewStats}
       logoSignedUrl={logoSignedUrl}
       initialTab={initialTab}
     />

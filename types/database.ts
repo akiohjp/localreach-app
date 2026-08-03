@@ -96,6 +96,8 @@ export type Database = {
           contact_dial_code?: string;
           /** Review-reply generator defaults. NULL = built-in defaults. */
           reply_settings?: ReplySettings | null;
+          /** Google Place ID for results reporting (rating/review-count snapshots). */
+          google_place_id?: string | null;
 
           created_at: string;
           updated_at: string;
@@ -232,6 +234,40 @@ export type Database = {
           },
         ];
       };
+      /** Daily snapshots of a store's public Google rating + review count. */
+      review_stats: {
+        Row: {
+          id: number;
+          store_id: string;
+          captured_on: string;
+          rating: number | null;
+          review_count: number;
+          created_at: string;
+        };
+        Insert: {
+          store_id: string;
+          captured_on: string;
+          rating?: number | null;
+          review_count: number;
+          created_at?: string;
+        };
+        Update: {
+          store_id?: string;
+          captured_on?: string;
+          rating?: number | null;
+          review_count?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "review_stats_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       /**
@@ -306,6 +342,13 @@ export type TablesUpdate<T extends keyof Database["public"]["Tables"]> =
 
 // Shorthand aliases
 export type Store = Tables<"stores">;
+
+/** One daily snapshot of a store's public Google rating + review count. */
+export type ReviewStat = {
+  captured_on: string;
+  rating: number | null;
+  review_count: number;
+};
 export type StoreInsert = TablesInsert<"stores">;
 export type StoreUpdate = TablesUpdate<"stores">;
 export type Customer = Tables<"customers">;
