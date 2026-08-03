@@ -249,8 +249,20 @@ export default function ReviewFlow({
   function rotateForced() {
     const pool = [...cleanForced]
     const picked: string[] = []
+    // At most ONE buyer-search geo phrase ("pizza in Dubai") per guest: two
+    // search phrases side by side read as spam to the guest AND concentrate
+    // the engine's geo frames until they repeat across the store's page
+    // (diversity gate caught 17-20x/100 with two per review, 2026-08-03).
+    // Mirrors lib/review-engine isGeoPhrase.
+    const GEO_RE = /\b(in|near|around)\s+[A-Z]/
+    let geoTaken = false
     while (pool.length > 0 && picked.length < FORCED_OFFERED_MAX) {
-      picked.push(...pool.splice(Math.floor(Math.random() * pool.length), 1))
+      const [k] = pool.splice(Math.floor(Math.random() * pool.length), 1)
+      if (!k) break
+      const isGeo = /^[\x20-\x7E]+$/.test(k) && GEO_RE.test(k)
+      if (isGeo && geoTaken) continue
+      if (isGeo) geoTaken = true
+      picked.push(k)
     }
     setForcedOffered(picked)
   }

@@ -812,7 +812,10 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     openersLong: ["Shopped at {store} recently and the visit was easier and friendlier than I expected."],
     openersShort: ["{store} is worth a look; I found what I needed and then some."],
     coresLong: ["What made it work was {list}. {store} made the whole thing simple."],
-    closersLong: ["I'll shop at {store} again next time I'm nearby."],
+    closersLong: [
+      "I'll shop at {store} again {next time I'm nearby|whenever I'm in the area|soon enough}.",
+      "That's my {errands|shopping} sorted at {store} from now on.",
+    ],
   },
   fitness: {
     openersLong: ["Trained at {store} and it had the right energy without any of the intimidating gym cliches."],
@@ -841,7 +844,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     openersShort: ["{store} gave me natural results and honest advice; I'd go back."],
     coresLong: [
       "What made the difference was {list}. At {store} the results looked like me, just better, not like a different face.",
-      "The thing I'd highlight is {list}. {store} clearly prioritises doing it safely over doing it fast.",
+      "The thing I'd highlight is {list}. {store} clearly prioritises {doing it safely over doing it fast|safety over speed|getting it right over rushing}.",
     ],
     bridgesLong: [
       "The consultation at {store} was {thorough|unhurried|properly detailed} and hygiene was {visibly taken seriously|clearly a priority|obvious everywhere}, which put me at ease.",

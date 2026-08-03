@@ -253,10 +253,22 @@ for (const store of STORES) {
     const start = (i * 5) % Math.max(1, store.keywords.length);
     const guest = [];
     for (let k = 0; k < taps; k++) guest.push(store.keywords[(start + k) % store.keywords.length]);
-    // Mirror production: two rotating core phrases offered, most guests keep them.
-    const f = store.forced.length
-      ? [store.forced[i % store.forced.length], store.forced[(i + 1) % store.forced.length]].filter((v, ix, a) => a.indexOf(v) === ix)
-      : [];
+    // Mirror production: up to two rotating core phrases offered, but at most
+    // ONE geo search phrase per guest (ReviewFlow.rotateForced caps it — two
+    // geo sentences per review read as spam and repeat across the page).
+    const GEO_RE = /\b(in|near|around)\s+[A-Z]/;
+    const f = [];
+    if (store.forced.length) {
+      let geoTaken = false;
+      for (let k = 0; k < store.forced.length && f.length < 2; k++) {
+        const cand = store.forced[(i + k) % store.forced.length];
+        const isGeo = GEO_RE.test(cand);
+        if (isGeo && geoTaken) continue;
+        if (f.includes(cand)) continue;
+        if (isGeo) geoTaken = true;
+        f.push(cand);
+      }
+    }
     const text = generateReview(store.name, [...f, ...guest.filter((g) => !f.includes(g))], {
       // Deterministic nonce: the gate measures the same 100 reviews every run,
       // so a pass is a stable guarantee rather than a lucky draw from the

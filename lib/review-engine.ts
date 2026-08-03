@@ -1357,15 +1357,18 @@ function isGeoPhrase(kw: string): boolean {
 /** EN-only frames where a buyer-search phrase reads natural. No taste or
  *  command voice, so they are safe for medical verticals unfiltered. */
 const GEO_TAILS: string[] = [
-  "Hard to beat for {kw}.",
+  // Every frame carries a choice group: geo phrases draw ~1 per review, so a
+  // single-surface frame lands ~11x per 100 reviews and trips the diversity
+  // gate (measured 16x, 2026-08-03). ~22 surfaces keeps the max under the cap.
+  "{Hard|Tough} to beat for {kw}.",
   "As far as {kw} goes, this is {the place|the spot|the one to know}.",
   "For {kw}, this is {my pick|the spot|where I'd send people}.",
   "If you're after {kw}, {this is it|look no further|start here}.",
   "My {go-to|first stop} for {kw} {now|these days}.",
-  "You won't do much better for {kw}.",
+  "You won't {do|find} much better for {kw}.",
   "Sets the {bar|standard} for {kw}.",
-  "When someone asks about {kw}, this is my answer.",
-  "Ticks every box for {kw}.",
+  "When someone asks about {kw}, this is {my answer|the name I give|where I point them}.",
+  "Ticks {every box|all the boxes} for {kw}.",
 ];
 
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
