@@ -1338,6 +1338,36 @@ const EN_PHRASE_GLUE = /\b(in|at|for|of|near|the|and|with|from|to)\b/i;
 function looksLikeProperName(kw: string): boolean {
   return kw.split(/[\s&]+/).filter(Boolean).every((w) => !/^[a-z]/.test(w));
 }
+/**
+ * Buyer-search GEO phrases ("pizza in Dubai", "aesthetic treatments in Dubai")
+ * are searches, not dishes. In an OBJECT slot they read broken — the live
+ * Pitfire demo produced "Hot Honey Margherita and the pizza in Dubai lived up
+ * to everything I'd heard" (owner-caught 2026-08-03): a dish and a geography
+ * joined as if both were menu items, plus a withArt "the" on a phrase that
+ * must never take one. JA/AR drop these phrases (dropForeignPhrases); EN must
+ * KEEP them — they are the SEO layer — so they route through dedicated frames
+ * where a search phrase is the natural object: "Hard to beat for pizza in
+ * Dubai." They never join a {list}, never merge with other tails, and never
+ * take an article.
+ */
+function isGeoPhrase(kw: string): boolean {
+  return /^[\x20-\x7E]+$/.test(kw) && /\s/.test(kw) && /\b(in|near|around)\s+[A-Z]/.test(kw);
+}
+
+/** EN-only frames where a buyer-search phrase reads natural. No taste or
+ *  command voice, so they are safe for medical verticals unfiltered. */
+const GEO_TAILS: string[] = [
+  "Hard to beat for {kw}.",
+  "As far as {kw} goes, this is {the place|the spot|the one to know}.",
+  "For {kw}, this is {my pick|the spot|where I'd send people}.",
+  "If you're after {kw}, {this is it|look no further|start here}.",
+  "My {go-to|first stop} for {kw} {now|these days}.",
+  "You won't do much better for {kw}.",
+  "Sets the {bar|standard} for {kw}.",
+  "When someone asks about {kw}, this is my answer.",
+  "Ticks every box for {kw}.",
+];
+
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
   if (locale === "en") return false;
   if (!/^[\x20-\x7E]+$/.test(kw)) return false; // not pure Latin/ASCII → leave alone
@@ -1434,7 +1464,11 @@ export function buildLocalizedReview(
   // how short a review can honestly be while keeping every phrase verbatim.
   const bucket = pickLenBucket(locale, seed, rating, keywords.length);
   const cfg = { ...LOCALE_CFG[locale], ...bucket };
-  const shuffledRaw = shuffle(keywords, forkRng(seed, 0xb8b26351));
+  // Geo search phrases are pulled out BEFORE the core/tail machinery: they
+  // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
+  const geoKws = locale === "en" ? keywords.filter((k) => isGeoPhrase(k)) : [];
+  const nonGeoKeywords = geoKws.length > 0 ? keywords.filter((k) => !isGeoPhrase(k)) : keywords;
+  const shuffledRaw = shuffle(nonGeoKeywords, forkRng(seed, 0xb8b26351));
   // Attribute-shaped phrases ("great for groups") cannot sit in the {list}
   // object slot, so sort them to the back — the core takes nouns, and they come
   // out through the appositive tails below. Stable within each group, so the
@@ -1588,11 +1622,28 @@ export function buildLocalizedReview(
     text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name);
   }
 
+  // Geo search phrases: one dedicated sentence each, rotated frames, never
+  // merged and never article'd. The verbatim guarantee holds — they join the
+  // protect list below so the length tuner cannot trim them.
+  if (geoKws.length > 0) {
+    const geoChoiceRng = forkRng(seed, 0x9e01);
+    const geoOrder = shuffle(
+      GEO_TAILS.map((t) => expandChoices(t, geoChoiceRng)),
+      forkRng(seed, 0x9e02),
+    );
+    let gi = 0;
+    for (const gkw of geoKws) {
+      if (text.includes(gkw)) continue;
+      const tpl = geoOrder[gi++ % geoOrder.length]!;
+      text = appendSpread(text, fill(tpl, { kw: gkw }), cfg.glue, tailSpread, locale, name);
+    }
+  }
+
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
   const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical, name);
   text = woven.text;
-  const protectAll = [...shuffled, ...woven.protect];
+  const protectAll = [...shuffled, ...geoKws, ...woven.protect];
 
   text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll, locale, sentenceBudget(bucket.kind));
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
