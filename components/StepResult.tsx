@@ -125,10 +125,23 @@ export default function StepResult({
       void handleCopy();
       return;
     }
-    // Fire-and-forget copy (can't throw), and keep window.open in the same user
-    // gesture tick so the popup isn't blocked.
-    void copyToClipboard(text);
-    window.open(gbpReviewUrl, "_blank", "noopener,noreferrer");
+    // The copy runs alongside the anchor's own navigation (see the render: this
+    // is an <a target="_blank">, not window.open, so nothing can block it).
+    //
+    // The result is NOT discarded any more. It used to be fire-and-forget, so a
+    // guest whose clipboard was refused — routine inside Instagram/LINE
+    // webviews — arrived at Google with nothing to paste and no idea why, on
+    // the one screen the whole product exists to reach. Now the manual-copy
+    // banner is showing and the text is selected when they come back.
+    void copyToClipboard(text).then((ok) => {
+      if (ok) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+        return;
+      }
+      selectReviewText();
+      setCopyBlocked(true);
+    });
   }
 
   function handleRegenerateWording() {
@@ -422,8 +435,10 @@ export default function StepResult({
         </a>
 
         {hasValidReviewUrl ? (
-          <button
-            type="button"
+          <a
+            href={gbpReviewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={handlePostOnGoogle}
             className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
               hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
@@ -431,7 +446,7 @@ export default function StepResult({
           >
             <ExternalLink size={13} />
             {t.result.postOnGoogle}
-          </button>
+          </a>
         ) : (
           // Owner hasn't set the Google review link — never open a blank/404
           // tab on the money path. Tell the guest what to do instead.

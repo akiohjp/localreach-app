@@ -66,14 +66,12 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
 
   /**
    * Copy whatever the guest wrote (may be empty — they can write straight into
-   * Google) and open the review box in the same user-gesture tick so the popup
-   * isn't blocked. Deliberately does NOT submit the private feedback: which path
-   * to take is the guest's choice, not ours.
+   * Google) alongside the anchor's own navigation. Deliberately does NOT submit
+   * the private feedback: which path to take is the guest's choice, not ours.
    */
   function handlePostOnGoogle() {
     const message = text.trim();
     if (message) void copyToClipboard(message);
-    window.open(googleReviewUrl, "_blank", "noopener,noreferrer");
   }
 
   const showGoogleOption = isUsableReviewUrl(googleReviewUrl);
@@ -155,8 +153,14 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
 
         {showGoogleOption && (
           <>
-            <button
-              type="button"
+            {/* Anchor, not window.open: in-app webviews (Instagram, LINE — where
+                QR scans routinely land) block script-opened popups, and with
+                noopener window.open returns null so the block is undetectable
+                anyway. A link is a user navigation and is not blocked. */}
+            <a
+              href={googleReviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={handlePostOnGoogle}
               className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
                 text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
@@ -164,7 +168,7 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
             >
               <ExternalLink size={13} />
               {t.feedback.postOnGoogle}
-            </button>
+            </a>
             <p className="text-[11px] text-slate-500 leading-relaxed text-center">
               {t.feedback.eitherNote}
             </p>
