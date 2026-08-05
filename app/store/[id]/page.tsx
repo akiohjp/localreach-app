@@ -69,6 +69,16 @@ export async function generateMetadata({
   return {
     title: `Leave a Review — ${name}`,
     description: greeting || undefined,
+    // Guest review pages stay out of the index. A crawlable review-collection
+    // page lets anyone search a client's name and see which tool they use, and
+    // it puts a page we control into results the client's own listing competes
+    // in. The QR is the only intended way in.
+    //
+    // Deliberately a meta tag and NOT a robots.txt disallow: blocking the crawl
+    // stops Google from ever reading this directive, so a URL that leaked into
+    // a link could still surface as a bare result. Allowing the fetch is what
+    // makes the noindex bind.
+    robots: { index: false, follow: false, nocache: true },
   }
 }
 
