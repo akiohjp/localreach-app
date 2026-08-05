@@ -12,7 +12,8 @@
     "audit:reviews": "npx tsx scripts/audit-review-generation.mjs",
     "test:replies": "npx tsx scripts/test-reply-generation.mjs",
     "test:rating-only": "npx tsx scripts/test-rating-only.mjs",
-    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation"
+    "check:rating-goal": "node scripts/check-rating-goal.mjs",
+    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

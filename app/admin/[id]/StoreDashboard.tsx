@@ -1452,6 +1452,98 @@ function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEnt
  * small trend bar. Facts only — no projections, no promises (rank or count
  * guarantees are exactly what the sales rules forbid).
  */
+/**
+ * How many more 5-star reviews it takes to move the number Google displays.
+ *
+ * Plain arithmetic, not a forecast: N reviews averaging R, plus x reviews at
+ * 5 stars, average (R*N + 5x)/(N + x). Reaching T therefore needs
+ * x >= N(T - R)/(5 - T). Returns null for targets at or above 5.0, which no
+ * finite number of reviews reaches unless every existing review is already a 5.
+ *
+ * R here is the rating Google publishes, which is rounded to one decimal, so
+ * the answer is an estimate. The UI says so — an owner deciding whether the
+ * monthly fee is worth it deserves the assumption stated, not a number that
+ * looks like a promise.
+ */
+function reviewsToReach(rating: number, count: number, target: number): number | null {
+  if (target <= rating) return 0
+  // Google DISPLAYS one decimal, so what has to be crossed is the rounding
+  // boundary, not the target itself: 4.4 shows once the average reaches 4.35.
+  // Using the target directly overstated the work badly on small counts — a
+  // 46-review store at 4.8 came out as "46 more" when 16 actually gets there.
+  const threshold = target - 0.05
+  if (threshold >= 5) return null
+  // EPS absorbs float noise: 0.45/0.55 arithmetic lands a hair above a whole
+  // number and Math.ceil then charges the owner one review too many (measured
+  // on four of the seven live stores).
+  const EPS = 1e-9
+  const needed = Math.ceil((count * (threshold - rating)) / (5 - threshold) - EPS)
+  return Math.max(0, needed)
+}
+
+/** Next displayed decimal, plus the next half-star milestone. */
+function ratingTargets(rating: number): number[] {
+  const round1 = (n: number) => Math.round(n * 10) / 10
+  const nextTenth = round1(rating + 0.1)
+  const nextHalf = Math.ceil(rating * 2) / 2 > rating ? Math.ceil(rating * 2) / 2 : rating + 0.5
+  return [...new Set([nextTenth, round1(nextHalf)])]
+    .filter((t) => t > rating && t <= 5)
+    .sort((a, b) => a - b)
+}
+
+function RatingGoal({ rating, count }: { rating: number; count: number }) {
+  if (count === 0) return null
+  // Collapse targets that cost the same: on a handful of reviews one 5-star
+  // can clear several decimals at once, and listing "1.1 needs 1 / 1.5 needs 1"
+  // reads like a broken calculator. Keep the highest target per price.
+  const byCost = new Map<number, number>()
+  for (const t of ratingTargets(rating)) {
+    const need = reviewsToReach(rating, count, t)
+    if (need == null) continue
+    const prev = byCost.get(need)
+    if (prev == null || t > prev) byCost.set(need, t)
+  }
+  const targets = [...byCost.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, t]) => t)
+  if (targets.length === 0) {
+    return (
+      <p className="text-[11px] text-slate-500 leading-relaxed">
+        At {rating.toFixed(1)} there is nowhere further for the rating to go.
+        From here it is the review count that keeps moving.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-slate-400">
+        To move the rating
+      </p>
+      <ul className="space-y-1">
+        {targets.map((t) => {
+          const need = reviewsToReach(rating, count, t)
+          if (need == null) return null
+          return (
+            <li key={t} className="flex items-baseline gap-2 text-sm text-slate-700">
+              <span className="font-bold text-slate-900 tabular-nums">
+                {t.toFixed(1)}<span className="text-amber-400">★</span>
+              </span>
+              <span className="text-slate-400">needs</span>
+              <span className="font-bold text-slate-900 tabular-nums">{need}</span>
+              <span className="text-slate-500">more 5-star review{need === 1 ? '' : 's'}</span>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="text-[11px] text-slate-400 leading-relaxed">
+        Estimated from the rounded rating Google shows, assuming the next
+        reviews are 5-star. A 4-star review still helps the count but moves the
+        average more slowly.
+      </p>
+    </div>
+  )
+}
+
 function ResultsPanel({
   stats,
 }: {
@@ -1509,6 +1601,11 @@ function ResultsPanel({
               style={{ height: `${20 + ((snapshot.review_count - min) / range) * 80}%` }}
             />
           ))}
+        </div>
+      )}
+      {last.rating != null && (
+        <div className="border-t border-gray-100 pt-4">
+          <RatingGoal rating={last.rating} count={last.review_count} />
         </div>
       )}
       <p className="text-[11px] text-slate-400 leading-relaxed">
