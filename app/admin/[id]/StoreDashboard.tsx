@@ -4,7 +4,7 @@ import { useState, useRef, KeyboardEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ExternalLink, Palette, Tag, QrCode,
-  CheckCircle, Loader2, X, Plus, Download,
+  CheckCircle, Loader2, X, Plus, Download, Printer,
   Globe, Link2, LogOut, Languages, Users, Lock,
   MessageCircle, Send, Copy, Star, MessageSquareWarning, Reply, Settings, Megaphone, MapPin, Sparkles,
 } from 'lucide-react'
@@ -1087,7 +1087,15 @@ function ReviewUrlEditor({
 // QR Code Panel
 // ─────────────────────────────────────────────
 
-function QRCodePanel({ storeUrl, qrDataUrl }: { storeUrl: string; qrDataUrl: string }) {
+function QRCodePanel({
+  storeUrl,
+  qrDataUrl,
+  storeId,
+}: {
+  storeUrl: string
+  qrDataUrl: string
+  storeId: string
+}) {
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
       <div className="shrink-0 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
@@ -1111,14 +1119,24 @@ function QRCodePanel({ storeUrl, qrDataUrl }: { storeUrl: string; qrDataUrl: str
 
         <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
           <a
-            href={qrDataUrl}
-            download="qr-code.png"
+            href={`/admin/${storeId}/print`}
             className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2
               text-xs font-semibold text-white shadow-sm hover:bg-slate-800
               active:scale-[0.98] transition-all"
           >
+            <Printer size={12} />
+            Print counter card
+          </a>
+
+          <a
+            href={qrDataUrl}
+            download="qr-code.png"
+            className="flex items-center gap-1.5 rounded-xl border border-gray-300
+              bg-white px-4 py-2 text-xs font-semibold text-slate-600
+              hover:border-slate-500 hover:text-slate-900 active:scale-[0.98] transition-all"
+          >
             <Download size={12} />
-            Download PNG
+            QR only (PNG)
           </a>
 
           <a
@@ -1799,7 +1817,7 @@ export default function StoreDashboard({
             )}
 
             <SectionCard label="Customer QR Code" icon={<QrCode size={14} />}>
-              <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} />
+              <QRCodePanel storeUrl={storeUrl} qrDataUrl={qrDataUrl} storeId={store.id} />
             </SectionCard>
 
             <SectionCard label="WhatsApp review requests" icon={<MessageCircle size={14} />}>

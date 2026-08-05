@@ -1,0 +1,44 @@
+/*
+ * Counter-card geometry.
+ *
+ * Sizes are in mm so what comes out of the printer matches the paper it is
+ * named after. Everything inside the card is sized in em off a per-size root,
+ * so one layout serves both A5 and A6 without a second set of rules.
+ *
+ * Plain CSS module rather than styled-jsx: styled-jsx rewrites every className
+ * it sees, and the multi-line Tailwind strings in this file made its parser
+ * fail the build outright.
+ */
+.card {
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  /* The card sits in a flex row, and a flex item may shrink below its own
+     width. Without this it collapsed to 14mm against the declared 148mm —
+     the height obeyed, the width did not, and the whole card printed as a
+     sliver. Measured in the browser, not eyeballed. */
+  flex-shrink: 0;
+}
+
+.a5 {
+  width: 148mm;
+  height: 210mm;
+  font-size: 15px;
+}
+
+.a6 {
+  width: 105mm;
+  height: 148mm;
+  font-size: 11px;
+}
+
+@media print {
+  .card {
+    box-shadow: none;
+    border-radius: 0;
+    /* Browsers drop background colours and the brand rule unless asked */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
