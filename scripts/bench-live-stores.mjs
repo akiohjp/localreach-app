@@ -224,9 +224,12 @@ function normalizeForGate(s, phrases) {
 }
 
 let gateFail = 0;
-console.log("─── diversity gate: 100 reviews per store, primary locale ───");
-for (const store of STORES) {
-  const locale = store.locale[0];
+// EVERY locale the store offers, not just the primary one. Gating only the
+// primary locale is how Arabic went un-measured for months: the tab is right
+// there on the page, a guest can pick it, and nothing ever checked whether its
+// hundredth review still read fresh. A locale we ship is a locale we gate.
+console.log("─── diversity gate: 100 reviews per store × every locale offered ───");
+for (const store of STORES) for (const locale of store.locale) {
   // Keywords are the only content that varies between one store's reviews —
   // they get masked to ‹›. The store name is replaced with a punctuation-free
   // token purely so names like "Let It Dough!" don't break sentence splitting;
@@ -235,7 +238,13 @@ for (const store of STORES) {
   const constPhrases = [
     [store.name, "STORENAME"],
   ].filter(([p]) => Boolean(p));
-  const splitRe = locale === "ja" ? /[^。]*。|[^。]+$/g : /[^.!?]*[.!?]+(?:\s|$)|[^.!?]+$/g;
+  // Arabic closes sentences with "." but asks with "؟" (U+061F), which the
+  // Latin split would swallow into the next sentence.
+  const splitRe = locale === "ja"
+    ? /[^。]*。|[^。]+$/g
+    : locale === "ar"
+      ? /[^.!?؟]*[.!?؟]+(?:\s|$)|[^.!?؟]+$/g
+      : /[^.!?]*[.!?]+(?:\s|$)|[^.!?]+$/g;
   // Mask BEFORE splitting: a store name ending in "!" ("Let It Dough!") would
   // otherwise split mid-sentence here and each half would register as its own
   // repeated refrain — a bench artifact; the engine itself handles punctuated
