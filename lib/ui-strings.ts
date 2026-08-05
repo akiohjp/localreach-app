@@ -97,6 +97,12 @@ export interface UiStrings {
      */
     postOnGoogle: string;
     eitherNote: string;
+    /**
+     * Clipboard refused (in-app webviews do this routinely) — the guest's own
+     * words are selected instead so they can long-press and copy. Without it
+     * they reach Google with an empty clipboard and have to retype.
+     */
+    copyBlocked: string;
   };
   feedbackSent: {
     title: string;
@@ -193,6 +199,8 @@ const en: UiStrings = {
     postOnGoogle: "Post on Google",
     eitherNote:
       "Either one is fine — or both. If you post on Google, what you wrote above is copied so you can paste it in your own words.",
+    copyBlocked:
+      "Couldn't copy automatically. Your text is selected — long-press and copy.",
   },
   feedbackSent: {
     title: "Thank you for your feedback.",
@@ -282,6 +290,8 @@ const ja: UiStrings = {
     postOnGoogle: "Googleに投稿する",
     eitherNote:
       "どちらでも、両方でも構いません。Googleに投稿する場合は、上にお書きの内容をコピーしますので、ご自身の言葉で貼り付けてください。",
+    copyBlocked:
+      "自動コピーできませんでした。お書きの内容を選択しましたので、長押しでコピーしてください。",
   },
   feedbackSent: {
     title: "フィードバックをありがとうございます。",
@@ -376,6 +386,8 @@ const ar: UiStrings = {
     postOnGoogle: "النشر على Google",
     eitherNote:
       "أيهما شئت، أو كلاهما. إن اخترت النشر على Google فسنسخ ما كتبته أعلاه لتلصقه بكلماتك أنت.",
+    copyBlocked:
+      "تعذّر النسخ التلقائي. نصّك محدد — اضغط مطولاً ثم انسخ.",
   },
   feedbackSent: {
     title: "شكرًا على ملاحظاتك.",

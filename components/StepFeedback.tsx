@@ -25,6 +25,7 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copyBlocked, setCopyBlocked] = useState(false);
 
   async function handleSubmit() {
     const message = text.trim();
@@ -71,7 +72,21 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
    */
   function handlePostOnGoogle() {
     const message = text.trim();
-    if (message) void copyToClipboard(message);
+    if (!message) return;
+    // The result is not discarded: a guest who wrote a complaint, had the copy
+    // refused, and landed on Google with an empty clipboard would have to type
+    // it all again — and most would simply not bother. Same defect the 5-star
+    // path had.
+    void copyToClipboard(message).then((ok) => {
+      if (ok) return;
+      const ta = document.querySelector<HTMLTextAreaElement>("textarea[data-feedback-text]");
+      if (ta) {
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+      }
+      setCopyBlocked(true);
+    });
   }
 
   const showGoogleOption = isUsableReviewUrl(googleReviewUrl);
@@ -118,6 +133,7 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
 
       {/* Textarea */}
       <textarea
+        data-feedback-text
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder={t.feedback.placeholder}
@@ -169,6 +185,12 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
               <ExternalLink size={13} />
               {t.feedback.postOnGoogle}
             </a>
+            {copyBlocked && (
+              <div className="flex items-center justify-center gap-2 bg-amber-50 border border-amber-300
+                rounded-xl py-2.5 px-3 text-xs font-semibold text-amber-800 text-center">
+                {t.feedback.copyBlocked}
+              </div>
+            )}
             <p className="text-[11px] text-slate-500 leading-relaxed text-center">
               {t.feedback.eitherNote}
             </p>
