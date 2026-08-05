@@ -1530,24 +1530,33 @@ function ActivityLine({ stats }: { stats: ReviewSnapshot[] }) {
       <p className="text-[10px] font-semibold tracking-[0.15em] uppercase text-slate-400">
         Recent activity
       </p>
-      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
-        {last7 != null && (
+      {last7 == null ? (
+        // Every store spends its first week here, including the demos we send
+        // out, so this is not a corner case — it is the first impression. Say
+        // what is being counted and when the figure arrives, rather than
+        // rendering an empty row.
+        <p className="text-sm text-slate-500 leading-relaxed">
+          Counting from day {trackedDays + 1}. The 7-day figure appears
+          {trackedDays >= 6 ? ' tomorrow' : ` in ${7 - trackedDays} days`}.
+        </p>
+      ) : (
+        <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
           <span className="text-slate-700">
             <span className="font-bold text-slate-900 tabular-nums">
               {last7 > 0 ? `+${last7}` : '0'}
             </span>{' '}
             <span className="text-slate-500">in the last 7 days</span>
           </span>
-        )}
-        {last30 != null && (
-          <span className="text-slate-700">
-            <span className="font-bold text-slate-900 tabular-nums">
-              {last30 > 0 ? `+${last30}` : '0'}
-            </span>{' '}
-            <span className="text-slate-500">in the last 30</span>
-          </span>
-        )}
-      </div>
+          {last30 != null && (
+            <span className="text-slate-700">
+              <span className="font-bold text-slate-900 tabular-nums">
+                {last30 > 0 ? `+${last30}` : '0'}
+              </span>{' '}
+              <span className="text-slate-500">in the last 30</span>
+            </span>
+          )}
+        </div>
+      )}
       {daysSinceNewReview != null && (
         <p className={`text-[11px] leading-relaxed ${stale ? 'text-amber-700' : 'text-slate-500'}`}>
           {daysSinceNewReview === 0
