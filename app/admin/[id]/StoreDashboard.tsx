@@ -16,7 +16,8 @@ import InstallAppButton from '@/components/InstallAppButton'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
 import { keywordPresetsFor } from '@/lib/keyword-presets'
 import { resolveVertical } from '@/lib/review-pools'
-import type { Store, LocalizedText, SupportedLocale, StoreUpdate } from '@/types/database'
+import { classifyKeyword, type KeywordType } from '@/lib/review-engine'
+import type { Store, LocalizedText, SupportedLocale, StoreUpdate, KeywordTypes } from '@/types/database'
 
 // ─────────────────────────────────────────────
 // Types
@@ -244,17 +245,72 @@ function keywordShapeWarning(kw: string): string | null {
   return null
 }
 
+/**
+ * What a keyword NAMES decides which sentences it can appear in, and until
+ * 2026-08-09 the engine guessed it from the string. The guess had no way to
+ * tell a dish from a discipline, so a clinic got "nailed AGA Treatment" and a
+ * grocery got "Big yes to Japanese and Korean groceries". The owner picks it
+ * here instead; anything left unset still falls back to the guess.
+ *
+ * Wording is deliberately in the owner's language, not the engine's: nobody
+ * running a shop thinks in "attribute" or "geo".
+ */
+const KEYWORD_TYPE_CHOICES: { value: KeywordType; label: string; hint: string }[] = [
+  { value: 'item', label: 'A thing', hint: 'One dish, product or named treatment — something a guest orders or buys' },
+  { value: 'service', label: 'Something you do for them', hint: 'A treatment, a fitting, shipping — reviews describe how it went, not how it tasted' },
+  { value: 'category', label: 'A whole range', hint: 'A class of what you sell, e.g. "Korean skincare" — reviews talk about selection' },
+  { value: 'attribute', label: 'A quality', hint: 'A description, not a thing, e.g. "family friendly", "no pressure to buy"' },
+  { value: 'geo', label: 'A search phrase', hint: 'What people type to find you, e.g. "pizza in Dubai"' },
+]
+
+function KeywordTypePicker({
+  kw,
+  value,
+  locale,
+  onChange,
+}: {
+  kw: string
+  value?: KeywordType
+  locale?: SupportedLocale
+  onChange: (t: KeywordType) => void
+}) {
+  // Showing the guess as the selected option (rather than a blank) means the
+  // owner sees what the engine is ALREADY doing and only has to correct it.
+  const effective = value ?? classifyKeyword(kw, undefined, locale === 'ja' ? 'ja' : locale === 'ar' ? 'ar' : 'en')
+  return (
+    <select
+      value={effective}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => onChange(e.target.value as KeywordType)}
+      aria-label={`What "${kw}" is`}
+      title={KEYWORD_TYPE_CHOICES.find((c) => c.value === effective)?.hint}
+      className={`rounded border bg-transparent py-0 pl-1 pr-4 text-[10px] font-semibold outline-none
+        ${value ? 'border-slate-300 text-slate-600' : 'border-dashed border-slate-300 text-slate-400'}`}
+    >
+      {KEYWORD_TYPE_CHOICES.map((c) => (
+        <option key={c.value} value={c.value}>{c.label}</option>
+      ))}
+    </select>
+  )
+}
+
 function KeywordManager({
   storeId,
   initial,
   businessCategory,
   locale,
+  types,
+  onTypeChange,
 }: {
   storeId: string
   initial: string[]
   /** Free-text category from the store row — resolved to a vertical here. */
   businessCategory?: string | null
   locale?: SupportedLocale
+  /** Shared with the core-phrase manager: ONE map covers both lists, so it is
+   *  owned by the parent and neither manager can clobber the other. */
+  types: KeywordTypes
+  onTypeChange: (kw: string, t: KeywordType) => void
 }) {
   const [keywords, setKeywords] = useState<string[]>(initial)
   const [input, setInput] = useState('')
@@ -305,7 +361,7 @@ function KeywordManager({
     if (toSave !== keywords) { setKeywords(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { keywords: toSave })
+      await saveField(storeId, { keywords: toSave, keyword_types: types })
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -327,6 +383,12 @@ function KeywordManager({
               bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm"
           >
             {kw}
+            <KeywordTypePicker
+              kw={kw}
+              value={types[kw]}
+              locale={locale}
+              onChange={(t) => onTypeChange(kw, t)}
+            />
             <button
               onClick={(e) => { e.stopPropagation(); remove(kw) }}
               aria-label={`Remove ${kw}`}
@@ -431,9 +493,15 @@ function KeywordManager({
 function ForcedKeywordManager({
   storeId,
   initial,
+  locale,
+  types,
+  onTypeChange,
 }: {
   storeId: string
   initial: string[]
+  locale?: SupportedLocale
+  types: KeywordTypes
+  onTypeChange: (kw: string, t: KeywordType) => void
 }) {
   const [items, setItems] = useState<string[]>(initial)
   const [input, setInput] = useState('')
@@ -475,7 +543,7 @@ function ForcedKeywordManager({
     if (toSave !== items) { setItems(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { forced_keywords: toSave })
+      await saveField(storeId, { forced_keywords: toSave, keyword_types: types })
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -503,6 +571,12 @@ function ForcedKeywordManager({
               bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-sm"
           >
             {kw}
+            <KeywordTypePicker
+              kw={kw}
+              value={types[kw]}
+              locale={locale}
+              onChange={(t) => onTypeChange(kw, t)}
+            />
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -1677,6 +1751,15 @@ export default function StoreDashboard({
   // lands on the same workspace (the server passes it back as initialTab).
   const [tab, setTab] = useState<TabId>(initialTab)
 
+  // ONE map for both keyword lists. Held here rather than inside each manager
+  // so that saving one list cannot write back a stale copy of the other's
+  // types — both managers read and write this same object.
+  const [keywordTypes, setKeywordTypes] = useState<KeywordTypes>(
+    () => (store.keyword_types ?? {}) as KeywordTypes,
+  )
+  const setKeywordType = (kw: string, t: KeywordType) =>
+    setKeywordTypes((prev) => ({ ...prev, [kw]: t }))
+
   function switchTab(t: TabId) {
     setTab(t)
     const url = new URL(window.location.href)
@@ -1934,7 +2017,19 @@ export default function StoreDashboard({
                 reviews, but nothing is ever added to a review the guest did not agree to.
                 They rotate between guests, so your reviews do not all read the same.
               </p>
-              <ForcedKeywordManager storeId={store.id} initial={store.forced_keywords ?? []} />
+              <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+                The small dropdown on each phrase tells us <span className="font-semibold text-slate-800">what
+                the phrase is</span> — a thing, something you do, a whole range, a quality, or a search
+                phrase. It decides which sentences the phrase can appear in: a treatment should never be
+                praised the way a dish is. We guess it for you; correct it when the guess is wrong.
+              </p>
+              <ForcedKeywordManager
+                storeId={store.id}
+                initial={store.forced_keywords ?? []}
+                locale={store.default_language}
+                types={keywordTypes}
+                onTypeChange={setKeywordType}
+              />
             </SectionCard>
 
             <SectionCard label="Guest keywords (tap-to-add)" icon={<Tag size={14} />}>
@@ -1949,6 +2044,8 @@ export default function StoreDashboard({
                 initial={store.keywords}
                 businessCategory={store.business_category}
                 locale={store.default_language}
+                types={keywordTypes}
+                onTypeChange={setKeywordType}
               />
             </SectionCard>
         </div>
