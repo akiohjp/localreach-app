@@ -268,11 +268,14 @@ function KeywordTypePicker({
   value,
   locale,
   onChange,
+  onDark = false,
 }: {
   kw: string
   value?: KeywordType
   locale?: SupportedLocale
   onChange: (t: KeywordType) => void
+  /** Core-phrase pills are near-black; slate text on them is unreadable. */
+  onDark?: boolean
 }) {
   // Showing the guess as the selected option (rather than a blank) means the
   // owner sees what the engine is ALREADY doing and only has to correct it.
@@ -285,7 +288,9 @@ function KeywordTypePicker({
       aria-label={`What "${kw}" is`}
       title={KEYWORD_TYPE_CHOICES.find((c) => c.value === effective)?.hint}
       className={`rounded border bg-transparent py-0 pl-1 pr-4 text-[10px] font-semibold outline-none
-        ${value ? 'border-slate-300 text-slate-600' : 'border-dashed border-slate-300 text-slate-400'}`}
+        ${onDark
+          ? value ? 'border-white/40 text-white' : 'border-dashed border-white/30 text-white/60'
+          : value ? 'border-slate-300 text-slate-600' : 'border-dashed border-slate-300 text-slate-400'}`}
     >
       {KEYWORD_TYPE_CHOICES.map((c) => (
         <option key={c.value} value={c.value}>{c.label}</option>
@@ -554,9 +559,9 @@ function ForcedKeywordManager({
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-600 leading-relaxed">
-        These phrases are <span className="font-semibold text-slate-800">automatically added to every review</span>{' '}
-        your guests create, so the terms you want to be found for always appear. Guests never see or
-        tap them. Add your location and what you want to rank for, e.g.{' '}
+        These phrases are <span className="font-semibold text-slate-800">offered to every guest already selected</span>,{' '}
+        so the terms you want to be found for reach most reviews — and a guest who does not want one
+        can remove it. Add your location and what you want to rank for, e.g.{' '}
         <span className="font-medium text-slate-700">&ldquo;best doughnuts in Dubai&rdquo;</span>.
       </p>
       <div
@@ -575,6 +580,7 @@ function ForcedKeywordManager({
               kw={kw}
               value={types[kw]}
               locale={locale}
+              onDark
               onChange={(t) => onTypeChange(kw, t)}
             />
             <button
