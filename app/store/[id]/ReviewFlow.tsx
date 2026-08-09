@@ -82,6 +82,8 @@ type Props = {
   entityArea?: string | null
   entityCity?: string | null
   entityCategoryLabel?: Record<string, string> | null
+  /** stores.keyword_types — what each keyword names. See classifyKeyword. */
+  keywordTypes?: Record<string, string> | null
 }
 
 export default function ReviewFlow({
@@ -102,6 +104,7 @@ export default function ReviewFlow({
   entityArea,
   entityCity,
   entityCategoryLabel,
+  keywordTypes,
 }: Props) {
   const entity = {
     area: entityArea ?? null,
@@ -197,6 +200,7 @@ export default function ReviewFlow({
         category: businessCategory,
         rating: ratingValue,
         entity,
+        keywordTypes,
       }),
     )
     setStep('result')
@@ -215,6 +219,7 @@ export default function ReviewFlow({
       category: businessCategory,
       rating,
       entity,
+      keywordTypes,
     })
     setReviewText(next)
     return next
@@ -401,6 +406,7 @@ export default function ReviewFlow({
                   category: businessCategory,
                             rating,
                   entity,
+                  keywordTypes,
                 })}
             />
           )}

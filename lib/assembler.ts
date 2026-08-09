@@ -6,7 +6,7 @@
  * Seeded RNG + per-run nonce so outputs vary strongly across runs.
  */
 
-import { buildLocalizedReview, type ReviewEntity } from "@/lib/review-engine";
+import { buildLocalizedReview, type KeywordTypeMap, type ReviewEntity } from "@/lib/review-engine";
 import { resolveVertical, type ReviewLocale } from "@/lib/review-pools";
 import type { SupportedLocale } from "@/types/database";
 
@@ -41,6 +41,13 @@ export type GenerateReviewOptions = {
     city?: string | null;
     categoryLabel?: Record<string, string> | null;
   } | null;
+  /**
+   * `stores.keyword_types` — what each keyword NAMES (item / service /
+   * category / attribute / geo). The engine used to guess this from the
+   * string, and the guess is what produced "Big yes to Japanese and Korean
+   * groceries." Anything absent from the map still falls back to the guess.
+   */
+  keywordTypes?: Record<string, string> | null;
 };
 
 function toReviewLocale(locale?: SupportedLocale): ReviewLocale {
@@ -110,7 +117,17 @@ export function generateReview(
           null,
       }
     : undefined;
-  return buildLocalizedReview(store, cleaned, seed, locale, vertical, forcedCount, rating, entity);
+  return buildLocalizedReview(
+    store,
+    cleaned,
+    seed,
+    locale,
+    vertical,
+    forcedCount,
+    rating,
+    entity,
+    (options?.keywordTypes as KeywordTypeMap | undefined) ?? undefined,
+  );
 }
 
 /** Call once per generated review (client). Each call must be unique for visible shuffle in demos. */

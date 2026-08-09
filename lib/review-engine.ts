@@ -679,7 +679,24 @@ const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
   // Walk-in-casual voice is filtered alongside command/consumption voice: a
   // patient books an appointment, they don't wander in "with an hour to kill"
   // (caught 2026-08-03 in the final eye-check).
-  en: /\b(go for|definitely try|don't skip|save room|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|time to spare|hour to kill|popped into|more or less by chance|quick stop/i,
+  // "We chose {store} for a small celebration" and "Brought a relative
+  // visiting from abroad" read absurd for a clinic (owner read-through
+  // 2026-08-07). Occasion/outing voice is filtered with the rest.
+  // Restaurant league-table voice is the other half, and it was missing
+  // until a live measurement on Kotobuki put it at 36% of EN reviews
+  // (2026-08-09): "The star of the visit was HydraFacial, no contest.",
+  // "Kotobuki Clinic nailed AGA Treatment.", "Big fan of IV Drip here.",
+  // "Next time I'm starting with the regenerative medicine." A patient does
+  // not rank treatments the way a diner ranks dishes. Kept OUT deliberately:
+  // "loved", "can't say enough about", "people weren't wrong about" — a
+  // patient really does write those about care they received, and stripping
+  // them leaves the clinic pools too thin for the diversity gate.
+  // Added 2026-08-09 after the naturalness reader (scripts/read-naturalness)
+  // flagged "Loved IV Drip." and "Aesthetics Therapy, so good." on the live
+  // Kotobuki config. "Loved" was deliberately kept in an hour earlier on the
+  // argument that a patient does write it about care received — a native
+  // reader disagreed for a NAMED PROCEDURE, which is the object slot here.
+  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad/i,
   ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方|たまたま通りかかって|立ち寄り)/,
   ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
 };
@@ -726,7 +743,9 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
     "Handy {spot|place|stop} if you're {in|around} {loc} and after a {cat}.",
     "Didn't expect to find a {cat} {this good|of this standard|this solid} in {loc}.",
     "{loc} {needed|was missing|has been waiting for} a {cat} like this.",
-    "A {proper|real|genuinely good} {cat}, right here in {loc}.",
+    // "a proper X" is British-marked as an intensifier; a US reader hears it
+    // as foreign. Neutral branches only (owner note 2026-08-07).
+    "A {real|genuinely good|seriously good} {cat}, right here in {loc}.",
     "We're {lucky|fortunate|glad} to have this {cat} in {loc}.",
     "If you {live|work|spend time} around {loc}, keep this {cat} {on your list|in mind|bookmarked}.",
     "Nice surprise to {come across|find|stumble on} a {cat} like this in {loc}.",
@@ -734,7 +753,7 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
     "Anyone around {loc} should give this {cat} a {look|try|chance}.",
     "It's become our {regular|default|usual} {cat} whenever we're in {loc}.",
     "A {cat} in {loc} that actually {delivers|comes through|holds up}.",
-    "Happy to finally have a {decent|good|proper} {cat} close by in {loc}.",
+    "Happy to finally have a {decent|good|solid} {cat} close by in {loc}.",
     "You don't come across a {cat} like this in {loc} {every day|often|all that often}.",
     "Ended up here {looking|hunting|searching} for a {cat} in {loc} and {got lucky|struck gold|found a keeper}.",
     "Between the {cat} options {in|around} {loc}, this is the one I'd {pick again|go back to|stick with}.",
@@ -896,15 +915,27 @@ const ENTITY_LOC_ONLY: Record<ReviewLocale, string[]> = {
 };
 
 const ENTITY_CAT_ONLY: Record<ReviewLocale, string[]> = {
+  // The pool-size arithmetic in ENTITY_BOTH applies here verbatim, and EN was
+  // the one branch that never got it: 8 flat templates, no choice groups, one
+  // entity sentence per review = a top line at 100/8. Live Cinar Istanbul
+  // measured 15x "If every rug store ran like this..." and 14x "Exactly what a
+  // good rug store should be." per 100 reviews (bench, 2026-08-09) — ja/ar
+  // already carried choice groups, so only EN refrained. Choice branches now
+  // put every surface at ~5 per 100. Two "A {cat} ..." openers were folded into
+  // "This {cat} ..." on the way: a bare indefinite article before {cat} breaks
+  // on any vowel-initial category ("A Asian supermarket"), which is the rule
+  // stated above this block but not followed here.
   en: [
-    "Exactly what a good {cat} should be.",
-    "One of the better {cat} options around.",
-    "You can tell this {cat} is run with care.",
-    "A {cat} that takes the details seriously.",
-    "As far as a {cat} goes, this one gets it right.",
-    "The kind of {cat} you hope to stumble on.",
-    "A {cat} doing the simple things properly.",
-    "If every {cat} ran like this, I'd complain a lot less.",
+    "{Exactly|Pretty much} what a good {cat} should be.",
+    "One of the better {cat} options {around|in the area|I've come across}.",
+    "You can tell this {cat} is run {with care|properly|by people who care}.",
+    "The kind of {cat} {you hope to stumble on|you want to find|that's easy to recommend}.",
+    "As far as a {cat} goes, this one {gets it right|has it sorted|does it properly}.",
+    "This {cat} {does the simple things properly|gets the basics right|takes the details seriously}.",
+    "If every {cat} ran like this, {I'd complain a lot less|there'd be a lot less to complain about}.",
+    "{Good|Nice|Reassuring} to find this sort of {cat}.",
+    "The sort of {cat} you can {trust|rely on|recommend without hesitating}.",
+    "{Nothing|Not much} I'd change about this {cat}.",
   ],
   ja: [
     "{cat}としては{文句なしです|申し分ないです|言うことなしです}。",
@@ -1354,21 +1385,145 @@ function isGeoPhrase(kw: string): boolean {
   return /^[\x20-\x7E]+$/.test(kw) && /\s/.test(kw) && /\b(in|near|around)\s+[A-Z]/.test(kw);
 }
 
+/**
+ * What KIND of thing a keyword names.
+ *
+ * Until 2026-08-09 this was inferred from the string alone, in three branches:
+ * geo phrase, attribute-shaped, and — for everything else — "a thing you order
+ * or buy". That last branch is not a classification, it is the leftover pile,
+ * and it is where every unnatural sentence the owner caught on a live phone
+ * came from. A category ("Japanese and Korean groceries") landed in a dish
+ * slot and produced "Big yes to Japanese and Korean groceries."; a field of
+ * medicine produced "Kotobuki Clinic nailed AGA Treatment." No regex fixes
+ * that, because the defect is semantic: the string carries no signal for the
+ * difference between a dish and a discipline.
+ *
+ * So the type is DATA now. `stores.keyword_types` maps a keyword to its type,
+ * set by whoever writes the keyword, and inference survives only as the
+ * fallback for keywords nobody has typed yet — which keeps every existing
+ * store rendering exactly as it does today.
+ */
+export type KeywordType = "item" | "service" | "category" | "attribute" | "geo";
+export type KeywordTypeMap = Record<string, KeywordType>;
+
+const KEYWORD_TYPES: ReadonlySet<string> = new Set([
+  "item", "service", "category", "attribute", "geo",
+]);
+
+export function classifyKeyword(
+  kw: string,
+  types: KeywordTypeMap | undefined,
+  locale: ReviewLocale,
+): KeywordType {
+  const explicit = types?.[kw.trim()];
+  if (explicit && KEYWORD_TYPES.has(explicit)) return explicit;
+  if (isGeoPhrase(kw)) return "geo";
+  if (isAttributeShaped(kw, locale)) return "attribute";
+  return "item";
+}
+
+/**
+ * Frames for a CATEGORY — a class of goods the business sells ("luxury rugs",
+ * "Japanese and Korean groceries"), not one orderable thing. Verbs stay
+ * number-neutral: the same slot takes a plural class and a mass noun, so any
+ * "is/was/are" here becomes a visible grammar error on half the stores.
+ */
+const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
+  en: [
+    "Good {range|selection|choice} of {kw}.",
+    "They know their {kw}.",
+    "This is where I {go|come} for {kw}.",
+    "Plenty of {kw} to {choose from|pick from}.",
+    "Worth a look if you {want|need} {kw}.",
+    "No shortage of {kw} {here|at this place}.",
+    "They clearly {care about|take pride in} their {kw}.",
+    "That's what I {come|keep coming} here for: {kw}.",
+  ],
+  ja: [
+    "{kw}の{品揃え|ラインナップ}が{良かったです|しっかりしていました}。",
+    "{kw}を{探している|見ている}なら{一度見る価値があります|ここだと思います}。",
+    "{kw}の{種類|選択肢}が{豊富でした|多かったです}。",
+    "{kw}については{ここで揃います|ここで足ります}。",
+    "{kw}を{ひと通り|まとめて}{見られました|見ることができました}。",
+  ],
+  ar: [
+    "{تشكيلة|مجموعة} {جيدة|واسعة} من {kw}.",
+    "إن كنت تبحث عن {kw}، فهذا هو المكان.",
+    "خيارات {kw} {متنوعة|كثيرة} هنا.",
+    "يعرفون {kw} {جيداً|تماماً}.",
+  ],
+};
+
+/**
+ * Frames for a SERVICE the guest received ("regenerative medicine", "custom
+ * sizing"). Deliberately clinical: no taste, no ranking, no ordering voice, so
+ * these are safe for medical verticals unfiltered. Number-neutral for the same
+ * reason as CATEGORY_TAILS.
+ */
+const SERVICE_TAILS: Record<ReviewLocale, string[]> = {
+  en: [
+    "Came in for {kw} and the process was {explained properly|walked through step by step|clear from the start}.",
+    "They took the time to explain {kw} before anything {started|began}.",
+    "No {complaints|concerns} about {kw}.",
+    "If you're {considering|looking into} {kw}, this is a {sensible|solid} place to start.",
+    "Happy with how they handled {kw}.",
+    "The follow-up after {kw} was {thorough|genuinely good}.",
+    "{Straightforward|Smooth} experience with {kw}.",
+    "Went in for {kw} and left knowing exactly what {had been done|to expect next}.",
+    "Nothing was {rushed|glossed over} around {kw}.",
+    "They answered every question I had about {kw}.",
+    "{Clear|Honest} about what {kw} would and would not do.",
+    "Booked {kw} and the whole thing ran {on time|to schedule}.",
+  ],
+  ja: [
+    "{kw}について{丁寧に説明してもらえました|きちんと説明がありました}。",
+    "{kw}を{受けました|お願いしました}が、{不安はありませんでした|安心して任せられました}。",
+    "{kw}を{検討している|考えている}なら、{まず相談してみる価値があります|話を聞いてみる価値があります}。",
+    "{kw}の{事前説明|説明}が{分かりやすかったです|明確でした}。",
+    "{kw}の{後のフォロー|アフターケア}も{しっかりしていました|丁寧でした}。",
+  ],
+  ar: [
+    "شرحوا {kw} {بوضوح|بالتفصيل} قبل البدء.",
+    "لا {ملاحظات|تحفظات} على {kw}.",
+    "إن كنت {تفكر في|تبحث عن} {kw}، فهذه بداية {موفقة|جيدة}.",
+    "المتابعة بعد {kw} كانت {ممتازة|دقيقة}.",
+  ],
+};
+
 /** EN-only frames where a buyer-search phrase reads natural. No taste or
  *  command voice, so they are safe for medical verticals unfiltered. */
 const GEO_TAILS: string[] = [
   // Every frame carries a choice group: geo phrases draw ~1 per review, so a
   // single-surface frame lands ~11x per 100 reviews and trips the diversity
   // gate (measured 16x, 2026-08-03). ~22 surfaces keeps the max under the cap.
-  "{Hard|Tough} to beat for {kw}.",
-  "As far as {kw} goes, this is {the place|the spot|the one to know}.",
+  // "Hard to beat FOR X" reads as "unbeatable in terms of X" — the idiom's
+  // usual object is price or value ("hard to beat for the money"), so a
+  // product+place phrase leaves it saying nothing a reader can parse, on top
+  // of the missing subject: "Hard to beat for Anatolian rugs in Dubai"
+  // (owner read-through 2026-08-09, live Cinar Dubai QR). "for" only works
+  // here in its PURPOSE reading, which needs a plain noun head in front of it.
+  // Not "hard to find better {kw}": that is the comparative ENTITY_BOTH rules
+  // out by name, and "You won't do much better for {kw}" already covers it.
+  "{Solid|Reliable} choice for {kw}.",
+  // "As far as X goes" forces singular agreement, and keywords are routinely
+  // plural ("naturally dyed rugs") -> "As far as ... rugs in Cappadocia goes"
+  // is a visible grammar error (owner read-through 2026-08-07). "When it comes
+  // to X" is agreement-free.
+  "When it comes to {kw}, this is {the place|the spot|the one to know}.",
   "For {kw}, this is {my pick|the spot|where I'd send people}.",
   "If you're after {kw}, {this is it|look no further|start here}.",
   "My {go-to|first stop} for {kw} {now|these days}.",
   "You won't {do|find} much better for {kw}.",
   "Sets the {bar|standard} for {kw}.",
   "When someone asks about {kw}, this is {my answer|the name I give|where I point them}.",
-  "Ticks {every box|all the boxes} for {kw}.",
+  // "Ticks the boxes" is British-marked; "checks" reads neutral to a US ear.
+  // Pitfire's management is a US native speaker (owner note 2026-08-07).
+  // "Checks all the boxes FOR X" wants X to be a need or an occasion ("for a
+  // family dinner"). Store keywords are product+place phrases ("pizza in
+  // Dubai"), which makes the "for" reading abstract and slightly off. The
+  // conditional frame takes any noun phrase (owner questioned it twice:
+  // 2026-08-07, first as "Ticks every box for natural dye rugs in Cappadocia").
+  "If you're {after|looking for} {kw}, this {checks every box|checks all the boxes}.",
 ];
 
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
@@ -1393,12 +1548,52 @@ function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
  * The forced slice keeps the stricter test (glue OR not-a-proper-name) for
  * callers that still pass forcedCount, e.g. the bench.
  */
+const isAsciiText = (k: string): boolean =>
+  [...k].every((c) => c.charCodeAt(0) >= 0x20 && c.charCodeAt(0) <= 0x7e);
+
 function dropForeignPhrases(
   keywords: string[],
   forcedCount: number,
   locale: ReviewLocale,
+  types?: KeywordTypeMap,
 ): { keywords: string[]; forcedCount: number } {
-  if (locale === "en") return { keywords, forcedCount };
+  if (locale === "en") {
+    // Only for stores that carry types: an untyped legacy store must keep
+    // rendering exactly as it does today.
+    if (!types) return { keywords, forcedCount };
+    const keptEn: string[] = [];
+    let keptForcedEn = 0;
+    keywords.forEach((k, i) => {
+      if (!isAsciiText(k)) return;
+      keptEn.push(k);
+      if (i < forcedCount) keptForcedEn++;
+    });
+    return { keywords: keptEn, forcedCount: keptForcedEn };
+  }
+  // An explicitly typed keyword does not need the shape guess. In a non-English
+  // review only an ITEM survives — a menu name a guest really does write in
+  // English ("Niku Beef udon"). Category, service, geo and attribute are all
+  // English PROSE, and prose in the wrong language reads as machine text.
+  //
+  // This is the actual cause of "handmade udon noodlesで締めて正解でした。" and
+  // "まずはregenerative medicineを。" on live JA demos: the 2026-08-03 change
+  // that turned core phrases into pre-ticked guest pills zeroed forcedCount in
+  // production, which silently moved those phrases from the strict test below
+  // to the narrow one — and the narrow test only looks for English glue words,
+  // which "sanuki-style udon" does not have. Typing the keyword removes the
+  // guess entirely; untyped keywords fall through to the old behaviour.
+  if (types) {
+    const kept: string[] = [];
+    let keptForced = 0;
+    keywords.forEach((k, i) => {
+      const t = types[k.trim()];
+      if (t && t !== "item" && isAsciiText(k)) return;
+      kept.push(k);
+      if (i < forcedCount) keptForced++;
+    });
+    keywords = kept;
+    forcedCount = keptForced;
+  }
   const fc = Math.max(0, Math.min(forcedCount, keywords.length));
   const forcedKept = keywords.slice(0, fc).filter((k) => !isForeignPhrase(k, locale));
   const guestKept = keywords
@@ -1440,6 +1635,7 @@ export function buildLocalizedReview(
   forcedCount = 0,
   rating = 5,
   entity?: ReviewEntity,
+  keywordTypes?: KeywordTypeMap,
 ): string {
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
@@ -1450,7 +1646,7 @@ export function buildLocalizedReview(
   const name =
     store.trim() ||
     (locale === "ja" ? "こちらのお店" : locale === "ar" ? "هذا المكان" : "this establishment");
-  const allKeywords = kws.map((k) => k.trim()).filter(Boolean);
+  const allKeywords = [...new Set(kws.map((k) => k.trim()).filter(Boolean))];
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
@@ -1461,7 +1657,7 @@ export function buildLocalizedReview(
     return t0;
   }
 
-  const { keywords: kwPool, forcedCount: fcUsable } = dropForeignPhrases(allKeywords, forcedCount, locale);
+  const { keywords: kwPool, forcedCount: fcUsable } = dropForeignPhrases(allKeywords, forcedCount, locale, keywordTypes);
   const keywords = selectWovenKeywords(kwPool, fcUsable, seed);
   // Length bucket is chosen AFTER keyword selection: the woven count decides
   // how short a review can honestly be while keeping every phrase verbatim.
@@ -1469,16 +1665,23 @@ export function buildLocalizedReview(
   const cfg = { ...LOCALE_CFG[locale], ...bucket };
   // Geo search phrases are pulled out BEFORE the core/tail machinery: they
   // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
-  const geoKws = locale === "en" ? keywords.filter((k) => isGeoPhrase(k)) : [];
-  const nonGeoKeywords = geoKws.length > 0 ? keywords.filter((k) => !isGeoPhrase(k)) : keywords;
+  const typeOf = (k: string) => classifyKeyword(k, keywordTypes, locale);
+  const geoKws = locale === "en" ? keywords.filter((k) => typeOf(k) === "geo") : [];
+  // Categories and services leave the object machinery for the same reason geo
+  // phrases do: the {list} slot and the ordinary tails both assume the phrase
+  // names one thing you ordered.
+  const catKws = keywords.filter((k) => typeOf(k) === "category");
+  const svcKws = keywords.filter((k) => typeOf(k) === "service");
+  const dedicated = new Set([...geoKws, ...catKws, ...svcKws]);
+  const nonGeoKeywords = dedicated.size > 0 ? keywords.filter((k) => !dedicated.has(k)) : keywords;
   const shuffledRaw = shuffle(nonGeoKeywords, forkRng(seed, 0xb8b26351));
   // Attribute-shaped phrases ("great for groups") cannot sit in the {list}
   // object slot, so sort them to the back — the core takes nouns, and they come
   // out through the appositive tails below. Stable within each group, so the
   // shuffle still drives variety.
   const shuffled = [
-    ...shuffledRaw.filter((k) => !isAttributeShaped(k, locale)),
-    ...shuffledRaw.filter((k) => isAttributeShaped(k, locale)),
+    ...shuffledRaw.filter((k) => typeOf(k) !== "attribute"),
+    ...shuffledRaw.filter((k) => typeOf(k) === "attribute"),
   ];
 
   // Only a small CORE of keywords goes into the {list} sentence (see LIST_CAP);
@@ -1489,7 +1692,7 @@ export function buildLocalizedReview(
   // The core {list} sentence is an object slot, so it takes NOUNS only. With
   // few nouns the core simply gets shorter (or empty) and the attribute phrases
   // all leave through the appositive tails — never "Loved the family friendly".
-  const coreNouns = shuffled.filter((k) => !isAttributeShaped(k, locale));
+  const coreNouns = shuffled.filter((k) => typeOf(k) !== "attribute");
   const coreKws = coreNouns.slice(0, coreCount);
   const longPhrases =
     coreKws.reduce((n, k) => n + k.length, 0) > 90 ||
@@ -1525,8 +1728,8 @@ export function buildLocalizedReview(
   const leftovers = shuffled.filter((kw) => kw.length > 0 && !text.includes(kw));
   // Attribute phrases get appositive tails; nouns keep the rich object tails.
   // Pairing only ever joins same-kind phrases so a pair never mixes the two.
-  const nounLeft = leftovers.filter((k) => !isAttributeShaped(k, locale));
-  const attrLeft = leftovers.filter((k) => isAttributeShaped(k, locale));
+  const nounLeft = leftovers.filter((k) => typeOf(k) !== "attribute");
+  const attrLeft = leftovers.filter((k) => typeOf(k) === "attribute");
   // `n` = how many verbatim phrases this slot already carries, so the later
   // budget merge cannot stack a pair onto a pair. Without it, pushGroup paired
   // 4 leftovers into 2 slots and the merge then joined those 2 slots into ONE
@@ -1610,6 +1813,12 @@ export function buildLocalizedReview(
   }
   let ti = 0;
   let ai = 0;
+  // The rotation counters below index into `order`, but `order` is re-filtered
+  // per slot (filterTasteVoice depends on the phrase), so the same template can
+  // come up twice — "Special mention for A. Special mention for B." landed
+  // adjacent in one review (owner read-through 2026-08-07). Remember what has
+  // been used and skip it.
+  const usedTails = new Set<string>();
   for (const slot of slots) {
     // Noun tails additionally drop taste voice when this phrase is not something
     // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30; the EN
@@ -1619,9 +1828,14 @@ export function buildLocalizedReview(
     // Rotation keeps consecutive tails off the same template; the move check
     // then rejects one that repeats a rhetorical beat already in the review.
     const rotated = slot.attr ? order[ai++ % order.length]! : order[ti++ % order.length]!;
-    const tpl = movesIn(fill(rotated, { kw: slot.text }), locale).size === 0
+    let tpl = movesIn(fill(rotated, { kw: slot.text }), locale).size === 0
       ? rotated
       : pickFreshMove(order, text, locale, tailSpread, (t) => fill(t, { kw: slot.text }));
+    if (usedTails.has(tpl)) {
+      const fresh = order.find((t) => !usedTails.has(t));
+      if (fresh) tpl = fresh; // else: pool exhausted, repeating beats dropping the phrase
+    }
+    usedTails.add(tpl);
     text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name);
   }
 
@@ -1642,11 +1856,26 @@ export function buildLocalizedReview(
     }
   }
 
+  // Category and service phrases: same treatment, their own frame pools. Each
+  // gets one dedicated sentence, rotated, never merged into a list.
+  const weaveDedicated = (phrases: string[], pool: string[], salt: number) => {
+    if (phrases.length === 0) return;
+    const choiceRng = forkRng(seed, salt);
+    const order = shuffle(pool.map((t) => expandChoices(t, choiceRng)), forkRng(seed, salt + 1));
+    let i = 0;
+    for (const kw of phrases) {
+      if (text.includes(kw)) continue;
+      text = appendSpread(text, fill(order[i++ % order.length]!, { kw }), cfg.glue, tailSpread, locale, name);
+    }
+  };
+  weaveDedicated(catKws, CATEGORY_TAILS[locale], 0x9e11);
+  weaveDedicated(svcKws, SERVICE_TAILS[locale], 0x9e21);
+
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
   const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical, name);
   text = woven.text;
-  const protectAll = [...shuffled, ...geoKws, ...woven.protect];
+  const protectAll = [...shuffled, ...geoKws, ...catKws, ...svcKws, ...woven.protect];
 
   text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll, locale, sentenceBudget(bucket.kind));
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
@@ -1677,20 +1906,30 @@ export function buildLocalizedReview(
  * minority roll, and a genuinely long review earns a second break. Single-block
  * output survives as real variation, not as the default.
  */
-const PARA_MIN_SIZE = { en: 38, ja: 85 } as const; // one break above this
-const PARA_TWO_SIZE = { en: 95, ja: 210 } as const; // two breaks above this
+// Real Google reviews are overwhelmingly ONE block. A 45-word review with a
+// paragraph break in it is already unusual; a listing where most reviews are
+// split the same way is the tell. Thresholds are the floor BELOW which a break
+// never happens, and the odds above it scale with length (owner note
+// 2026-08-07: "改行も自然にしよう" — 48/60 reviews were exactly 2 paragraphs).
+const PARA_MIN_SIZE = { en: 70, ja: 150 } as const; // never break below this
+const PARA_TWO_SIZE = { en: 150, ja: 320 } as const; // three paragraphs need this
 function layoutParagraphs(text: string, locale: ReviewLocale, rng: () => number, store?: string): string {
   const flat = oneLineCollapse(text.replace(/\n+/g, " "));
   if (!flat) return "";
   const size = locale === "ja" ? cjkCount(flat) : wordCount(flat);
   const parts = splitSentences(flat, locale, store);
   const min = locale === "ja" ? PARA_MIN_SIZE.ja : PARA_MIN_SIZE.en;
-  if (size < min || parts.length < 3 || rng() < 0.12) return flat;
+  if (size < min || parts.length < 3) return flat;
+  // Odds of breaking at all, by length. Short reviews stay whole; only genuinely
+  // long ones usually split, which is what a real listing looks like.
+  const twoSize = locale === "ja" ? PARA_TWO_SIZE.ja : PARA_TWO_SIZE.en;
+  const breakChance = size >= twoSize ? 0.7 : size >= min * 1.4 ? 0.45 : 0.25;
+  if (rng() > breakChance) return flat;
   const joiner = locale === "ja" ? "" : " ";
   const chunk = (from: number, to: number) => parts.slice(from, to).join(joiner).trim();
   // Long enough for three paragraphs, with every one of them ≥2 sentences.
-  const two = locale === "ja" ? PARA_TWO_SIZE.ja : PARA_TWO_SIZE.en;
-  if (size >= two && parts.length >= 6 && rng() < 0.6) {
+  const two = twoSize;
+  if (size >= two && parts.length >= 7 && rng() < 0.3) {
     const a = Math.round(parts.length / 3);
     const b = Math.round((parts.length * 2) / 3);
     return [chunk(0, a), chunk(a, b), chunk(b, parts.length)].join(PARAGRAPH_GAP);

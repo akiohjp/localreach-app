@@ -115,9 +115,9 @@ const EN_GENERIC: PoolSet = {
   openersLong: [
     "Came to {store} for the first time and I'll definitely be back.",
     "Been meaning to try {store} for ages and finally made it, so glad I did.",
-    "Popped into {store} on the weekend and it was a really good visit.",
+    "{Stopped into|Swung by|Dropped into} {store} on the weekend and it was a really good visit.",
     "First time at {store} and it lived up to what friends had been telling me.",
-    "Had a {great|really good|genuinely good} time at {store}, leaving this so a few more people {give it a go|find it|try it}.",
+    "Had a {great|really good|genuinely good} time at {store}, leaving this so a few more people {give it a try|find it|try it}.",
     "Went to {store} not expecting much and {came away really happy|left genuinely impressed|was completely won over}.",
     "{store} was recommended to me and now I see why people rave about it.",
     "Stopped by {store} {today|this week|recently} and it was {well worth the trip|worth every minute|a really good call}.",
@@ -172,7 +172,7 @@ const EN_GENERIC: PoolSet = {
   ],
   coresCompact: [
     "Loved {list}.",
-    "{list}, spot on.",
+    "{list}, {no notes|nailed it|exactly right}.",
     "{list}, so good.",
     "Highlight for me was {list}.",
     "Go for {list}.",
@@ -202,7 +202,7 @@ const EN_GENERIC: PoolSet = {
     "The place was {clean and comfortable|spotless and relaxed|tidy and welcoming}, easy to settle in.",
     "Prices felt {fair|reasonable|right} for what you {get|actually get|walk away with}.",
     "Service was {warm|attentive|genuinely friendly} without being pushy.",
-    "They sorted out a small request {without any fuss|like it was nothing|without blinking}.",
+    "They took care of a small request {without any fuss|like it was nothing|without blinking}.",
     "{Everything|The whole visit|The whole thing} ran smoothly from start to finish.",
     "You can tell the {team|staff|people here} care about getting the details right.",
     "{Nice, relaxed|Calm, easy|Comfortable, low-key} atmosphere, never felt rushed.",
@@ -225,12 +225,12 @@ const EN_GENERIC: PoolSet = {
     "Zero {hassle|fuss|friction}.",
     "Everyone was {helpful|welcoming|on it}.",
     "{Quick|Fast|Prompt} without feeling rushed.",
-    "Spotless place.",
+    "{Spotless|Immaculate|Very clean} place.",
   ],
   closersLong: [
     "I'd {happily|gladly|readily} recommend {store} to anyone.",
     "Will {definitely|certainly|absolutely} be back to {store}.",
-    "{store} is a {solid|safe|strong} choice, give it a go.",
+    "{store} is a {solid|safe|strong} choice, give it a try.",
     "Adding {store} to {my regular list|the rotation|my regulars}.",
     "If you haven't {tried|been to|checked out} {store} yet, do.",
     "Can't recommend {store} {enough|highly enough|more}.",
@@ -239,10 +239,10 @@ const EN_GENERIC: PoolSet = {
     "I've already told {two people|a couple of friends|half my office} about {store} since.",
     "Next time I won't wait {so long|this long|months} to come back to {store}.",
     "We'll be bringing {people|friends|visitors} to {store} from now on.",
-    "That's {store} on the {shortlist|regular rotation|favourites list} for good.",
+    "That's {store} on the {shortlist|regular rotation|favorites list} for good.",
     "I left {store} glad I'd {made the effort|gone|taken the time}.",
     "{store} {earned|deserves} this review, {simple as that|plain and simple|full stop}.",
-    "Do yourself a favour and {check out|visit|go see} {store}.",
+    "Do yourself a favor and {check out|visit|go see} {store}.",
     "I know where I'm {going|headed|pointing people} next time the question comes up: {store}.",
   ],
   closersShort: [
@@ -278,7 +278,7 @@ const EN_GENERIC: PoolSet = {
     "I'm {fussy|picky|particular} about this kind of thing, and I left with {nothing to pick at|no complaints|nothing to fault}.",
     "My expectations were {high|set high|already high} and they still {cleared|beat|passed} them.",
     "Not {a single thing|one thing} I'd change about the {visit|experience|whole thing}.",
-    "Half the battle is {just doing what you promise|getting the basics right|being consistent}, and they do.",
+    "Half the battle is {just doing what you promise|getting the basics right|showing up consistently}, and they do.",
     "Came out in a better mood than I went in, which {says a lot|is rarer than it sounds|counts for a lot}.",
     "Simple things, done {properly|right|well}.",
     "If I lived closer I'd be here {far too often|all the time|every week}.",
@@ -303,7 +303,6 @@ const EN_GENERIC: PoolSet = {
     "Definitely try {kw}.",
     "{kw} stood out most for me.",
     "Also a big fan of {kw}.",
-    "Don't skip {kw}.",
     "Also worth a mention: {kw}.",
     "I'd come back just for {kw}.",
     "Special mention for {kw}.",
@@ -317,7 +316,6 @@ const EN_GENERIC: PoolSet = {
     "Glad we didn't pass on {kw}.",
     "People weren't wrong about {kw}.",
     "A quick shout for {kw} too.",
-    "Save room for {kw}.",
     "{kw} rounded the visit off nicely.",
     "You'll want to ask about {kw}.",
     "Even {kw} got the same care.",
@@ -427,7 +425,7 @@ const JA_GENERIC: PoolSet = {
   ],
   bridgesLong: [
     "スタッフの対応も{丁寧|きめ細やか|てきぱきしていて親切}で、待たされることもありませんでした。",
-    "店内は{清潔で居心地がよかった|きれいで落ち着けた|清潔感があって過ごしやすかった}です。",
+    "店内は{清潔で居心地がよかったです|きれいで落ち着けました|清潔感があって過ごしやすかったです}。",
     "値段も内容に{見合っていて納得|対して良心的|見合っていて安心}でした。",
     "接客は{親切|感じよく自然|柔らかい雰囲気}で、無理に勧めてくることもありませんでした。",
     "ちょっとしたお願いにも{快く|嫌な顔ひとつせず|さらっと}応じてくれました。",
@@ -778,6 +776,12 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     ],
     bridgesLong: ["The bill felt fair relative to the portions, and service kept pace with the kitchen at {store}."],
     closersLong: ["I'd go back to {store} hungry again without overthinking it."],
+    // Food-only idiom. It used to sit in EN_GENERIC, which handed "Save room
+    // for the silk rugs." to a rug showroom (owner read-through 2026-08-07).
+    // "Don't skip X" / "Save room for X" only work when X is a dish. In the
+    // shared pool they produced "Don't skip the patient explanation." on a rug
+    // showroom (probe 2026-08-07).
+    tails: ["Save room for {kw}.", "Go hungry for {kw}.", "Don't skip {kw}."],
   },
   cafe: {
     openersLong: [
@@ -787,6 +791,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     openersShort: ["{store} is a solid spot to sit and slow down for a bit."],
     coresLong: ["The little things did it for me: {list}, and {store} clearly {cares about|sweats|thinks about} the details."],
     closersLong: ["I'll be back to {store} next time I want somewhere calm to sit."],
+    tails: ["Save room for {kw}.", "Don't skip {kw}."],
   },
   beauty: {
     openersLong: [
@@ -814,7 +819,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     coresLong: ["What made it work was {list}. {store} made the whole thing simple."],
     closersLong: [
       "I'll shop at {store} again {next time I'm nearby|whenever I'm in the area|soon enough}.",
-      "That's my {errands|shopping} sorted at {store} from now on.",
+      "That's my {errands|shopping} handled at {store} from now on.",
     ],
   },
   fitness: {
@@ -844,7 +849,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     openersShort: ["{store} gave me natural results and honest advice; I'd go back."],
     coresLong: [
       "What made the difference was {list}. At {store} the results looked like me, just better, not like a different face.",
-      "The thing I'd highlight is {list}. {store} clearly prioritises {doing it safely over doing it fast|safety over speed|getting it right over rushing}.",
+      "What I'd highlight: {list}. {store} clearly puts {safety ahead of speed|getting it right ahead of getting it fast|care ahead of pace over rushing}.",
     ],
     bridgesLong: [
       "The consultation at {store} was {thorough|unhurried|properly detailed} and hygiene was {visibly taken seriously|clearly a priority|obvious everywhere}, which put me at ease.",
@@ -1312,7 +1317,7 @@ const EN_AGENCY: PoolSet = {
     "{kw} keeps proving useful.",
     "{kw} really stood out for us.",
     "No complaints about {kw} either.",
-    "{kw} got sorted without any fuss.",
+    "{kw} was handled without any fuss.",
     "Special mention for {kw}.",
   ],
   microOpeners: [

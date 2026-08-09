@@ -1929,8 +1929,8 @@ export default function StoreDashboard({
             <SectionCard label="Core phrases (SEO)" icon={<Star size={14} />}>
               <p className="text-xs text-slate-600 mb-4 leading-relaxed">
                 The phrases you most want to be found for. Each guest is offered a couple of
-                them as pills that are already switched on, mixed in with the ones below — and
-                a guest can switch any of them off. Almost nobody does, so they reach most
+                them as recommended pills that are already switched on, mixed in with the ones
+                below — and a guest can remove any of them. Almost nobody does, so they reach most
                 reviews, but nothing is ever added to a review the guest did not agree to.
                 They rotate between guests, so your reviews do not all read the same.
               </p>

@@ -20,23 +20,23 @@ const STRINGS = {
   en: {
     title: 'Live Demo Guide',
     subtitle:
-      'Open the guest review journey and the store dashboard (forced GEO keywords · pills · QR) straight from this page.',
+      'Open the guest review journey and the store dashboard (core phrases · guest pills · QR) straight from this page.',
     subnote: 'Presentation helper — open each link in a new tab while you talk.',
     guestHeading: '1. Guest flow',
     guestBody:
-      'Star rating → keyword picks → generated review text → post on Google. Forced keywords are merged in behind the scenes.',
+      'Star rating → phrase picks → generated review text → the guest posts it on Google. A few phrases are recommended for the store and come already selected — the guest can remove any of them.',
     guestButton: 'Open guest screen',
     qrLabel: 'On-site QR (same URL)',
     adminHeading: '2. Store dashboard',
     adminBody:
-      'Forced GEO keywords · Guest keyword pills · QR · multilingual content · Google review link · WhatsApp review requests.',
+      'Core phrases (SEO) · Guest keyword pills · QR · multilingual content · Google review link · WhatsApp review requests.',
     adminButton: 'Dashboard sign-in',
     otherHeading: '3. More',
     lpButton: 'Product page (LP)',
     scriptHeading: 'Suggested talk track (~3 min)',
     scriptSteps: [
       'On a phone: QR or "guest screen" — stars, keywords, and how natural the generated text reads.',
-      'Show the dashboard: "forced keywords enter the text without the guest tapping anything".',
+      'Show the dashboard: core phrases are recommended to the guest and come pre-selected, and they rotate between guests. The guest can remove any of them — nothing is ever added to a review the guest did not agree to.',
       'The Google-post link and copy flow (actual posting needs the demo environment).',
       'If useful, one line on product positioning via the LP.',
     ],
@@ -44,23 +44,23 @@ const STRINGS = {
   ja: {
     title: 'プレゼン用デモガイド',
     subtitle:
-      'ゲストのレビュー導線と管理画面（強制GEOキーワード・ピル・QR）を、このページからすぐ開けます。',
+      'ゲストのレビュー導線と管理画面（コアフレーズ・ゲストピル・QR）を、このページからすぐ開けます。',
     subnote: 'Presentation helper — open each link in a new tab while you talk.',
     guestHeading: '1. お客様フロー（Guest）',
     guestBody:
-      '星評価 → キーワード選択 → 生成文案 → Google投稿。強制キーワードは裏で合流します。',
+      '星評価 → フレーズ選択 → 生成文案 → ゲスト自身がGoogleに投稿。一部のフレーズは店の推奨として選択済みで提示され、ゲストはそれを外せます。',
     guestButton: 'お客様画面を開く',
     qrLabel: '会場用 QR（同上URL）',
     adminHeading: '2. 管理画面（Store admin）',
     adminBody:
-      'Forced GEO keywords · Guest keyword pills · QR · 多言語コンテンツ · GBPリンク · WhatsAppレビュー依頼。',
+      'Core phrases (SEO) · Guest keyword pills · QR · 多言語コンテンツ · GBPリンク · WhatsAppレビュー依頼。',
     adminButton: '管理ログイン',
     otherHeading: '3. その他',
     lpButton: 'LP（local-reach-lp）',
     scriptHeading: '話す順番の例（約3分）',
     scriptSteps: [
       'スマホで QR または「お客様画面」— 星とキーワード、生成文の natural さ。',
-      '「強制キーワードはタップ不要で本文に入る」と管理画面で見せる。',
+      '管理画面で「コアフレーズは推奨として選択済みで提示され、ゲストごとにローテーションする。ゲストは外せるし、同意していない語句は入らない」と見せる。',
       'GBP 投稿用リンク・コピー導線（実際の投稿はデモ環境で要調整）。',
       '必要なら LP でプロダクト位置づけの一言。',
     ],

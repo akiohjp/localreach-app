@@ -78,6 +78,28 @@ const STORES = [
     forced: [],
     entity: { area: null, city: "Dubai", categoryLabel: { en: "AI SEO agency" } },
   },
+  // Cinar Rugs — 3 live trial stores (pulled 2026-08-09, all default_language
+  // "en"). Added after the owner read a live QR draft and hit the third bad
+  // GEO frame in three days; the store was never in this bench, so nothing
+  // here was ever rendering "... rugs in <city>" phrases.
+  {
+    name: "Cinar Rugs Dubai", locale: ["en"], category: "rug store",
+    keywords: ["luxury rugs","silk rugs","Anatolian designs","bespoke design","custom sizing","one-of-a-kind pieces","museum-quality pieces","collector's pieces","signature collection","craftsmanship","master weavers","intricate patterns","heirloom quality","showroom visit","interior advice","worldwide shipping"],
+    forced: ["luxury rugs in Dubai","handmade Turkish silk rugs in Dubai","bespoke rugs in Dubai","designer rugs in Dubai","custom-size rugs in Al Quoz","hand-knotted wool rugs in Dubai","Anatolian rugs in Dubai","Hereke silk rugs in Dubai"],
+    entity: { area: "Al Quoz", city: "Dubai", categoryLabel: { en: "rug store" } },
+  },
+  {
+    name: "Cinar Rugs Istanbul", locale: ["en"], category: "rug store",
+    keywords: ["rug weaving demonstration","showroom tour","silk rugs","wool kilims","antique rugs","Hereke silk","one-of-a-kind pieces","museum-quality pieces","collector's pieces","craftsmanship","master weavers","intricate patterns","heirloom quality","wall hangings","worldwide shipping","custom sizing","no pressure to buy","English-speaking staff"],
+    forced: ["handwoven silk rugs in Istanbul","hand-knotted wool rugs in Istanbul","Hereke silk rugs in Istanbul","Turkish kilims near the Grand Bazaar","antique rugs in Istanbul","custom-size rugs in Istanbul","silk and wool rugs in Sultanahmet","hand-woven rugs in Fatih"],
+    entity: { area: "Grand Bazaar", city: "Istanbul", categoryLabel: { en: "rug store" } },
+  },
+  {
+    name: "Cinar Rugs Cappadocia", locale: ["en"], category: "rug store",
+    keywords: ["rug weaving demonstration","showroom tour","silk rugs","wool kilims","natural dyes","double-knot technique","one-of-a-kind pieces","museum-quality pieces","craftsmanship","master weavers","intricate patterns","fine detail","heirloom quality","wall hangings","worldwide shipping","custom sizing","no pressure to buy","English-speaking staff"],
+    forced: ["handwoven silk rugs in Cappadocia","hand-knotted wool rugs in Cappadocia","Turkish kilims in Avanos","naturally dyed rugs in Cappadocia","Anatolian rugs in Cappadocia","custom-size rugs in Cappadocia","double-knotted rugs in Avanos","hand-woven rugs in Nevsehir"],
+    entity: { area: "Avanos", city: "Nevsehir", categoryLabel: { en: "rug store" } },
+  },
 ];
 
 // ------------------------------------------------------------- detectors ----

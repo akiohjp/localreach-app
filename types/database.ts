@@ -55,6 +55,11 @@ export type ReplySettings = {
 // Database schema
 // ----------------------------------------------------------------
 
+/** What each keyword NAMES: item | service | category | attribute | geo.
+ *  Keys are the keyword strings. Absent keys fall back to engine inference,
+ *  so this is additive for every store that predates it. */
+export type KeywordTypes = Record<string, "item" | "service" | "category" | "attribute" | "geo">;
+
 export type Database = {
   public: {
     Tables: {
@@ -77,6 +82,8 @@ export type Database = {
           keywords: string[];
           /** Always woven into generated reviews (admin “forced” GEO terms). */
           forced_keywords?: string[];
+          /** keyword -> what it names; decides which sentence frames it may enter. */
+          keyword_types?: KeywordTypes;
           brand_color: string;
           /** Object path `{owner_uuid}/{filename}` in `store-logos` bucket; legacy HTTPS URLs normalized by migration. */
           logo_url: string | null;
@@ -115,6 +122,8 @@ export type Database = {
           google_review_url: string;
           keywords?: string[];
           forced_keywords?: string[];
+          /** keyword -> what it names; decides which sentence frames it may enter. */
+          keyword_types?: KeywordTypes;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -141,6 +150,8 @@ export type Database = {
           google_review_url?: string;
           keywords?: string[];
           forced_keywords?: string[];
+          /** keyword -> what it names; decides which sentence frames it may enter. */
+          keyword_types?: KeywordTypes;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -283,6 +294,7 @@ export type Database = {
           greeting_text: LocalizedText;
           keywords: string[];
           forced_keywords: string[];
+          keyword_types: KeywordTypes;
           google_review_url: string;
           brand_color: string;
           default_language: SupportedLocale;
@@ -357,7 +369,7 @@ export type CustomerInsert = TablesInsert<"customers">;
 /** Fields editable from the client self-service portal. */
 export type StoreBrandSettings = Pick<
   Store,
-  "brand_color" | "logo_url" | "keywords" | "forced_keywords"
+  "brand_color" | "logo_url" | "keywords" | "forced_keywords" | "keyword_types"
 >;
 
 // ----------------------------------------------------------------
