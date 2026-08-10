@@ -472,6 +472,12 @@ function joinListEn(phrases: string[], rng: () => number): string {
   if (p.length === 2) {
     // Two items read best joined with "and"; a bare comma ("A, B was great")
     // looks like a clipped list. Keep an occasional "plus" for variety.
+    //
+    // Unless a phrase already contains "and": "the Karak and doughnuts and a
+    // thoughtful gift" reads as one runaway list and the reader cannot tell
+    // where the first item ends (naturalness reader, 2026-08-10, live Let It
+    // Dough! config, both runs). "plus" keeps the boundary visible.
+    if (p.some((x) => /\band\b/i.test(x))) return `${p[0]} plus ${p[1]}`;
     return rng() < 0.82 ? `${p[0]} and ${p[1]}` : `${p[0]} plus ${p[1]}`;
   }
   if (p.length === 3) {
@@ -717,7 +723,7 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "Another plus: {kw}.",
     "{Also worth mentioning|Worth flagging too}: {kw}.",
     "One more thing{ I liked|}: {kw}.",
-    "Plus {kw}, which I {appreciated|rate|didn't take for granted}.",
+    "Plus {kw}, which I {appreciated|rate}.",
     "{Same goes|That goes} for {kw}.",
     "Another point in its favor: {kw}.",
     "And {kw}, too, which {helps|matters|makes a difference}.",
@@ -922,7 +928,7 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
   // deliberately mix recommendation, discovery, habit and plain-statement
   // shapes rather than reshuffling one sentence.
   en: [
-    "My {go-to|default|first-choice} {cat} in {loc} now.",
+    "My {go-to|first-choice} {cat} in {loc} now.",
     "Glad to have this {cat} {in|here in|right in} {loc}.",
     "If you're {near|around|anywhere near} {loc}, this is the {cat} to try.",
     "{Solid|Dependable|Quality} {cat} right in {loc}.",

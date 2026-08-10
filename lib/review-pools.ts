@@ -215,7 +215,7 @@ const EN_GENERIC: PoolSet = {
     "{Nice, relaxed|Calm, easy|Comfortable, low-key} atmosphere, never felt rushed.",
     "Someone checked in on us {at the right times|now and then|when it mattered}, without hovering.",
     "Even with a steady stream of people coming in, nothing felt {chaotic|rushed|out of control}.",
-    "The person looking after us {remembered everything|kept track of everything|missed nothing} without needing to write it down.",
+    "The person looking after us {remembered everything|kept track of everything|missed nothing}.",
     "Questions got {straight|clear|honest} answers, which I {appreciate|always appreciate}.",
     "They were upfront about the one thing that wasn't available, which I {respect|appreciated|rate}.",
     "It was busy, and they still {made it feel unhurried|kept things calm|kept the pace relaxed}.",
@@ -778,7 +778,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     ],
     openersShort: ["{store}? Yeah, we'd eat there again.", "Quick take after {store}: a good meal, with a couple of standout plates."],
     coresLong: [
-      "What landed best was {list}. At {store} that came through from the first bite to the last.",
+      "What landed best was {list}, and that held up from the first bite to the last.",
       "If you strip the meal down, it was basically {list} done with care, and that's {store}.",
     ],
     bridgesLong: ["The bill felt fair relative to the portions, and service kept pace with the kitchen at {store}."],
