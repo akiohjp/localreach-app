@@ -724,7 +724,10 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "{Also worth mentioning|Worth flagging too}: {kw}.",
     "One more thing{ I liked|}: {kw}.",
     "Plus {kw}, which I {appreciated|rate}.",
-    "The same goes for {kw}.",
+    // An attribute pill can be a bare adjective phrase ("family friendly"), and
+    // only appositive frames take that shape — "The same goes for family
+    // friendly." is not a sentence anyone writes.
+    "Also on the list: {kw}.",
     "Another point in its favor: {kw}.",
     "And {kw}, too, which {helps|matters|makes a difference}.",
     // Not "It's also {kw}": attribute pills are routinely whole clauses ("no
@@ -735,6 +738,16 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "On top of that, {kw}.",
     "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
     "Small detail, but a {good|welcome|nice} one: {kw}.",
+    "{Worth noting|Worth adding} as well: {kw}.",
+    "{Counts for something|Not nothing} either: {kw}.",
+    "And this helped: {kw}.",
+    "One thing I did not expect: {kw}.",
+    "A {detail|point} in their favor: {kw}.",
+    "Also true: {kw}.",
+    "{Nice|Good} to see as well: {kw}.",
+    "File this under reasons to go back: {kw}.",
+    "{Handy|Useful} too: {kw}.",
+    "Another thing worth {a mention|flagging}: {kw}.",
   ],
   // JA: the phrase is closed off with 、before the frame continues, so no
   // particle ever attaches to the keyword — grammatical for a noun, an adjective

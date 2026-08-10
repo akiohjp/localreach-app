@@ -90,7 +90,34 @@ async function fetchStores() {
 }
 
 const { ENABLED_LOCALES } = await import("../lib/guest-locales.ts");
+const { classifyKeyword } = await import("../lib/review-engine.ts");
 const STORES = await fetchStores();
+
+// ------------------------------------------------- untyped keyword report ---
+// An untyped keyword falls back to the engine's guess, which is the behaviour
+// the type system exists to replace: the guess is what produced "Kotobuki
+// Clinic nailed AGA Treatment." The dashboard now freezes a type for every
+// keyword on save, so an untyped store is one nobody has saved since — most
+// likely a store an outreach push just created.
+{
+  const rows = [];
+  for (const st of STORES) {
+    const all = [...new Set([...st.forced, ...st.keywords])].filter((k) => k && k.trim());
+    const untyped = all.filter((k) => !(st.keywordTypes ?? {})[k.trim()]);
+    if (untyped.length) rows.push({ name: st.name, untyped, total: all.length });
+  }
+  console.log("─── keyword types ───");
+  if (!rows.length) {
+    console.log("  ✓ every live store has a type on every keyword");
+  } else {
+    for (const r of rows) {
+      const guesses = r.untyped.slice(0, 4).map((k) => `${k} → ${classifyKeyword(k, undefined, "en")}`);
+      console.log(`  ! ${r.name}: ${r.untyped.length}/${r.total} untyped (guessing: ${guesses.join(", ")}${r.untyped.length > 4 ? ", …" : ""})`);
+    }
+    console.log("  → open the store dashboard and press Save on the keyword sections, or run scripts/set-keyword-types.mjs --apply");
+  }
+  console.log("");
+}
 
 
 // ------------------------------------------------------------- detectors ----

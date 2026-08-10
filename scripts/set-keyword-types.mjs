@@ -119,6 +119,17 @@ const TYPES = {
     attribute: ["入場料無料", "65球700円", "36打席", "無料の駐車場", "駅から歩ける立地",
                 "夜22時までの営業", "静かな練習環境", "ふらっと立ち寄れる気軽さ"],
   },
+  // The sales demo. It carried "LocalReach demo" and "Google reviews" as guest
+  // pills, so the generator produced "Go for the Google reviews." — on the one
+  // store a prospect is most likely to be shown (2026-08-11).
+  "LocalReach Demo Cafe Dubai": {
+    geo: ["specialty coffee in Dubai"],
+    category: ["third-wave coffee", "breakfast"],
+    item: ["flat white", "cold brew", "matcha latte", "avocado toast", "shakshuka",
+           "pistachio croissant", "date cheesecake"],
+    attribute: ["friendly service", "quick service", "cozy atmosphere",
+                "family friendly", "oat milk options", "fresh ingredients"],
+  },
   "mirAIreach": {
     // Visibility and rankings are outcomes of work done, not stock you browse:
     // "Plenty of ChatGPT visibility to choose from." was the giveaway.

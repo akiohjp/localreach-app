@@ -319,6 +319,33 @@ function KeywordTypePicker({
   )
 }
 
+/**
+ * Freeze the type of every keyword being saved.
+ *
+ * The dropdown SHOWS the engine's guess but the map only ever held what the
+ * owner explicitly changed, so a store where nobody touched a dropdown saved
+ * `keyword_types: {}` — and the engine went back to guessing at generation
+ * time. That is the whole thing keyword types were introduced to stop, and it
+ * hit every NEW store, which is exactly the store an outreach push creates.
+ *
+ * Writing the effective type down makes the stored data explicit and
+ * auditable: what the owner sees in the pill is what the engine will use.
+ */
+function materializeTypes(
+  keywords: string[],
+  types: KeywordTypes,
+  locale: SupportedLocale | undefined,
+): KeywordTypes {
+  const loc = locale === 'ja' ? 'ja' : locale === 'ar' ? 'ar' : 'en'
+  const out: KeywordTypes = { ...types }
+  for (const kw of keywords) {
+    const k = kw.trim()
+    if (!k) continue
+    if (!out[k]) out[k] = classifyKeyword(k, undefined, loc)
+  }
+  return out
+}
+
 function KeywordManager({
   storeId,
   initial,
@@ -326,6 +353,7 @@ function KeywordManager({
   locale,
   types,
   onTypeChange,
+  onTypesFrozen,
 }: {
   storeId: string
   initial: string[]
@@ -336,6 +364,8 @@ function KeywordManager({
    *  owned by the parent and neither manager can clobber the other. */
   types: KeywordTypes
   onTypeChange: (kw: string, t: KeywordType) => void
+  /** Lift the frozen map after a save so the sibling manager sees it too. */
+  onTypesFrozen: (t: KeywordTypes) => void
 }) {
   const [keywords, setKeywords] = useState<string[]>(initial)
   const [input, setInput] = useState('')
@@ -386,7 +416,9 @@ function KeywordManager({
     if (toSave !== keywords) { setKeywords(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { keywords: toSave, keyword_types: types })
+      const frozen = materializeTypes(toSave, types, locale)
+      await saveField(storeId, { keywords: toSave, keyword_types: frozen })
+      onTypesFrozen(frozen)
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -521,12 +553,15 @@ function ForcedKeywordManager({
   locale,
   types,
   onTypeChange,
+  onTypesFrozen,
 }: {
   storeId: string
   initial: string[]
   locale?: SupportedLocale
   types: KeywordTypes
   onTypeChange: (kw: string, t: KeywordType) => void
+  /** Lift the frozen map after a save so the sibling manager sees it too. */
+  onTypesFrozen: (t: KeywordTypes) => void
 }) {
   const [items, setItems] = useState<string[]>(initial)
   const [input, setInput] = useState('')
@@ -568,7 +603,9 @@ function ForcedKeywordManager({
     if (toSave !== items) { setItems(toSave); setInput('') }
     setState('saving')
     try {
-      await saveField(storeId, { forced_keywords: toSave, keyword_types: types })
+      const frozen = materializeTypes(toSave, types, locale)
+      await saveField(storeId, { forced_keywords: toSave, keyword_types: frozen })
+      onTypesFrozen(frozen)
       setState('saved')
       setTimeout(() => setState('idle'), 2500)
     } catch {
@@ -2162,6 +2199,7 @@ export default function StoreDashboard({
                 locale={store.default_language}
                 types={keywordTypes}
                 onTypeChange={setKeywordType}
+                onTypesFrozen={setKeywordTypes}
               />
             </SectionCard>
 
@@ -2179,6 +2217,7 @@ export default function StoreDashboard({
                 locale={store.default_language}
                 types={keywordTypes}
                 onTypeChange={setKeywordType}
+                onTypesFrozen={setKeywordTypes}
               />
             </SectionCard>
         </div>
