@@ -64,13 +64,18 @@ const TYPES = {
   },
   "Pitfire Pizza": {
     category: ["artisan pizza", "oven-fresh pizza"],
+    // "Keep an eye out for the comfortable seating." — the item frames want
+    // something you ordered (naturalness reader, both runs, 2026-08-10).
+    attribute: ["comfortable seating", "good value", "quick service", "friendly team", "crispy crust"],
   },
   "Cinar Rugs Dubai": {
     category: ["luxury rugs", "silk rugs", "Anatolian designs", "one-of-a-kind pieces",
                "museum-quality pieces", "collector's pieces"],
     item: ["showroom visit", "signature collection"],
     service: ["bespoke design", "custom sizing", "interior advice", "worldwide shipping"],
-    attribute: [],
+    // A quality is not a thing you picked: "My pick: the heirloom quality."
+    // (naturalness reader, both runs, 2026-08-10).
+    attribute: ["heirloom quality", "intricate patterns", "master weavers"],
   },
   "Cinar Rugs Istanbul": {
     item: ["rug weaving demonstration", "showroom tour"],

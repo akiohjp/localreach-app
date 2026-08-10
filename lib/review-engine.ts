@@ -724,13 +724,13 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "{Also worth mentioning|Worth flagging too}: {kw}.",
     "One more thing{ I liked|}: {kw}.",
     "Plus {kw}, which I {appreciated|rate}.",
-    "{Same goes|That goes} for {kw}.",
+    "The same goes for {kw}.",
     "Another point in its favor: {kw}.",
     "And {kw}, too, which {helps|matters|makes a difference}.",
     // Not "It's also {kw}": attribute pills are routinely whole clauses ("no
     // pressure to buy"), and the copula then produces "It's also no pressure
     // to buy." (naturalness reader, 2026-08-10, live Cinar Istanbul config).
-    "{kw}, {for what that's worth|and that helps|no small thing}.",
+    "Also {kw}, {for what that's worth|and that helps|no small thing}.",
     "In the plus column: {kw}.",
     "On top of that, {kw}.",
     "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
