@@ -34,6 +34,8 @@ const RESULT_STORE_ID = isValidUuid(DEMO_STORE_ID) ? DEMO_STORE_ID : "demo";
 export default function ReviewPage() {
   const [step, setStep] = useState<Step>("rating");
   const [rating, setRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(true)
   const [reviewText, setReviewText] = useState("");
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [reviewLocale, setReviewLocale] = useState<SupportedLocale>("en");
@@ -192,8 +194,15 @@ export default function ReviewPage() {
                 storeId={RESULT_STORE_ID}
                 rating={rating}
                 storeName={STORE_CONFIG.storeName}
-                googleReviewUrl={STORE_CONFIG.gbpReviewUrl}
-                onSubmit={() => setStep("feedback_sent")}
+                onSubmit={(written) => {
+                  setFeedbackText(written)
+                  setFeedbackSent(true)
+                  setStep("feedback_sent")
+                }}
+                onSkip={() => {
+                  setFeedbackSent(false)
+                  setStep("feedback_sent")
+                }}
               />
             )}
             {step === "feedback_sent" && (
@@ -201,6 +210,8 @@ export default function ReviewPage() {
                 t={t}
                 storeName={STORE_CONFIG.storeName}
                 googleReviewUrl={STORE_CONFIG.gbpReviewUrl}
+                feedbackText={feedbackText}
+                sent={feedbackSent}
                 onReset={reset}
               />
             )}

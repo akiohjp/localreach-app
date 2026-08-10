@@ -41,6 +41,16 @@ export interface UiStrings {
     title: string;
     subtitle: string;
     reviewAria: string;
+    /**
+     * A private line to the owner, offered next to the public draft. Happy
+     * guests have things they will say to a person and not to Google, and a
+     * store that only hears from unhappy guests hears half of it.
+     */
+    noteHeading: string;
+    noteNote: string;
+    notePlaceholder: string;
+    noteSend: string;
+    noteSent: string;
     whatsappOptional: string;
     /**
      * SMS variants of the capture block, used when the store's contact_channel
@@ -79,8 +89,21 @@ export interface UiStrings {
     title: string;
     /** "Help {store} improve." */
     help: string;
-    quickTags: string[];
+    /**
+     * Fixed, countable reasons. The old version pasted a tag into the textarea,
+     * which read back as prose and could not be totalled — so the dashboard
+     * could show that something was wrong but never what, across guests.
+     * `key` is stored; `label` is only ever shown.
+     */
+    topics: { key: string; label: string }[];
     placeholder: string;
+    /** Optional: lets the store follow up with this guest instead of guessing. */
+    contactHeading: string;
+    contactNote: string;
+    contactName: string;
+    contactPhone: string;
+    /** Leaves without sending anything, and still reaches the same next screen. */
+    skip: string;
     describeAria: string;
     send: string;
     sending: string;
@@ -146,6 +169,11 @@ const en: UiStrings = {
     title: "Ready to post",
     subtitle: "Edit freely before submitting.",
     reviewAria: "Your review text",
+    noteHeading: "Anything just for the team?",
+    noteNote: "Optional, private — this one is not posted anywhere.",
+    notePlaceholder: "Something you'd tell them in person…",
+    noteSend: "Send to the team",
+    noteSent: "Sent — thank you.",
     whatsappOptional: "WhatsApp (Optional)",
     smsOptional: "Phone number (optional)",
     smsPhoneAria: "Phone number",
@@ -182,14 +210,19 @@ const en: UiStrings = {
   feedback: {
     title: "We're sorry to hear that.",
     help: "Help {store} improve.",
-    quickTags: [
-      "Food quality",
-      "Service",
-      "Wait time",
-      "Pricing",
-      "Cleanliness",
-      "Other",
+    topics: [
+      { key: "quality", label: "Food quality" },
+      { key: "service", label: "Service" },
+      { key: "wait", label: "Waiting time" },
+      { key: "price", label: "Price" },
+      { key: "cleanliness", label: "Cleanliness" },
+      { key: "other", label: "Something else" },
     ],
+    contactHeading: "Want them to get back to you?",
+    contactNote: "Optional. Only the owner sees this.",
+    contactName: "Your name",
+    contactPhone: "Phone number",
+    skip: "Continue without sending",
     placeholder: "Describe your experience...",
     describeAria: "Describe your experience",
     send: "Send privately to the team",
@@ -243,6 +276,11 @@ const ja: UiStrings = {
     title: "投稿の準備ができました",
     subtitle: "投稿前に自由に編集できます。",
     reviewAria: "レビュー本文",
+    noteHeading: "お店の方にだけ伝えたいことはありますか？",
+    noteNote: "任意・非公開です。どこにも掲載されません。",
+    notePlaceholder: "直接なら言えること、なんでも…",
+    noteSend: "お店に送る",
+    noteSent: "送信しました。ありがとうございます。",
     whatsappOptional: "WhatsApp（任意）",
     smsOptional: "電話番号（任意）",
     smsPhoneAria: "電話番号",
@@ -280,7 +318,19 @@ const ja: UiStrings = {
   feedback: {
     title: "申し訳ございません。",
     help: "{store}の改善にご協力ください。",
-    quickTags: ["料理の質", "接客", "待ち時間", "価格", "清潔さ", "その他"],
+    topics: [
+      { key: "quality", label: "料理の質" },
+      { key: "service", label: "接客" },
+      { key: "wait", label: "待ち時間" },
+      { key: "price", label: "価格" },
+      { key: "cleanliness", label: "清潔さ" },
+      { key: "other", label: "その他" },
+    ],
+    contactHeading: "お店から連絡してもよろしいですか？",
+    contactNote: "任意です。お店の人だけが見ます。",
+    contactName: "お名前",
+    contactPhone: "電話番号",
+    skip: "送らずに次へ",
     placeholder: "ご体験の内容をお書きください…",
     describeAria: "ご体験の内容",
     send: "お店に直接送る（非公開）",
@@ -334,6 +384,11 @@ const ar: UiStrings = {
     title: "جاهزة للنشر",
     subtitle: "عدّلها بحرية قبل الإرسال.",
     reviewAria: "نص مراجعتك",
+    noteHeading: "هل من شيء تود قوله لفريق المكان وحده؟",
+    noteNote: "اختياري وخاص — لا يُنشر في أي مكان.",
+    notePlaceholder: "ما كنت ستقوله لهم وجهاً لوجه…",
+    noteSend: "أرسِل إلى الفريق",
+    noteSent: "تم الإرسال، شكراً لك.",
     whatsappOptional: "واتساب (اختياري)",
     smsOptional: "رقم الهاتف (اختياري)",
     smsPhoneAria: "رقم الهاتف",
@@ -369,14 +424,19 @@ const ar: UiStrings = {
   feedback: {
     title: "نأسف لسماع ذلك.",
     help: "ساعد {store} على التحسّن.",
-    quickTags: [
-      "جودة الطعام",
-      "الخدمة",
-      "وقت الانتظار",
-      "الأسعار",
-      "النظافة",
-      "أخرى",
+    topics: [
+      { key: "quality", label: "جودة الطعام" },
+      { key: "service", label: "الخدمة" },
+      { key: "wait", label: "وقت الانتظار" },
+      { key: "price", label: "السعر" },
+      { key: "cleanliness", label: "النظافة" },
+      { key: "other", label: "شيء آخر" },
     ],
+    contactHeading: "هل تود أن يتواصلوا معك؟",
+    contactNote: "اختياري. لا يراه سوى صاحب المكان.",
+    contactName: "الاسم",
+    contactPhone: "رقم الهاتف",
+    skip: "المتابعة من دون إرسال",
     placeholder: "صف تجربتك…",
     describeAria: "صف تجربتك",
     send: "إرسال إلى الفريق (خاص)",

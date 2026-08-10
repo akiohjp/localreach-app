@@ -118,6 +118,11 @@ export default function ReviewFlow({
   const [step, setStep] = useState<Step>('rating')
   const [rating, setRating] = useState(0)
   const [reviewText, setReviewText] = useState('')
+  // Carried to the thank-you screen: what the guest wrote (so it can be copied
+  // on the way to Google) and whether they actually sent it (so a guest who
+  // skipped is not thanked for feedback they did not leave).
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(true)
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
   // The guest picks which language the REVIEW is generated in (independent of the
   // page UI). Defaults to the page locale.
@@ -417,8 +422,16 @@ export default function ReviewFlow({
               storeId={storeId}
               rating={rating}
               storeName={storeName}
-              googleReviewUrl={googleReviewUrl}
-              onSubmit={() => setStep('feedback_sent')}
+              dialCode={contactDialCode ?? undefined}
+              onSubmit={(written) => {
+                setFeedbackText(written)
+                setFeedbackSent(true)
+                setStep('feedback_sent')
+              }}
+              onSkip={() => {
+                setFeedbackSent(false)
+                setStep('feedback_sent')
+              }}
             />
           )}
 
@@ -427,6 +440,8 @@ export default function ReviewFlow({
               t={t}
               storeName={storeName}
               googleReviewUrl={googleReviewUrl}
+              feedbackText={feedbackText}
+              sent={feedbackSent}
               onReset={reset}
             />
           )}

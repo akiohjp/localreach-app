@@ -13,6 +13,7 @@ import { ratingGoals, reviewActivity, type ReviewSnapshot } from '@/lib/review-m
 import LogoUploader from '@/components/LogoUploader'
 import ReplyGenerator from '@/components/ReplyGenerator'
 import InstallAppButton from '@/components/InstallAppButton'
+import NotificationToggle from '@/components/NotificationToggle'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
 import { keywordPresetsFor } from '@/lib/keyword-presets'
 import { resolveVertical } from '@/lib/review-pools'
@@ -35,7 +36,23 @@ type FeedbackEntry = {
   id: string
   rating: number
   message: string
+  /** Countable reasons the guest tapped; empty for a note left with a high rating. */
+  topics?: string[] | null
+  contact_name?: string | null
+  contact_phone?: string | null
+  /** NULL = nobody has opened it yet. */
+  read_at?: string | null
   created_at: string
+}
+
+/** Same fixed keys the guest screen stores. Shown, never stored, in English. */
+const TOPIC_LABEL: Record<string, string> = {
+  service: 'Service',
+  wait: 'Waiting time',
+  quality: 'Quality',
+  cleanliness: 'Cleanliness',
+  price: 'Price',
+  other: 'Something else',
 }
 
 type Props = {
@@ -51,6 +68,8 @@ type Props = {
   /** Private low-rating (<4★) guest feedback — owner-only. */
   feedback?: FeedbackEntry[]
   feedbackCount?: number
+  /** Notes nobody has opened yet — drives the tab badge. */
+  feedbackUnread?: number
   /** Signed URL when logo bucket is non-public. */
   logoSignedUrl?: string | null
   /** Workspace to open first (from the URL's ?tab=). */
@@ -1490,10 +1509,43 @@ function CrmSection({
 // ─────────────────────────────────────────────
 
 // ─────────────────────────────────────────────
-// Private feedback (guests who rated under 4★) — read-only, owner only
+// Private guest notes — read-only, owner only. Any rating: a happy guest can
+// leave one too, which is also what keeps the flow from treating unhappy
+// guests as a separate case.
 // ─────────────────────────────────────────────
 
-function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEntry[] }) {
+function FeedbackSection({
+  storeId,
+  count,
+  unread,
+  recent,
+  vapidPublicKey,
+}: {
+  storeId: string
+  count: number
+  unread: number
+  recent: FeedbackEntry[]
+  vapidPublicKey: string
+}) {
+  const [cleared, setCleared] = useState(false)
+  const openUnread = cleared ? 0 : unread
+
+  async function markRead() {
+    setCleared(true)
+    try {
+      const res = await fetch('/api/feedback/mark-read', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ store_id: storeId }),
+      })
+      // Put the badge back rather than pretending: an owner who thinks they
+      // have read everything stops looking.
+      if (!res.ok) setCleared(false)
+    } catch {
+      setCleared(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -1504,15 +1556,38 @@ function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEnt
           </p>
         </div>
         <p className="text-xs text-slate-500 leading-relaxed">
-          Private feedback from guests who rated under 4 stars. Never shown on Google —
-          only you see it here, so you can fix issues before they go public.
+          Notes guests sent straight to you. Never shown on Google — only you see them, so you can
+          put something right before it becomes a public review, and hear the good things guests
+          only say in person.
         </p>
       </div>
+
+      <NotificationToggle storeId={storeId} vapidPublicKey={vapidPublicKey} />
+
+      {openUnread > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5">
+          <p className="text-xs font-semibold text-sky-900">
+            {openUnread} you have not opened yet
+          </p>
+          <button
+            type="button"
+            onClick={markRead}
+            className="text-[11px] font-semibold text-sky-700 hover:text-sky-900 underline underline-offset-2"
+          >
+            Mark all as read
+          </button>
+        </div>
+      )}
 
       {recent.length > 0 ? (
         <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
           {recent.map((f) => (
-            <div key={f.id} className="flex items-start justify-between gap-3 px-4 py-3 bg-white">
+            <div
+              key={f.id}
+              className={`flex items-start justify-between gap-3 px-4 py-3 ${
+                !f.read_at && !cleared ? 'bg-sky-50/60' : 'bg-white'
+              }`}
+            >
               <div className="space-y-1.5 min-w-0">
                 <div className="flex items-center gap-0.5" aria-label={`${f.rating} stars`}>
                   {[1, 2, 3, 4, 5].map((n) => (
@@ -1523,7 +1598,32 @@ function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEnt
                     />
                   ))}
                 </div>
-                <p className="text-sm text-slate-700 break-words">{f.message}</p>
+                {f.topics && f.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {f.topics.map((key) => (
+                      <span
+                        key={key}
+                        className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600"
+                      >
+                        {TOPIC_LABEL[key] ?? key}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {f.message && <p className="text-sm text-slate-700 break-words">{f.message}</p>}
+                {(f.contact_name || f.contact_phone) && (
+                  <p className="text-[11px] text-slate-500">
+                    {/* The difference between reading a complaint and being able
+                        to answer it. Tel link so it is one tap from here. */}
+                    {f.contact_name}
+                    {f.contact_name && f.contact_phone ? ' · ' : ''}
+                    {f.contact_phone && (
+                      <a href={`tel:${f.contact_phone}`} className="font-semibold text-sky-700 hover:underline">
+                        {f.contact_phone}
+                      </a>
+                    )}
+                  </p>
+                )}
               </div>
               <p className="text-[11px] text-slate-400 tabular-nums shrink-0">
                 {new Date(f.created_at).toLocaleDateString('en-US', {
@@ -1535,7 +1635,7 @@ function FeedbackSection({ count, recent }: { count: number; recent: FeedbackEnt
           ))}
         </div>
       ) : (
-        <p className="text-xs text-slate-400 py-4 text-center">No private feedback yet.</p>
+        <p className="text-xs text-slate-400 py-4 text-center">No notes from guests yet.</p>
       )}
     </div>
   )
@@ -1739,6 +1839,7 @@ export default function StoreDashboard({
   crmLoadError = false,
   feedback = [],
   feedbackCount = 0,
+  feedbackUnread = 0,
   logoSignedUrl,
   initialTab = 'grow',
   reviewStats = [],
@@ -1774,7 +1875,7 @@ export default function StoreDashboard({
   }
   const TABS = [
     { id: 'grow' as const, label: 'Grow', icon: Megaphone, blurb: 'Collect and answer reviews' },
-    { id: 'customers' as const, label: 'Customers', icon: Users, blurb: 'Who came in, and private feedback' },
+    { id: 'customers' as const, label: 'Customers', icon: Users, blurb: 'Who came in, and notes they sent you' },
     { id: 'settings' as const, label: 'Settings', icon: Settings, blurb: 'Brand, content and review setup' },
   ]
 
@@ -1957,7 +2058,13 @@ export default function StoreDashboard({
             </SectionCard>
 
             <SectionCard label="Private feedback" icon={<MessageSquareWarning size={14} />}>
-              <FeedbackSection count={feedbackCount} recent={feedback} />
+              <FeedbackSection
+                storeId={store.id}
+                count={feedbackCount}
+                unread={feedbackUnread}
+                recent={feedback}
+                vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''}
+              />
             </SectionCard>
         </div>
 

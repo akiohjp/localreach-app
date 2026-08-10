@@ -112,3 +112,52 @@ self.addEventListener("fetch", (event) => {
 
   // 3) Everything else: default browser handling (live network).
 });
+
+// ── Push: new guest feedback ────────────────────────────────────────────────
+// The dashboard is something an owner opens on purpose, and feedback that only
+// exists behind a deliberate visit reads to staff as feedback that never came.
+// This is the one channel that reaches the phone on its own — the app is
+// already installable, and on iOS push only works once it has been installed,
+// which is what the "Install app" button is for.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "New guest feedback";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      // Reuse the installed app's own icons so the notification is recognisable.
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      // Same tag per store: a busy evening collapses into one line instead of
+      // burying the phone in separate notifications.
+      tag: data.tag || "feedback",
+      renotify: true,
+      data: { url: data.url || "/admin" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/admin";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      // Focus a tab that already has the dashboard open rather than stacking
+      // another one on top of it.
+      for (const client of all) {
+        if (client.url.includes("/admin") && "focus" in client) {
+          await client.focus();
+          if ("navigate" in client) await client.navigate(target);
+          return;
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(target);
+    })(),
+  );
+});

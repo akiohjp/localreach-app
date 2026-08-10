@@ -219,6 +219,12 @@ export type Database = {
           store_id: string;
           rating: number;
           message: string;
+          /** Countable reasons the guest tapped. Empty for a note left with a high rating. */
+          topics: string[];
+          contact_name: string | null;
+          contact_phone: string | null;
+          /** NULL = the owner has not opened it yet. Drives the unread badge. */
+          read_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -226,6 +232,10 @@ export type Database = {
           store_id: string;
           rating: number;
           message: string;
+          topics?: string[];
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          read_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -233,11 +243,65 @@ export type Database = {
           store_id?: string;
           rating?: number;
           message?: string;
+          topics?: string[];
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          read_at?: string | null;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "feedback_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      /**
+       * Web Push endpoints for a store's feedback notifications. Service-role
+       * only — RLS is on with no anon/authenticated policy, because a row here
+       * says "send this store's guest comments to this device".
+       */
+      push_subscriptions: {
+        Row: {
+          id: string;
+          store_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          last_sent_at: string | null;
+          /** Set when the push service reports the endpoint is gone (404/410). */
+          expired_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          store_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          created_at?: string;
+          last_sent_at?: string | null;
+          expired_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          store_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          created_at?: string;
+          last_sent_at?: string | null;
+          expired_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_store_id_fkey";
             columns: ["store_id"];
             isOneToOne: false;
             referencedRelation: "stores";

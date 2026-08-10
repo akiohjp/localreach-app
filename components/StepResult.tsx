@@ -86,6 +86,11 @@ export default function StepResult({
   const [countryCode, setCountryCode] = useState(dialCode);
   const [phone, setPhone] = useState("");
   const [optIn, setOptIn] = useState(true);
+  // A private line to the owner, alongside the public draft. Until now the only
+  // way to say something directly was to rate under 4 stars, so the store heard
+  // from unhappy guests and nobody else.
+  const [note, setNote] = useState("");
+  const [noteState, setNoteState] = useState<"idle" | "sending" | "sent">("idle");
   const [waState, setWaState] = useState<WaState>("idle");
   /** True when Save succeeded on a preview page (no DB write). */
   const [waSavedWasPreview, setWaSavedWasPreview] = useState(false);
@@ -117,6 +122,30 @@ export default function StepResult({
   }
 
   const hasValidReviewUrl = isUsableReviewUrl(gbpReviewUrl);
+
+  async function sendNote() {
+    const message = note.trim();
+    if (!message || noteState !== "idle") return;
+    setNoteState("sending");
+    // Preview pages have no real store row — keep the UX, skip the write.
+    if (!isValidUuid(storeId)) {
+      setNoteState("sent");
+      return;
+    }
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ store_id: storeId, rating: 5, message, topics: [] }),
+      });
+      // A failure here must not block the public review the guest came to post,
+      // so it reverts to idle and lets them try again rather than shouting.
+      setNoteState(res.ok ? "sent" : "idle");
+    } catch (err) {
+      console.error("[note] submit failed", err);
+      setNoteState("idle");
+    }
+  }
 
   function handlePostOnGoogle() {
     // The owner hasn't configured the Google review link yet — never open a
@@ -374,6 +403,41 @@ export default function StepResult({
           )}
         </div>
       )}
+
+      {/* Private note to the owner — offered to everyone, not only to guests who
+          rated low. Sits after the public draft so it never competes with it. */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2.5">
+        <div className="space-y-0.5">
+          <p className="text-xs font-bold text-slate-700">{t.result.noteHeading}</p>
+          <p className="text-[11px] text-slate-500">{t.result.noteNote}</p>
+        </div>
+        {noteState === "sent" ? (
+          <p className="text-xs font-semibold text-green-700">{t.result.noteSent}</p>
+        ) : (
+          <>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder={t.result.notePlaceholder}
+              aria-label={t.result.noteHeading}
+              className="w-full p-3 text-base text-slate-800 leading-relaxed bg-white
+                border border-gray-300 rounded-lg resize-none
+                focus:outline-none focus:border-slate-500 transition-colors placeholder:text-slate-400"
+            />
+            <button
+              type="button"
+              onClick={sendNote}
+              disabled={!note.trim() || noteState === "sending"}
+              className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 rounded-lg
+                hover:bg-slate-800 active:scale-[0.98] transition-all
+                disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {noteState === "sending" ? "…" : t.result.noteSend}
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Manual-copy hint — clipboard blocked (in-app browser); text is pre-selected */}
       <div className={`transition-all duration-300 overflow-hidden ${copyBlocked ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>

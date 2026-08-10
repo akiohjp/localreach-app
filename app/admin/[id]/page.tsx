@@ -99,10 +99,13 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
     crmLoadError = true
   }
 
-  // Private low-rating (<4★) feedback — service-role read, scoped to this store.
+  // Private guest notes — service-role read, scoped to this store. Any rating,
+  // not just under 4: a happy guest can now leave a note too.
   const feedbackRes = await admin
     .from('feedback')
-    .select('id, rating, message, created_at', { count: 'exact' })
+    .select('id, rating, message, topics, contact_name, contact_phone, read_at, created_at', {
+      count: 'exact',
+    })
     .eq('store_id', id)
     .order('created_at', { ascending: false })
     .limit(30)
@@ -113,9 +116,21 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
     id: string
     rating: number
     message: string
+    topics: string[] | null
+    contact_name: string | null
+    contact_phone: string | null
+    read_at: string | null
     created_at: string
   }[]
   const feedbackCount = feedbackRes.count ?? 0
+  // Counted separately from the page-size-limited list above: 30 rows back is
+  // not the same question as "how many has nobody looked at".
+  const unreadRes = await admin
+    .from('feedback')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', id)
+    .is('read_at', null)
+  const feedbackUnread = unreadRes.count ?? 0
 
   // NEXT_PUBLIC_APP_URL missing must NEVER silently mint localhost QR codes /
   // WhatsApp links in production — derive from the live request host instead.
@@ -177,6 +192,7 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       crmLoadError={crmLoadError}
       feedback={feedback}
       feedbackCount={feedbackCount}
+      feedbackUnread={feedbackUnread}
       reviewStats={reviewStats}
       logoSignedUrl={logoSignedUrl}
       initialTab={initialTab}
