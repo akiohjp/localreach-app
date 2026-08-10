@@ -154,7 +154,7 @@ const EN_GENERIC: PoolSet = {
   ],
   coresLong: [
     "{list} really stood out.",
-    "Loved {list}, that was the highlight for me.",
+    "Loved {list}. That was the highlight for me.",
     "{list} alone made the trip worth it.",
     "{store} absolutely nailed {list}.",
     "Honestly, {list} made the visit for me.",

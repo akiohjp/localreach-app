@@ -725,7 +725,7 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     // pressure to buy"), and the copula then produces "It's also no pressure
     // to buy." (naturalness reader, 2026-08-10, live Cinar Istanbul config).
     "{kw}, {for what that's worth|and that helps|no small thing}.",
-    "Put {kw} in the plus column.",
+    "In the plus column: {kw}.",
     "On top of that, {kw}.",
     "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
     "Small detail, but a {good|welcome|nice} one: {kw}.",
@@ -890,7 +890,7 @@ function filterMedicalVoice(pool: PoolSet, locale: ReviewLocale, vertical: Verti
 const RETAIL_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>(["retail"]);
 
 const RETAIL_UNFIT_EN =
-  /\bnailed\b|\bcome hungry\b|\bsave room\b|\bfirst bite\b|\btasted\b|\bthe meal\b|celebration|celebrate|without writing any of it down|\bgo see\b|\bthe rotation\b|\bmy usual spots\b|\bmy regular list\b|\bfull day of errands\b|\bnew regular in me\b|\banother good one from\b|\beasy to settle in\b/i;
+  /\bnailed\b|\bcome hungry\b|\bsave room\b|\bfirst bite\b|\btasted\b|\bthe meal\b|celebration|celebrate|without writing any of it down|\bgo see\b|\bthe rotation\b|\bmy usual spots\b|\bmy regular list\b|\bloved\b|\bgo for\b|turned out even better|\bfull day of errands\b|\bnew regular in me\b|\banother good one from\b|\beasy to settle in\b/i;
 
 function filterRetailVoice(pool: PoolSet, locale: ReviewLocale, vertical: Vertical): PoolSet {
   if (locale !== "en" || !RETAIL_VERTICALS.has(vertical)) return pool;
@@ -1714,7 +1714,7 @@ const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
     "They had what I was looking for in their {kw}.",
     "Came for {kw} and {found exactly that|was not disappointed}.",
     "I would {come back|make the trip} for the {kw} alone.",
-    "They are {a step above|ahead of most} on {kw}.",
+    "They are {a step above|ahead of most} when it comes to {kw}.",
   ],
   ja: [
     "{kw}の{品揃え|ラインナップ}が{良かったです|しっかりしていました}。",
@@ -1818,7 +1818,7 @@ const GEO_TAILS: string[] = [
   "{Bookmark|Save|Note} {this one|this place} for {kw}.",
   "Whenever someone asks about {kw}, I {point them here|send them here}.",
   "I stopped {looking|searching} once I found {this place|them} for {kw}.",
-  "They {cover|handle} {kw} properly.",
+  "Worth going to them for {kw}.",
   "Ask me about {kw} and this is the answer.",
   "{Exactly|Just} what I needed for {kw}.",
   "The one I {keep recommending|recommend} for {kw}.",
