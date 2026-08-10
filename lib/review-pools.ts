@@ -116,7 +116,7 @@ const EN_GENERIC: PoolSet = {
     "Came to {store} for the first time and I'll definitely be back.",
     "Been meaning to try {store} for ages and finally made it, so glad I did.",
     "{Stopped into|Swung by|Dropped into} {store} on the weekend and it was a really good visit.",
-    "First time at {store} and it lived up to what friends had been telling me.",
+    "First time at {store} and it lived up to what {friends|people|the reviews} had been {telling me|saying}.",
     "Had a {great|really good|genuinely good} time at {store}, leaving this so a few more people {give it a try|find it|try it}.",
     "Went to {store} not expecting much and {came away really happy|left genuinely impressed|was completely won over}.",
     "{store} was recommended to me and now I see why people rave about it.",
@@ -126,13 +126,13 @@ const EN_GENERIC: PoolSet = {
     "Visited {store} with the family and we all left happy.",
     "{store} is one of those local spots I'll be telling everyone about.",
     "A {colleague|friend|neighbour} kept mentioning {store}, so I finally went to see for myself.",
-    "Ended up at {store} more or less by chance and it turned out to be the right call.",
+    "Ended up at {store} {more or less by chance|without planning to} and it turned out to be the right call.",
     "{Second|Third} visit to {store} this {month|week}, which probably says it all.",
     "We chose {store} for a small celebration and it turned out to be a great pick.",
     "Was in the area with {time to spare|an hour to kill|some time} and gave {store} a {go|try|shot}.",
     "After a {long day|hectic week|full day of errands}, {store} was exactly what I needed.",
     "Brought a {friend|colleague|relative} visiting from abroad to {store} and we both left {impressed|happy|converted}.",
-    "I walked past {store} for months before finally going in, and I regret waiting.",
+    "I walked past {store} for {months|weeks} before finally going in, and I {regret waiting|should have gone sooner}.",
     "My partner picked {store} this time, and credit where it's due.",
     "Everyone kept {telling me about|mentioning|recommending} {store}, and for once the hype {checks out|holds up|was right}.",
   ],
@@ -164,7 +164,7 @@ const EN_GENERIC: PoolSet = {
     "What got me was {list}, genuinely good.",
     "{list} turned out even better than I expected.",
     "If I had to call out a highlight, it'd be {list}.",
-    "For me the visit came down to {list}.",
+    "For me it came down to {list}.",
     "We're still talking about {list}.",
     "No wonder people make a fuss about {list}.",
     "The star of the visit was {list}, no contest.",
@@ -203,13 +203,20 @@ const EN_GENERIC: PoolSet = {
     "Prices felt {fair|reasonable|right} for what you {get|actually get|walk away with}.",
     "Service was {warm|attentive|genuinely friendly} without being pushy.",
     "They took care of a small request {without any fuss|like it was nothing|without blinking}.",
+    // Filtered verticals draw from a much smaller pool: every consumption,
+    // outing and league-table line is stripped for a clinic, so the survivors
+    // carry the whole page and one of them hit 9x per 100 (bench, 2026-08-10).
+    // These are written to pass that filter — no ordering, no ranking, no
+    // wandering in — while still reading naturally for a shop or a restaurant.
+    "The place was calm and well organized.",
+    "I never felt {rushed|hurried} at any point.",
     "{Everything|The whole visit|The whole thing} ran smoothly from start to finish.",
     "You can tell the {team|staff|people here} care about getting the details right.",
     "{Nice, relaxed|Calm, easy|Comfortable, low-key} atmosphere, never felt rushed.",
     "Someone checked in on us {at the right times|now and then|when it mattered}, without hovering.",
     "Even with a steady stream of people coming in, nothing felt {chaotic|rushed|out of control}.",
-    "The person looking after us {remembered everything|kept track of everything|missed nothing}, without writing any of it down.",
-    "Questions got {straight|clear|honest} answers, which I appreciate more than a sales pitch.",
+    "The person looking after us {remembered everything|kept track of everything|missed nothing} without needing to write it down.",
+    "Questions got {straight|clear|honest} answers, which I {appreciate|always appreciate}.",
     "They were upfront about the one thing that wasn't available, which I {respect|appreciated|rate}.",
     "It was busy, and they still {made it feel unhurried|kept things calm|kept the pace relaxed}.",
     "You get the sense the same standards apply {on a Tuesday as on a weekend|whatever day you come|whether it's quiet or slammed}.",
@@ -260,9 +267,9 @@ const EN_GENERIC: PoolSet = {
     "Glad I {went|made the trip|stopped in}.",
   ],
   fillers: [
-    "Little things like that are why I'll pick {store} again.",
+    "{Little things|Small touches} like that are why I'll {pick|choose} {store} again.",
     "Walked out already planning {to come back|the next visit|a return trip}.",
-    "The kind of place you {want to tell people about|end up recommending|bring up in conversation}.",
+    "The kind of {place|spot} you {want to tell people about|end up recommending|bring up in conversation}.",
     "Everything just felt {easy|effortless|simple}, which I appreciate.",
     "Exactly what I was {hoping for|after|looking for}.",
     "Nice to find a spot this {reliable|consistent|dependable}.",
@@ -271,12 +278,12 @@ const EN_GENERIC: PoolSet = {
     "Didn't feel rushed at any point, which I really {rate|appreciate|value}.",
     "Good value for what you actually get, too.",
     "Honestly hard to fault {the experience|the visit|any of it}.",
-    "It's rare that a place {matches|lives up to} its reviews, but this one does.",
+    "It's {rare|not common} that a place {matches|lives up to} its reviews, but this one does.",
     "I kept {waiting for|looking for|expecting} the catch and there {wasn't one|never was one|simply wasn't one}.",
     "Consistency like this is {harder to find than it should be|rarer than it should be|not as common as you'd hope}.",
     "You {notice|can feel|can tell} the difference when people take {pride|real pride|genuine pride} in their work.",
-    "I'm {fussy|picky|particular} about this kind of thing, and I left with {nothing to nitpick|no complaints|nothing to fault}.",
-    "My expectations were {high|set high|already high} and they still {exceeded|surpassed|topped} them.",
+    "I'm {fussy|picky|particular} about this kind of thing, and I left with {nothing to nitpick|no complaints|nothing I would change}.",
+    "My expectations were {high|set high|already high} and they still {exceeded|surpassed} them.",
     "Not {a single thing|one thing} I'd change about the {visit|experience|whole thing}.",
     "Half the battle is {just doing what you promise|getting the basics right|showing up consistently}, and they do.",
     "Came out in a better mood than I went in, which {says a lot|is rarer than it sounds|counts for a lot}.",
@@ -767,7 +774,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
   restaurant: {
     openersLong: [
       "We ate at {store} {recently|the other day|last week} and I figured I'd jot down what stuck with us at the table.",
-      "{Dinner|A meal|Lunch} at {store} was the kind of meal where you {walk out and actually want to say something online|leave already composing the review|want to tell someone about straight away}.",
+      "{Dinner|A meal|Lunch} at {store} was the kind of meal where you {walk out and actually want to say something online|leave already composing the review|start telling people about it straight away}.",
     ],
     openersShort: ["{store}? Yeah, we'd eat there again.", "Quick take after {store}: a good meal, with a couple of standout plates."],
     coresLong: [
@@ -804,6 +811,16 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     closersLong: ["I've already thought about my next appointment at {store}, which is unusual for me."],
   },
   clinic: {
+    fillers: [
+      "Everything ran {to time|on schedule}, which I {appreciated|noticed}.",
+      "Questions were answered {before I had to ask twice|the first time I asked}.",
+      "{Reception|The front desk} handled everything {without fuss|smoothly}.",
+      "They were {clear|upfront} about costs from the start.",
+      "I left knowing exactly what {happens next|to expect}.",
+      "The follow-up came {when they said it would|exactly as promised}.",
+      "The appointment started {on time|when it was meant to}.",
+      "Nothing was {pushed|recommended} that I did not need.",
+    ],
     openersLong: [
       "Visited {store} for an appointment and the whole thing was calmer and clearer than I'm used to.",
       "Came into {store} not sure what to expect and left reassured.",
@@ -819,7 +836,10 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     coresLong: ["What made it work was {list}. {store} made the whole thing simple."],
     closersLong: [
       "I'll shop at {store} again {next time I'm nearby|whenever I'm in the area|soon enough}.",
-      "That's my {shopping|list} handled at {store} from now on.",
+      // No nested slot inside a choice group: expandChoices matches [^{}]* and
+    // leaves the whole thing literal, which put "{That's my shopping handled at
+    // Cinar Rugs Dubai from now on|...}" into a draft review (2026-08-10).
+    "{store} is where I'll be {shopping|going} from now on.",
     ],
   },
   fitness: {
@@ -829,6 +849,16 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     closersLong: ["I'd recommend {store} to anyone looking for a place that doesn't overcomplicate it."],
   },
   dental: {
+    fillers: [
+      "Everything ran {to time|on schedule}, which I {appreciated|noticed}.",
+      "Questions were answered {before I had to ask twice|the first time I asked}.",
+      "{Reception|The front desk} handled everything {without fuss|smoothly}.",
+      "They were {clear|upfront} about costs from the start.",
+      "I left knowing exactly what {happens next|to expect}.",
+      "The follow-up came {when they said it would|exactly as promised}.",
+      "The appointment started {on time|when it was meant to}.",
+      "Nothing was {pushed|recommended} that I did not need.",
+    ],
     openersLong: [
       "Went to {store} for a check-up half-expecting the usual dread, and the whole appointment was calmer than that.",
       "Switched to {store} after a bad run elsewhere, and the difference was obvious from the first visit.",
@@ -842,6 +872,16 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     closersLong: ["I'd trust {store} with my family's teeth, and that's not something I say lightly about a clinic."],
   },
   aesthetic: {
+    fillers: [
+      "Everything ran {to time|on schedule}, which I {appreciated|noticed}.",
+      "Questions were answered {before I had to ask twice|the first time I asked}.",
+      "{Reception|The front desk} handled everything {without fuss|smoothly}.",
+      "They were {clear|upfront} about costs from the start.",
+      "I left knowing exactly what {happens next|to expect}.",
+      "The follow-up came {when they said it would|exactly as promised}.",
+      "The appointment started {on time|when it was meant to}.",
+      "Nothing was {pushed|recommended} that I did not need.",
+    ],
     openersLong: [
       "Booked a treatment at {store} a little nervous about looking overdone, and left glad I picked somewhere careful.",
       "Went to {store} for a consultation and appreciated that nobody tried to upsell me on things I didn't need.",
@@ -1289,7 +1329,7 @@ const EN_AGENCY: PoolSet = {
   ],
   fillers: [
     "It's rare to find a provider this {straightforward|easy to deal with|honest}.",
-    "They do what they promise, which shouldn't be rare, but it is.",
+    "They do what they promise, which {shouldn't be rare, but it is|is rarer than it should be}.",
     "As an owner, that saves me time I don't have.",
     "You can tell they actually care whether it works.",
     "Refreshing after some of the agencies we've dealt with.",
@@ -1297,13 +1337,27 @@ const EN_AGENCY: PoolSet = {
     "It just works, and I can get on with running the business.",
     "Good people to deal with, too.",
     "The invoice matches the quote, every time.",
-    "I stopped worrying about this side of the business months ago.",
+    "I stopped worrying about this side of the business {months ago|a while back|early on}.",
     "Everything gets explained before it gets billed.",
     "They flag problems before we notice them.",
     "Everything felt honest from the first call.",
     "No upselling, no drama.",
-    "They made something confusing feel manageable.",
+    "They made something confusing feel {manageable|straightforward|easy to follow}.",
     "Exactly the kind of support a small business needs.",
+    // The agency pool is exclusive (no generic merge), so it carries a whole
+    // store's page on its own. At 16 fillers the top line landed 13x per 100
+    // against a cap of 12 (bench, 2026-08-10, once real keyword types put
+    // every phrase in a dedicated tail and left the body to this pool).
+    "{Questions|Emails} get answered the same {day|working day}.",
+    "We always know {what is running|where things stand} without asking.",
+    "The reporting is {short and readable|plain enough to act on}.",
+    "They said what they could not do, which {built trust fast|told me plenty}.",
+    "No {jargon|buzzwords} for the sake of it.",
+    "Scope changes get {priced before the work|agreed up front}.",
+    "They work like part of the team rather than a supplier.",
+    "It has been {steady|consistent} month after month.",
+    "Nothing has needed chasing so far.",
+    "They understood the business before touching anything.",
   ],
   tails: [
     "Also have to mention {kw}.",

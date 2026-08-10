@@ -77,11 +77,19 @@ async function fetchStores() {
         forced: s.forced_keywords ?? [],
         entity: { area: s.entity_area, city: s.entity_city, categoryLabel: s.entity_category_label ?? {} },
         keywordTypes: s.keyword_types ?? null,
+        // What guests can actually reach today (lib/guest-locales). Frozen
+        // locales are still measured — the pools are still there and will be
+        // reopened — but a locale nobody can tap must not hold the ship gate
+        // red, or the gate stops being read.
+        shipped: ["en", "ja", "ar"].filter(
+          (l) => ENABLED_LOCALES.includes(l) || l === s.default_language,
+        ),
       };
     })
     .filter((s) => s.name && !TEST_ROWS.test(s.name) && (s.keywords.length || s.forced.length));
 }
 
+const { ENABLED_LOCALES } = await import("../lib/guest-locales.ts");
 const STORES = await fetchStores();
 
 
@@ -107,6 +115,14 @@ function maxPhrasesPerSentence(text, locale, phrases) {
 }
 
 const DETECTORS = [
+  // A template slot that never got filled ships as literal braces. It happened
+  // on 2026-08-10: a choice group was written with {store} inside it, and
+  // expandChoices only matches [^{}]*, so a draft review read "{That's my
+  // shopping handled at Cinar Rugs Dubai from now on|...}". Nothing caught it
+  // except a native-speaker read of the output — this is the cheap gate that
+  // should have.
+  { key: "rawSlot", label: "unexpanded template slot or choice group in the output",
+    test: (t) => /[{}]/.test(t) },
   { key: "pileup3", label: "3+ keywords crammed into ONE sentence",
     test: (t, loc, ph) => maxPhrasesPerSentence(t, loc, ph).worst >= 3 },
   { key: "doublePlus", label: '"A plus B plus C" chain',
@@ -306,8 +322,9 @@ for (const store of STORES) for (const locale of store.locale) {
     return n > (s.length >= longLen ? GATE.longConstantMax : GATE.shortConstantMax);
   });
   const ok = offenders.length === 0 && sentCount.size >= GATE.minDistinct && openerSet.size >= GATE.minOpeners;
-  if (!ok) gateFail++;
-  console.log(`  ${ok ? "✓" : "✗"} ${store.name} / ${locale}: distinct=${sentCount.size} openers=${openerSet.size}${offenders.length ? " offenders: " + offenders.slice(0, 3).map(([s, n]) => `${n}x "${s.slice(0, 48)}"`).join(" | ") : ""}`);
+  const frozen = !store.shipped.includes(locale);
+  if (!ok && !frozen) gateFail++;
+  console.log(`  ${ok ? "✓" : frozen ? "·" : "✗"} ${store.name} / ${locale}${frozen ? " (frozen, not shipped)" : ""}: distinct=${sentCount.size} openers=${openerSet.size}${offenders.length ? " offenders: " + offenders.slice(0, 3).map(([s, n]) => `${n}x "${s.slice(0, 48)}"`).join(" | ") : ""}`);
 }
 
 const anyFail = fail + gateFail;

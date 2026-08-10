@@ -168,9 +168,43 @@ function headIsUncountable(phrase: string): boolean {
   return MASS_NOUN_HEADS.has(last) || /ing$/.test(last);
 }
 
+const BRANDED_SERVICE_HEADS: ReadonlySet<string> = new Set([
+  "therapy", "drip", "facial", "infusion", "peel", "cleanse", "massage",
+  "injection", "wellness", "medicine",
+]);
+
+/** Every word capitalised = the business's own name for the service. */
+function isTitleCased(phrase: string): boolean {
+  const words = phrase.trim().split(/\s+/);
+  return words.length > 1 && words.every((w) => /^[A-Z0-9]/.test(w) || /^(of|and|the|for|with|in)$/i.test(w));
+}
+
+/**
+ * Service frames written in VISIT voice. An agency client does not "come in
+ * for" monthly reporting and a rug store does not get "booked" for worldwide
+ * shipping — both read as a template wearing the wrong business (naturalness
+ * reader, 2026-08-10: 12 of the 29 findings that survived two runs).
+ */
+const SERVICE_VISIT_VOICE = /^(Came in for|Went in for|Booked)/;
+
+function serviceTailsFor(vertical: Vertical, locale: ReviewLocale): string[] {
+  const pool = SERVICE_TAILS[locale];
+  if (locale !== "en") return pool;
+  if (!NON_VISIT_VERTICALS.has(vertical) && vertical !== "retail") return pool;
+  const kept = pool.filter((t) => !SERVICE_VISIT_VOICE.test(t));
+  return kept.length > 0 ? kept : pool;
+}
+
 function withServiceArt(phrase: string): string {
-  if (headIsUncountable(phrase)) return phrase;
   if (LEADING_DETERMINER.test(phrase)) return phrase;
+  // "the IV Therapy" is right and "the regenerative medicine" is wrong, and the
+  // head noun alone cannot tell them apart — the difference is that one is the
+  // clinic's NAME for one specific service. Title-casing is that signal.
+  const head = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
+  if (isTitleCased(phrase) && (BRANDED_SERVICE_HEADS.has(head) || NAMED_SERVICE_HEADS.has(head))) {
+    return `the ${phrase}`;
+  }
+  if (headIsUncountable(phrase)) return phrase;
   if (headIsNamedService(phrase)) return `the ${phrase}`;
   return withArt(phrase);
 }
@@ -815,7 +849,7 @@ const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
   // Kotobuki config. "Loved" was deliberately kept in an hour earlier on the
   // argument that a patient does write it about care received — a native
   // reader disagreed for a NAMED PROCEDURE, which is the object slot here.
-  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad/i,
+  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|bringing {people|friends|visitors}|sort out|half the battle|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad/i,
   ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方|たまたま通りかかって|立ち寄り)/,
   ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
 };
@@ -909,7 +943,7 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
     "Happy to finally have a {decent|good|solid} {cat} close by in {loc}.",
     "You don't come across a {cat} like this in {loc} {every day|often|all that often}.",
     "Ended up here {looking|hunting|searching} for a {cat} in {loc} and {got lucky|struck gold|found a keeper}.",
-    "Between the {cat} options {in|around} {loc}, this is the one I'd {pick again|go back to|stick with}.",
+    "{Of|Among} the {cat} options {in|around} {loc}, this is the one I'd {pick again|go back to|stick with}.",
   ],
   ja: [
     "{loc}で{cat}を探しているなら、ここを{おすすめします|推します|すすめたいです}。",
@@ -1320,15 +1354,60 @@ function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg,
   return weaveParagraphs(segments.filter(Boolean), forkRng(seed, 0x108), compact, cfg.glue);
 }
 
-function reviewNoKeywords(store: string, pool: PoolSet, cfg: LocaleCfg, seed: number): string {
-  const opener = fill(pick(pool.openersShort.length ? pool.openersShort : pool.openersLong, forkRng(seed, 0x201)), { store });
-  const closer = fill(pick(pool.closersShort.length ? pool.closersShort : pool.closersLong, forkRng(seed, 0x202)), { store });
-  const mid = pool.noKeywordMid.length
-    ? fill(pick(pool.noKeywordMid, forkRng(seed, 0x204)), { store })
+/**
+ * The skeleton for a review whose CORE slot has no keyword.
+ *
+ * It used to be three picks: a short opener, one of five noKeywordMid lines,
+ * a short closer. That was sized for the rare store with no keywords at all.
+ * Keyword TYPES (2026-08-09) changed who lands here: a clinic whose keywords
+ * are all "service", or an agency whose keywords are all "service", routes
+ * every phrase to a dedicated tail and arrives with an EMPTY core — so this
+ * path became the skeleton of EVERY review for those stores, and five lines
+ * turned into a refrain. Measured 2026-08-10 once the bench started feeding
+ * real types: one sentence in 22 of every 100 Kotobuki reviews, 150 distinct
+ * sentences per 100 mirAIreach reviews against a floor of 200.
+ *
+ * The fix is not more noKeywordMid lines, it is using the pools a keyworded
+ * review already uses — openers, fillers, bridges and closers are large and
+ * were sitting unused on this path. pickFreshMove keeps the four slots from
+ * making the same rhetorical move twice.
+ */
+function reviewNoKeywords(
+  store: string,
+  pool: PoolSet,
+  cfg: LocaleCfg,
+  seed: number,
+  locale: ReviewLocale = "en",
+): string {
+  const render = (t: string) => fill(t, { store });
+  const openerPool = [...pool.openersLong, ...pool.openersShort];
+  const opener = render(pick(openerPool, forkRng(seed, 0x201)));
+
+  // noKeywordMid stays first in the pool: those lines were written for exactly
+  // this shape of review. The fillers join them so the slot has depth.
+  const midPool = [...pool.noKeywordMid, ...pool.fillers];
+  const mid = midPool.length
+    ? render(pickFreshMove(midPool, opener, locale, forkRng(seed, 0x204), render))
     : "";
-  const t = [opener, mid, closer].map(oneLineCollapse).filter(Boolean).join(PARAGRAPH_GAP);
+
+  const bridgePool = [...pool.bridgesLong, ...pool.bridgesShort];
+  const bridge = bridgePool.length
+    ? render(pickFreshMove(bridgePool, `${opener} ${mid}`, locale, forkRng(seed, 0x205), render, false))
+    : "";
+
+  const closerPool = [...pool.closersLong, ...pool.closersShort];
+  const closer = render(
+    pickFreshMove(closerPool, `${opener} ${mid} ${bridge}`, locale, forkRng(seed, 0x202), render),
+  );
+
+  // Same ordering freedom a keyworded review has, so the bridge is not always
+  // the third sentence on a page where every review takes this path.
+  const bridgeFirst = forkRng(seed, 0x206)() < 0.41;
+  const parts = bridgeFirst ? [opener, bridge, mid, closer] : [opener, mid, bridge, closer];
+  const t = parts.map(oneLineCollapse).filter(Boolean).join(PARAGRAPH_GAP);
   return tuneLength(t, store, pool, cfg, seed, 0x203);
 }
+
 
 /**
  * Real guests name a business 0-2 times; our templates could stack it up to 5
@@ -1608,14 +1687,34 @@ export function classifyKeyword(
  */
 const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
   en: [
+    // Pool size is a diversity constraint, not padding: a store with three
+    // category keywords emits three of these per review, so 100 reviews draw
+    // 300 times from this pool. At 8 templates "They know their ‹›." landed
+    // 23 times per 100 against a cap of 12 (bench, 2026-08-10, once real
+    // keyword types were fed in). Every frame carries a choice group for the
+    // same reason. Number-neutral throughout: the slot takes a plural class
+    // and a mass noun alike, so any is/was here is a grammar error on half
+    // the stores.
     "Good {range|selection|choice} of {kw}.",
-    "They know their {kw}.",
+    "They {know|really know} their {kw}.",
     "This is where I {go|come} for {kw}.",
     "Plenty of {kw} to {choose from|pick from}.",
     "Worth a look if you {want|need} {kw}.",
     "No shortage of {kw} {here|at this place}.",
     "They clearly {care about|take pride in} their {kw}.",
-    "That's what I {come|keep coming} here for: {kw}.",
+    "That is what I {come|keep coming} here for: {kw}.",
+    "{Solid|Strong} {lineup|selection} when it comes to {kw}.",
+    "If you are after {kw}, they have it {covered|sorted}.",
+    "You can tell they {focus on|specialize in} {kw}.",
+    "No {complaints|notes} on their {kw}.",
+    "Hard to {fault|criticize} their {kw}.",
+    "Good {variety|range} in their {kw}.",
+    "Not many places do {kw} {this well|properly}.",
+    "{Genuinely|Really} good {kw} {here|in this place}.",
+    "They had what I was looking for in their {kw}.",
+    "Came for {kw} and {found exactly that|was not disappointed}.",
+    "I would {come back|make the trip} for the {kw} alone.",
+    "They are {a step above|ahead of most} on {kw}.",
   ],
   ja: [
     "{kw}の{品揃え|ラインナップ}が{良かったです|しっかりしていました}。",
@@ -1648,10 +1747,20 @@ const SERVICE_TAILS: Record<ReviewLocale, string[]> = {
     "The follow-up after {kw} was {thorough|genuinely good}.",
     "{Straightforward|Smooth} experience with {kw}.",
     "Went in for {kw} and left knowing exactly what {had been done|to expect next}.",
-    "Nothing was {rushed|glossed over} with {kw}.",
+    "Nothing about {kw} felt rushed.",
     "They answered every question I had about {kw}.",
     "{Clear|Honest} about what {kw} would and would not do.",
     "Booked {kw} and the whole thing ran {on time|to schedule}.",
+    "{Simple|Easy} to get started with {kw}.",
+    "They were {upfront|clear} about {kw} from the start.",
+    "{No surprises|Nothing unexpected} with {kw}.",
+    "Everything about {kw} was {explained in plain terms|easy to follow}.",
+    "{Glad|Happy} I went to them for {kw}.",
+    "They made {kw} straightforward.",
+    "I would go back to them for {kw}.",
+    "They knew what they were doing with {kw}.",
+    "{Fair|Sensible} pricing for {kw}.",
+    "No {delays|hold-ups} with {kw}.",
   ],
   ja: [
     "{kw}について{丁寧に説明してもらえました|きちんと説明がありました}。",
@@ -1702,6 +1811,18 @@ const GEO_TAILS: string[] = [
   // conditional frame takes any noun phrase (owner questioned it twice:
   // 2026-08-07, first as "Ticks every box for natural dye rugs in Cappadocia").
   "If you're {after|looking for} {kw}, this {checks every box|checks all the boxes}.",
+  "For {kw}, I would {start here|look here first}.",
+  "Top of my list for {kw}.",
+  "Anyone {hunting|searching} for {kw} should {look here|start here}.",
+  "That {ended|settled} my search for {kw}.",
+  "{Bookmark|Save|Note} {this one|this place} for {kw}.",
+  "Whenever someone asks about {kw}, I {point them here|send them here}.",
+  "I stopped {looking|searching} once I found {this place|them} for {kw}.",
+  "They {cover|handle} {kw} properly.",
+  "Ask me about {kw} and this is the answer.",
+  "{Exactly|Just} what I needed for {kw}.",
+  "The one I {keep recommending|recommend} for {kw}.",
+  "{Worth the trip|Worth going out of your way} for {kw}.",
 ];
 
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
@@ -1847,7 +1968,7 @@ export function buildLocalizedReview(
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
-    let t0 = reviewNoKeywords(name, pool, cfg0, seed);
+    let t0 = reviewNoKeywords(name, pool, cfg0, seed, locale);
     const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical, name);
     t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9), vertical));
     if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
@@ -1863,7 +1984,21 @@ export function buildLocalizedReview(
   // Geo search phrases are pulled out BEFORE the core/tail machinery: they
   // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
   const typeOf = (k: string) => classifyKeyword(k, keywordTypes, locale);
-  const geoKws = locale === "en" ? keywords.filter((k) => typeOf(k) === "geo") : [];
+  const geoAll = locale === "en" ? keywords.filter((k) => typeOf(k) === "geo") : [];
+  // Each geo phrase gets its own dedicated sentence, and nothing capped how
+  // many. Cinar Istanbul types eight of them, the guest picker has no
+  // selection limit, and a guest who taps them all published a review made of
+  // eight "<what> in <where>" sentences — a keyword list, not a review, and
+  // two of the geo frames landed 14x per 100 on the store's page (bench,
+  // 2026-08-10). Two dedicated sentences max; the rest still appear verbatim
+  // through the ordinary tails. The window rotates with the seed so the page
+  // shows every search phrase across reviews instead of the same first two.
+  const GEO_SENTENCE_CAP = 2;
+  const geoOffset = geoAll.length ? Math.floor(forkRng(seed, 0x6e00)() * geoAll.length) : 0;
+  const geoKws =
+    geoAll.length <= GEO_SENTENCE_CAP
+      ? geoAll
+      : Array.from({ length: GEO_SENTENCE_CAP }, (_, i) => geoAll[(geoOffset + i) % geoAll.length]!);
   // Categories and services leave the object machinery for the same reason geo
   // phrases do: the {list} slot and the ordinary tails both assume the phrase
   // names one thing you ordered.
@@ -1902,7 +2037,7 @@ export function buildLocalizedReview(
   // Build the keyword-free skeleton instead; the tails carry all the phrases.
   let text =
     coreKws.length === 0
-      ? reviewNoKeywords(name, pool, cfg, seed)
+      ? reviewNoKeywords(name, pool, cfg, seed, locale)
       : buildInner(name, coreKws, pool, cfg, compact, seed, locale);
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
   // Reserve room for what still has to be woven after this pass: at least one
@@ -2076,7 +2211,7 @@ export function buildLocalizedReview(
   // category, which is a mass/plural head ("fresh doughnuts") and stays bare.
   // Without this, every service frame read "They took the time to explain AI
   // SEO audit" (naturalness reader, 2026-08-10, live mirAIreach config).
-  weaveDedicated(svcKws, SERVICE_TAILS[locale], 0x9e21, locale === "en" ? withServiceArt : undefined);
+  weaveDedicated(svcKws, serviceTailsFor(vertical, locale), 0x9e21, locale === "en" ? withServiceArt : undefined);
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
