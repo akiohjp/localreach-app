@@ -1726,8 +1726,23 @@ function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
  * The forced slice keeps the stricter test (glue OR not-a-proper-name) for
  * callers that still pass forcedCount, e.g. the bench.
  */
-const isAsciiText = (k: string): boolean =>
-  [...k].every((c) => c.charCodeAt(0) >= 0x20 && c.charCodeAt(0) <= 0x7e);
+/**
+ * "Is this phrase written in Latin script?" — NOT "is it ASCII".
+ *
+ * The ASCII test dropped every accented menu name from English reviews:
+ * "Brûlée Me Away" vanished from 60 of 60 Let It Dough! drafts, so a guest
+ * who tapped it published a review that never mentions it. Dubai menus are
+ * full of these (crème, jalapeño, açaí, Zaʼatar), and the guarantee the
+ * product sells is that the tapped phrase appears verbatim.
+ *
+ * What the callers actually mean is "a reader of this locale can read it",
+ * so the test is by SCRIPT: Latin (with diacritics) passes, CJK / Hangul /
+ * Arabic / Cyrillic / Hebrew / Greek / Thai do not.
+ */
+const NON_LATIN_SCRIPT =
+  /[\u0370-\u03FF\u0400-\u04FF\u0590-\u05FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/;
+
+const isLatinText = (k: string): boolean => !NON_LATIN_SCRIPT.test(k);
 
 function dropForeignPhrases(
   keywords: string[],
@@ -1742,7 +1757,7 @@ function dropForeignPhrases(
     const keptEn: string[] = [];
     let keptForcedEn = 0;
     keywords.forEach((k, i) => {
-      if (!isAsciiText(k)) return;
+      if (!isLatinText(k)) return;
       keptEn.push(k);
       if (i < forcedCount) keptForcedEn++;
     });
@@ -1765,7 +1780,7 @@ function dropForeignPhrases(
     let keptForced = 0;
     keywords.forEach((k, i) => {
       const t = types[k.trim()];
-      if (t && t !== "item" && isAsciiText(k)) return;
+      if (t && t !== "item" && isLatinText(k)) return;
       kept.push(k);
       if (i < forcedCount) keptForced++;
     });

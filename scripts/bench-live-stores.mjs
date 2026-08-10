@@ -21,86 +21,69 @@ const RUNS = Number(process.argv[2] ?? 60);
 /** Optional experiment: cap how many forced phrases each store contributes. */
 const FORCED_CAP = process.env.FORCED_CAP ? Number(process.env.FORCED_CAP) : Infinity;
 
-/** Live production stores (is_active), pulled 2026-08-02. Demo/test rows kept
- *  out except where they are what we actually send to a prospect. */
-const STORES = [
-  {
-    name: "Kotobuki Clinic", locale: ["en", "ja", "ar"], category: "aesthetic clinic",
-    keywords: ["IV Drip","IV Therapy","Exosome Therapy","Hydrogen Inhalation Therapy","Peptide Therapy","HydraFacial","Acne Scar Treatment","Regenerative Medicine","AGA Treatment","Vitamin IV","Diabetes & Metabolism Programme","Weight Management Programme","Medical Wellness Check","Anti-Aging Treatment"],
-    forced: ["Japanese aesthetic medicine in Dubai","aesthetic treatments in Dubai","regenerative medicine"],
-    entity: { area: "Trade Centre", city: "Dubai", categoryLabel: { en: "Japanese aesthetic clinic", ja: "美容・再生医療クリニック", ar: "عيادة تجميل يابانية" } },
-  },
-  {
-    name: "1004 Gourmet", locale: ["en", "ja", "ar"], category: "Asian grocery store",
-    keywords: ["Korean ramen","Shin Ramyun","Bibigo dumplings","Kimchi","CJ Kimchi","Korean BBQ sauces","Binggrae Banana Milk","Korean snacks","Mochi","Korean porridge","Cold noodle broth","Frozen dumplings","Halal products","Korean bread","Japanese groceries","Wasabi paste"],
-    forced: ["Korean groceries in Dubai","Asian groceries in Dubai","halal Asian groceries"],
-    entity: { area: "Deira", city: "Dubai", categoryLabel: { en: "Asian supermarket", ja: "アジア食材店", ar: "سوبرماركت آسيوي" } },
-  },
-  {
-    name: "Pitfire Pizza", locale: ["en", "ar"], category: "pizza restaurant",
-    keywords: ["Garlic Knots","Hot Honey Margherita","Black Truffle Cream Linguine","Buffalo Chicken Wings","Korean Style Wings","Bresaola & Rocket","Truffle Pasta","Chicken Penne Alfredo","Spinach & Artichoke Dip","Herby Chicken Caesar","Chocolate Chip Cookie Brownie","72-hour artisan dough","crispy crust","oven-fresh pizza","quick service","friendly team","comfortable seating","good value"],
-    forced: ["pizza in Dubai","artisan pizza","72-hour dough"],
-    entity: { area: "Dubai Hills", city: "Dubai", categoryLabel: { en: "pizza restaurant", ar: "مطعم بيتزا" } },
-  },
-  {
-    name: "Maru Udon", locale: ["en", "ja", "ar"], category: "japanese restaurant",
-    keywords: ["Niku Beef udon","Hokkaido Curry","Karamiso Spice","Paitan Chicken","Tan Tan Shezuan","Katsu Curry Udon","Kake Classic","Zaru Dipping","Premium Wagyu Beef Gyudon","Karaage Don","Tempura Don","Shrimp Gyoza","shrimp tempura","onigiri rice balls","Udonut dessert","handmade udon noodles","sanuki-style broth","vegan udon options"],
-    forced: ["udon in Dubai","sanuki-style udon","handmade udon noodles"],
-    entity: { area: "Motor City", city: "Dubai", categoryLabel: { en: "udon restaurant", ja: "うどん店", ar: "مطعم ياباني" } },
-  },
-  {
-    name: "Let It Dough!", locale: ["en", "ja", "ar"], category: "cafe",
-    keywords: ["fresh doughnuts","best doughnuts in Dubai","UAE homegrown","globally-inspired flavors","Boston Cream","Za'atar & Labneh","Brûlée Me Away","natural ingredients","no artificial colors","gift box","perfect for gifts","great for parties and events","office treats","birthday doughnut box","a thoughtful gift","Karak and doughnuts","Japanese tea","Best V60 in Dubai","Great options for drinks"],
-    forced: ["premium doughnuts","doughnuts made fresh daily","doughnuts in Dubai","friendly service"],
-    entity: { area: "WAFI Mall", city: "Dubai", categoryLabel: { en: "doughnut shop", ja: "ドーナツ店", ar: "متجر دونات" } },
-  },
-  {
-    name: "Sushidokoro Tsukasa", locale: ["ja", "en"], category: "sushi restaurant",
-    keywords: ["漬けカンパチ月見丼","握り寿司","ランチの握り","旬の魚","新鮮なネタ","真妻わさび","赤出汁","茶碗蒸し","デザート","日本酒","気軽に行けるカウンター","一人でも入りやすい","気さくな大将","丁寧な接客","明朗会計","リーズナブル","ランチが手頃","落ち着いた雰囲気","清潔感のある店内","子連れでも入りやすい"],
-    forced: [],
-    entity: { area: "渡鹿", city: "熊本市", categoryLabel: { en: "sushi restaurant", ja: "寿司店" } },
-  },
-  {
-    name: "Sengawa Golf", locale: ["ja", "en"], category: "fitness",
-    keywords: ["入場料無料","65球700円","お得な回数券","36打席","左打席","レンタルクラブ","無料の駐車場","駅から歩ける立地","早朝からの練習","仕事帰りの練習","夜22時までの営業","打ちっぱなしの練習","初心者の練習","アイアンの練習","ドライバーの練習","2階のゴルフスクール","プロのレッスン","体験レッスン","静かな練習環境","ふらっと立ち寄れる気軽さ"],
-    forced: [],
-    entity: { area: "三鷹", city: "東京", categoryLabel: { en: "golf driving range", ja: "ゴルフ練習場" } },
-  },
-  {
-    name: "Ocha Cafe Sakura", locale: ["en", "ja", "ar"], category: "japanese tea house",
-    keywords: ["Matcha latte","Hojicha latte","Ceremonial matcha","Matcha Suruga RG","Fukamushi sencha","Genmaicha","Hojicha","Japanese tea gift set","Gift-wrapped tea set","Matcha bowl and whisk set","Assorted sweets box","Gift cheesecake","Tea and sweets gift box","Matcha roll cake","Hojicha roll cake","Souffle cheesecake","Matcha cheesecake","Yuzu cheesecake","Dates cheesecake","Strawberry daifuku","Fruit daifuku","Kinako mochi"],
-    forced: ["matcha gift sets in Abu Dhabi","Japanese tea gift boxes in Abu Dhabi","ceremonial matcha in Abu Dhabi","matcha whisk and bowl sets","Japanese sweets in a gift box","tea sets with gift wrapping"],
-    entity: { area: "Al Maryah Island", city: "Abu Dhabi", categoryLabel: { en: "Japanese tea house", ja: "日本茶専門店", ar: "مقهى شاي ياباني" } },
-  },
-  {
-    name: "mirAIreach", locale: ["en"], category: "agency",
-    keywords: ["local SEO work","GEO strategy","AIO optimization","AI SEO audit","AEO content","AI visibility report","AI Overviews visibility","ChatGPT visibility","Google Business Profile setup","Google Maps ranking","Google review management","QR review system","AI business automation","website design","structured data setup","free AI visibility scan","monthly reporting","clear flat pricing","fast WhatsApp support","honest measurable results"],
-    forced: [],
-    entity: { area: null, city: "Dubai", categoryLabel: { en: "AI SEO agency" } },
-  },
-  // Cinar Rugs — 3 live trial stores (pulled 2026-08-09, all default_language
-  // "en"). Added after the owner read a live QR draft and hit the third bad
-  // GEO frame in three days; the store was never in this bench, so nothing
-  // here was ever rendering "... rugs in <city>" phrases.
-  {
-    name: "Cinar Rugs Dubai", locale: ["en"], category: "rug store",
-    keywords: ["luxury rugs","silk rugs","Anatolian designs","bespoke design","custom sizing","one-of-a-kind pieces","museum-quality pieces","collector's pieces","signature collection","craftsmanship","master weavers","intricate patterns","heirloom quality","showroom visit","interior advice","worldwide shipping"],
-    forced: ["luxury rugs in Dubai","handmade Turkish silk rugs in Dubai","bespoke rugs in Dubai","designer rugs in Dubai","custom-size rugs in Al Quoz","hand-knotted wool rugs in Dubai","Anatolian rugs in Dubai","Hereke silk rugs in Dubai"],
-    entity: { area: "Al Quoz", city: "Dubai", categoryLabel: { en: "rug store" } },
-  },
-  {
-    name: "Cinar Rugs Istanbul", locale: ["en"], category: "rug store",
-    keywords: ["rug weaving demonstration","showroom tour","silk rugs","wool kilims","antique rugs","Hereke silk","one-of-a-kind pieces","museum-quality pieces","collector's pieces","craftsmanship","master weavers","intricate patterns","heirloom quality","wall hangings","worldwide shipping","custom sizing","no pressure to buy","English-speaking staff"],
-    forced: ["handwoven silk rugs in Istanbul","hand-knotted wool rugs in Istanbul","Hereke silk rugs in Istanbul","Turkish kilims near the Grand Bazaar","antique rugs in Istanbul","custom-size rugs in Istanbul","silk and wool rugs in Sultanahmet","hand-woven rugs in Fatih"],
-    entity: { area: "Grand Bazaar", city: "Istanbul", categoryLabel: { en: "rug store" } },
-  },
-  {
-    name: "Cinar Rugs Cappadocia", locale: ["en"], category: "rug store",
-    keywords: ["rug weaving demonstration","showroom tour","silk rugs","wool kilims","natural dyes","double-knot technique","one-of-a-kind pieces","museum-quality pieces","craftsmanship","master weavers","intricate patterns","fine detail","heirloom quality","wall hangings","worldwide shipping","custom sizing","no pressure to buy","English-speaking staff"],
-    forced: ["handwoven silk rugs in Cappadocia","hand-knotted wool rugs in Cappadocia","Turkish kilims in Avanos","naturally dyed rugs in Cappadocia","Anatolian rugs in Cappadocia","custom-size rugs in Cappadocia","double-knotted rugs in Avanos","hand-woven rugs in Nevsehir"],
-    entity: { area: "Avanos", city: "Nevsehir", categoryLabel: { en: "rug store" } },
-  },
-];
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * The store list used to be a snapshot pasted in on 2026-08-02, and it carried
+ * no keyword TYPES because types did not exist yet. So from 2026-08-09 the
+ * bench measured a path production no longer takes: every keyword inferred
+ * instead of typed. Kotobuki left the gate at distinct=397 with no offender
+ * while the typed path repeats one sentence in ~22 of every 100 reviews.
+ *
+ * It reads the live rows now. A bench named "live" that is a copy of live is
+ * exactly the failure it is supposed to catch.
+ */
+function loadEnv() {
+  const candidates = [
+    path.resolve(process.cwd(), ".env.local"),
+    path.resolve(process.cwd(), "../../../dev/localreach-app/.env.local"),
+  ];
+  const p = candidates.find((c) => fs.existsSync(c));
+  if (!p) throw new Error(`env not found: ${candidates.join(" | ")}`);
+  for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
+    const m = /^([A-Z_]+)=(.*)$/.exec(line);
+    if (m) process.env[m[1]] ??= m[2].replace(/^"|"$/g, "");
+  }
+}
+loadEnv();
+
+const TEST_ROWS = /^(Kutsu test|Fujiya Test|QA Onboarding Bistro|Dubai Bar)$/;
+
+async function fetchStores() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const res = await fetch(
+    `${url}/rest/v1/stores?select=store_name,keywords,forced_keywords,business_category,entity_area,entity_city,entity_category_label,default_language,keyword_types,greeting_text&is_active=eq.true&order=created_at`,
+    { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+  );
+  if (!res.ok) throw new Error(await res.text());
+  const rows = await res.json();
+  return rows
+    .map((s) => {
+      const name = s.store_name?.en ?? Object.values(s.store_name ?? {})[0] ?? "";
+      // Same derivation the guest page uses (lib/guest-locales): the locales
+      // the owner actually filled in, before the EN-only gate — the bench is
+      // here to catch what the pools produce, gate or no gate.
+      const filled = new Set([s.default_language]);
+      for (const src of [s.store_name, s.greeting_text]) {
+        for (const [k, v] of Object.entries(src ?? {})) if (typeof v === "string" && v.trim()) filled.add(k);
+      }
+      return {
+        name,
+        locale: ["en", "ja", "ar"].filter((l) => filled.has(l)),
+        category: s.business_category ?? undefined,
+        keywords: s.keywords ?? [],
+        forced: s.forced_keywords ?? [],
+        entity: { area: s.entity_area, city: s.entity_city, categoryLabel: s.entity_category_label ?? {} },
+        keywordTypes: s.keyword_types ?? null,
+      };
+    })
+    .filter((s) => s.name && !TEST_ROWS.test(s.name) && (s.keywords.length || s.forced.length));
+}
+
+const STORES = await fetchStores();
+
 
 // ------------------------------------------------------------- detectors ----
 
@@ -170,6 +153,7 @@ for (const store of STORES) {
         const forcedUsed = store.forced.slice(0, FORCED_CAP);
         const merged = [...forcedUsed, ...guest.filter((g) => !forcedUsed.includes(g))];
         const text = generateReview(store.name, merged, {
+          keywordTypes: store.keywordTypes,
           nonce: createReviewNonce(),
           outletKey: `${store.name}|${locale}`,
           locale,
@@ -301,6 +285,7 @@ for (const store of STORES) for (const locale of store.locale) {
       }
     }
     const text = generateReview(store.name, [...f, ...guest.filter((g) => !f.includes(g))], {
+      keywordTypes: store.keywordTypes,
       // Deterministic nonce: the gate measures the same 100 reviews every run,
       // so a pass is a stable guarantee rather than a lucky draw from the
       // balls-in-bins tail (and a fail is always reproducible).
