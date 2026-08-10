@@ -3,37 +3,11 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { getLocalizedText, isRtlLocale, type SupportedLocale } from '@/types/database'
+import { localesForStore } from '@/lib/guest-locales'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import ReviewFlow from './ReviewFlow'
 
-const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ja', 'ar']
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
-
-/**
- * Locales this particular store actually offers.
- *
- * Why not the full list: the switcher used to hardcode EN/JA/AR because every
- * store was in the UAE. A Japanese store showing an Arabic tab (and an Arabic
- * option in the review-language picker) reads as a template nobody configured,
- * and a guest who taps it lands on a page the owner never wrote. So we derive
- * the list from what the owner filled in — the store's default language plus
- * any locale key present in store_name / greeting_text — keeping the canonical
- * EN → JA → AR order. Falls back to the default language alone.
- */
-function localesForStore(store: {
-  default_language: SupportedLocale
-  store_name: Record<string, string> | null
-  greeting_text: Record<string, string> | null
-}): SupportedLocale[] {
-  const filled = new Set<string>([store.default_language])
-  for (const src of [store.store_name, store.greeting_text]) {
-    for (const [k, v] of Object.entries(src ?? {})) {
-      if (typeof v === 'string' && v.trim()) filled.add(k)
-    }
-  }
-  const list = SUPPORTED_LOCALES.filter((l) => filled.has(l))
-  return list.length > 0 ? list : [store.default_language]
-}
 
 // React cache deduplicates the Supabase query between generateMetadata and Page.
 // Reads the anon-safe VIEW (not the base table) so the public anon key can never

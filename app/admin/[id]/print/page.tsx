@@ -4,35 +4,14 @@ import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { isStoreCurrentlyActive } from '@/lib/subscription'
-import { getLocalizedText, type SupportedLocale } from '@/types/database'
+import { getLocalizedText } from '@/types/database'
+import { localesForStore } from '@/lib/guest-locales'
 import { qrPngDataUrl } from '@/lib/qr'
 import PrintCard from './PrintCard'
 
 export const metadata: Metadata = {
   title: 'Counter card — LocalReach',
   robots: { index: false, follow: false },
-}
-
-const SUPPORTED_LOCALES: SupportedLocale[] = ['en', 'ja', 'ar']
-
-/**
- * Same derivation the guest page uses: the locales the owner actually filled
- * in. A card printed for a Dubai counter should carry Arabic; one for a Tokyo
- * shop should not, and neither should invent a language the store never set up.
- */
-function localesForStore(store: {
-  default_language: SupportedLocale
-  store_name: Record<string, string> | null
-  greeting_text: Record<string, string> | null
-}): SupportedLocale[] {
-  const filled = new Set<string>([store.default_language])
-  for (const src of [store.store_name, store.greeting_text]) {
-    for (const [k, v] of Object.entries(src ?? {})) {
-      if (typeof v === 'string' && v.trim()) filled.add(k)
-    }
-  }
-  const list = SUPPORTED_LOCALES.filter((l) => filled.has(l))
-  return list.length > 0 ? list : [store.default_language]
 }
 
 export default async function PrintCardPage({

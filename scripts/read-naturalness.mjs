@@ -19,7 +19,7 @@
  * that cries wolf stops being read (learned on 2026-08-07, when the Title-Case
  * gate produced 120 false positives on its first run).
  *
- * Usage: node scripts/read-naturalness.mjs [runsPerLocale] [--store=<substr>]
+ * Usage: npx tsx scripts/read-naturalness.mjs [runsPerLocale] [--store=<substr>] [--locale=<en|ja|ar>]
  * Env: GEMINI_API_KEY + the Supabase pair, read from
  *      ../../../dev/localreach-app/.env.local when not already set.
  */
@@ -30,10 +30,20 @@ const { generateReview } = await import("../lib/assembler.ts");
 
 const RUNS = Number(process.argv[2]?.startsWith("--") ? 24 : process.argv[2] ?? 24);
 const ONLY = (process.argv.find((a) => a.startsWith("--store=")) ?? "").split("=")[1] ?? "";
+// Read only the locale we actually ship (see lib/guest-locales). Reading a
+// language no guest can reach spends the budget on output nobody will see.
+const ONLY_LOCALE = (process.argv.find((a) => a.startsWith("--locale=")) ?? "").split("=")[1] ?? "";
 
 function loadEnv() {
-  const p = path.resolve(process.cwd(), "../../../dev/localreach-app/.env.local");
-  if (fs.existsSync(p)) {
+  // The keys live in the deploy repo. Run from either checkout: the monorepo
+  // (relative hop) or the deploy repo itself — the script used to know only the
+  // hop and died with "missing env" when run from the other one.
+  const candidates = [
+    path.resolve(process.cwd(), ".env.local"),
+    path.resolve(process.cwd(), "../../../dev/localreach-app/.env.local"),
+  ];
+  for (const p of candidates) {
+    if (!fs.existsSync(p)) continue;
     for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
       const m = /^([A-Z_]+)=(.*)$/.exec(line);
       if (m) process.env[m[1]] ??= m[2].replace(/^"|"$/g, "");
@@ -128,12 +138,20 @@ function buildPrompt(store, locale, category, sentences) {
  * the first run of this script reported "unparseable" for every store. Sending
  * the DISTINCT sentences instead covers more of the surface for fewer tokens.
  */
-function distinctSentences(reviews, locale) {
+function distinctSentences(reviews, locale, storeName = "") {
+  // A store name can END in terminal punctuation ("Let It Dough!"), and the
+  // splitter then cut the review mid-sentence. The model duly reported the
+  // leftovers as "missing subject" - 11 high-severity findings on the first
+  // run that were the instruments own doing. Mask the name before splitting.
+  const NAME_SLOT = "STORENAMESLOT";
+  const mask = storeName.trim() ? (t) => t.split(storeName).join(NAME_SLOT) : (t) => t;
+  const unmask = (t) => t.split(NAME_SLOT).join(storeName);
+
   const re = locale === "ja" ? /[^。]*。|[^。]+$/g : /[^.!?]*[.!?]+(?:\s|$)|[^.!?]+$/g;
   const seen = new Set();
   for (const r of reviews) {
-    for (const s of r.replace(/\n+/g, " ").match(re) ?? []) {
-      const t = s.trim();
+    for (const s of mask(r.replace(/\n+/g, " ")).match(re) ?? []) {
+      const t = unmask(s.trim());
       if (t) seen.add(t);
     }
   }
@@ -165,7 +183,8 @@ for (const st of stores) {
   const forced = st.forced_keywords ?? [];
   const catLabels = st.entity_category_label ?? {};
   const locales = [...new Set([st.default_language ?? "en", ...Object.keys(catLabels)])]
-    .filter((l) => ["en", "ja", "ar"].includes(l));
+    .filter((l) => ["en", "ja", "ar"].includes(l))
+    .filter((l) => !ONLY_LOCALE || l === ONLY_LOCALE);
 
   for (const locale of locales) {
     const reviews = [];
@@ -188,7 +207,7 @@ for (const st of stores) {
         keywordTypes: st.keyword_types ?? null,
       }));
     }
-    const sentences = distinctSentences(reviews, locale);
+    const sentences = distinctSentences(reviews, locale, name);
     const raw = await callGemini(buildPrompt(name, locale, st.business_category, sentences));
     // A model that never answered is NOT a pass. Saying so out loud is the
     // difference between this gate and one that goes quiet when it breaks.

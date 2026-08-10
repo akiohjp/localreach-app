@@ -28,8 +28,14 @@ const APPLY = process.argv.includes("--apply");
 
 function loadEnv() {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) return;
-  const p = path.resolve(process.cwd(), "../../../dev/localreach-app/.env.local");
-  if (!fs.existsSync(p)) throw new Error(`env not found: ${p}`);
+  // Run from either checkout: the monorepo (relative hop) or the deploy repo
+  // itself, which is where the keys live.
+  const candidates = [
+    path.resolve(process.cwd(), ".env.local"),
+    path.resolve(process.cwd(), "../../../dev/localreach-app/.env.local"),
+  ];
+  const p = candidates.find((c) => fs.existsSync(c));
+  if (!p) throw new Error(`env not found: ${candidates.join(" | ")}`);
   for (const line of fs.readFileSync(p, "utf8").split(/\r?\n/)) {
     const m = /^([A-Z_]+)=(.*)$/.exec(line);
     if (m) process.env[m[1]] ??= m[2].replace(/^"|"$/g, "");
@@ -85,7 +91,12 @@ const TYPES = {
   },
   "Let It Dough!": {
     category: ["premium doughnuts", "fresh doughnuts", "office treats"],
-    attribute: ["no artificial colors", "perfect for gifts", "great for parties and events"],
+    // "UAE homegrown" and "Great options for drinks" were typed as items, so
+    // every object slot took them: "The star of the visit was the UAE
+    // homegrown, no contest." They describe the business, not a thing anyone
+    // ordered (naturalness reader, 2026-08-10).
+    attribute: ["no artificial colors", "perfect for gifts", "great for parties and events",
+                "UAE homegrown", "Great options for drinks"],
   },
   "Ocha Cafe Sakura": {
     category: ["matcha whisk and bowl sets", "Japanese sweets in a gift box",
@@ -112,7 +123,9 @@ const TYPES = {
               "structured data setup", "free AI visibility scan", "monthly reporting",
               "AI Overviews visibility", "ChatGPT visibility", "Google Maps ranking",
               "QR review system"],
-    attribute: [],
+    // How we sell, not what we deliver: "They took ownership of the clear flat
+    // pricing and it shows." (naturalness reader, 2026-08-10).
+    attribute: ["clear flat pricing", "honest measurable results", "no long contracts"],
   },
 };
 

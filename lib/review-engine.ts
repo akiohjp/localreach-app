@@ -98,10 +98,95 @@ function cjkCount(text: string): number {
  * hardcode "the" before {list}/{kw}/{a}/{b}. The raw keyword stays a verbatim
  * substring either way, so the SEO guarantee is unchanged.
  */
+const LEADING_DETERMINER = /^(the|a|an|my|our|your|their|its|this|that|these|those|some|any|every|no|one|two|three|\d+)\s/i;
+
+/**
+ * Title Case all the way through is a NAME ("Boston Cream", "Za'atar & Labneh",
+ * "Dubai Marina"); a capital on the first word only is a common noun the owner
+ * happened to sentence-case ("Hojicha latte", "Japanese tea gift set"). The old
+ * uppercase-means-proper-noun rule sent the second group out bare — "What got
+ * me was Hojicha latte and Japanese tea gift set" (naturalness reader,
+ * 2026-08-10, 11 sentences on the live Ocha Cafe config).
+ */
+function looksSentenceCased(phrase: string): boolean {
+  const words = phrase.trim().split(/\s+/);
+  if (words.length < 2) return false;
+  if (!/^[A-Z]/.test(words[0]!)) return false;
+  // ALL-CAPS tokens are acronyms and say nothing either way ("AI SEO audit",
+  // "Best V60 in Dubai"); a Title-Case word after the first is what marks a
+  // real name ("Boston Cream", "Matcha Suruga RG").
+  return !words.slice(1).some((w) => /^[A-Z][a-z]/.test(w));
+}
+
 function withArt(phrase: string): string {
-  // Never double an article the keyword already carries ("the best pizza in town").
-  if (/^the\s/i.test(phrase)) return phrase;
-  return /^[a-z]/.test(phrase) ? `the ${phrase}` : phrase;
+  // Never double a determiner the keyword already carries. Was "the" only, so
+  // the keyword "a thoughtful gift" came out as "the a thoughtful gift" on the
+  // live Let It Dough! config (naturalness reader, 2026-08-10).
+  if (LEADING_DETERMINER.test(phrase)) return phrase;
+  if (/^[a-z]/.test(phrase)) return `the ${phrase}`;
+  return looksSentenceCased(phrase) ? `the ${phrase}` : phrase;
+}
+
+/**
+ * Services split in two and the article follows the split, not the type:
+ * you book A scan, an audit, a setup — but "the regenerative medicine" and
+ * "the worldwide shipping" are wrong, because the head is a field or an
+ * activity, not a countable thing. Adding the article to every service phrase
+ * fixed mirAIreach and broke Kotobuki in the same run (naturalness reader,
+ * 2026-08-10) — the head noun is what decides.
+ */
+const MASS_NOUN_HEADS: ReadonlySet<string> = new Set([
+  "medicine", "advice", "care", "support", "maintenance", "training", "coaching",
+  "consulting", "guidance", "work", "content", "management", "automation",
+  "hospitality", "service", "shipping", "insurance", "aftercare", "wellness",
+  "nutrition", "therapy", "dentistry", "surgery", "research", "assistance",
+  "visibility", "optimization", "optimisation", "exposure", "awareness",
+]);
+
+/**
+ * The mirror case: a Title-Cased service name is a proper name and stays bare
+ * ("HydraFacial", "IV Drip"), UNTIL its head is a generic service noun — then
+ * it is one specific programme at one clinic and English wants the article:
+ * "No complaints about Weight Management Programme" (naturalness reader,
+ * 2026-08-10, live Kotobuki config).
+ */
+const NAMED_SERVICE_HEADS: ReadonlySet<string> = new Set([
+  "programme", "program", "package", "plan", "check", "checkup", "treatment",
+  "consultation", "session", "course", "scan", "audit", "report", "setup",
+  "system", "formula", "assessment", "screening",
+]);
+
+function headIsNamedService(phrase: string): boolean {
+  const last = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
+  return NAMED_SERVICE_HEADS.has(last);
+}
+
+function headIsUncountable(phrase: string): boolean {
+  const last = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
+  // Gerunds are activities, never countable here: shipping, sizing, cleaning,
+  // reporting, tailoring, detailing.
+  return MASS_NOUN_HEADS.has(last) || /ing$/.test(last);
+}
+
+function withServiceArt(phrase: string): string {
+  if (headIsUncountable(phrase)) return phrase;
+  if (LEADING_DETERMINER.test(phrase)) return phrase;
+  if (headIsNamedService(phrase)) return `the ${phrase}`;
+  return withArt(phrase);
+}
+
+/**
+ * Geo / category / service phrases are deliberately left bare ("Solid choice
+ * for sushi in Dubai"), but a superlative head is ungrammatical without the
+ * article: "If you're after best doughnuts in Dubai". English does not allow
+ * the bare form here, whatever the phrase is.
+ */
+const SUPERLATIVE_HEAD = /^(best|top|finest|cheapest|largest|biggest|nicest|greatest|fastest|closest|friendliest|most)\b/i;
+
+function withSuperlativeArt(phrase: string, locale: ReviewLocale): string {
+  if (locale !== "en") return phrase;
+  if (LEADING_DETERMINER.test(phrase)) return phrase;
+  return SUPERLATIVE_HEAD.test(phrase) ? `the ${phrase}` : phrase;
 }
 
 /**
@@ -124,6 +209,25 @@ const ATTRIBUTE_SHAPED: RegExp[] = [
   /\b(and|&)\s+(clean|comfortable|cosy|cozy|quiet|friendly|fast|affordable|welcoming)$/i,
   /\b(daily|weekly|nightly|always|often)$/i,
   /^(no|not)\s/i,
+  // Adverb-led descriptions: the head is an adjective or participle, never a
+  // thing you can "try" ("Spotlessly clean", "Freshly fried", "Highly
+  // recommended"). The adjectival tail is required so "Daily specials" and
+  // "Weekly menu" — real items — are not swept in with them.
+  /^\w+ly\s+\w+(ed|y|ful|ous|ive|ing|ish|clean|fresh|fast|good)$/i,
+  // Verdict pills an owner types as a whole clause ("Will definitely come
+  // back", "You won't regret it"), which no object slot can take.
+  /^(will|would|i'll|we'll|you'll|can't|cannot|must|never|always)\b/i,
+  // Two adjectives joined ("Juicy and addictive", "Rich and flavorful").
+  /^\w+(y|ful|ous|ive|ed|ing|ish)\s+and\s+\w+(y|ful|ous|ive|ed|ing|ish)$/i,
+  // Provenance / production claims owners type as selling points: they modify
+  // the business, they are not things a guest ordered ("UAE homegrown" came out
+  // as "The star of the visit was the UAE homegrown, no contest." on the live
+  // Let It Dough! config — naturalness reader, 2026-08-10).
+  /\b(homegrown|home-grown|handmade|hand-made|family-run|family-owned|locally sourced|locally-sourced|halal|vegan|organic|gluten-free|sugar-free)$/i,
+  // "Great options for drinks", "Good spot for groups": a quality-of-the-place
+  // claim wearing a noun in the middle. The bare "great for X" case is already
+  // the first pattern above.
+  /^(great|good|excellent|nice|solid|perfect)\s+\w+\s+for\b/i,
 ];
 
 /**
@@ -580,11 +684,14 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "{Also worth mentioning|Worth flagging too}: {kw}.",
     "One more thing{ I liked|}: {kw}.",
     "Plus {kw}, which I {appreciated|rate|didn't take for granted}.",
-    "{Same goes|That goes} for {kw} {too|as well}.",
-    "And {kw}, which counts for a lot.",
+    "{Same goes|That goes} for {kw}.",
+    "Another point in its favor: {kw}.",
     "And {kw}, too, which {helps|matters|makes a difference}.",
-    "It's also {kw}, {for what that's worth|and that helps|no small thing}.",
-    "Add {kw} to the plus column.",
+    // Not "It's also {kw}": attribute pills are routinely whole clauses ("no
+    // pressure to buy"), and the copula then produces "It's also no pressure
+    // to buy." (naturalness reader, 2026-08-10, live Cinar Istanbul config).
+    "{kw}, {for what that's worth|and that helps|no small thing}.",
+    "Put {kw} in the plus column.",
     "On top of that, {kw}.",
     "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
     "Small detail, but a {good|welcome|nice} one: {kw}.",
@@ -615,8 +722,20 @@ export type ReviewEntity = {
   cat?: string | null;
 };
 
+/**
+ * Islands take "on", not "in" — "a Japanese tea house in Al Maryah Island"
+ * (naturalness reader, 2026-08-10, 9 sentences on the live Ocha Cafe config,
+ * whose whole address IS an island). The entity templates hardcode "in", so
+ * the swap happens after the fill, keyed on the location name itself.
+ */
+function fixLocPreposition(text: string, loc: string): string {
+  if (!/\bislands?$/i.test(loc.trim())) return text;
+  const esc = loc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp("\\b([Ii])n (" + esc + ")", "g"), (_m, i, l) => `${i === "I" ? "O" : "o"}n ${l}`);
+}
+
 function fillEntity(tpl: string, loc: string, cat: string): string {
-  const filled = tpl.replace(/\{loc\}/g, loc).replace(/\{cat\}/g, cat);
+  const filled = fixLocPreposition(tpl.replace(/\{loc\}/g, loc).replace(/\{cat\}/g, cat), loc);
   // "a" → "an" when the substituted category starts with a vowel LETTER:
   // "a Asian supermarket" reached production output (caught 2026-08-03).
   // Letter heuristic over sound is right for this domain: "an udon restaurant"
@@ -711,6 +830,40 @@ function filterMedicalVoice(pool: PoolSet, locale: ReviewLocale, vertical: Verti
   // Every slot is filtered, not just the keyword slots: closers and fillers
   // carry consumption voice too ("今度は別の楽しみ方で{store}を試してみるつもり
   // です" reads absurd for a clinic — caught 2026-08-03 in verification).
+  const out = {} as PoolSet;
+  (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
+    out[k] = strip(pool[k]);
+  });
+  return out;
+}
+
+/**
+ * Shops sell things other people made. The generic pools carry two voices that
+ * only fit a place that PRODUCES what you consume: kitchen credit ("1004
+ * Gourmet nailed the wasabi paste." — they stock it, they did not make it) and
+ * table service ("The person looking after us missed nothing, without writing
+ * any of it down." — nobody takes your order in a rug store). Occasion voice
+ * lands wrong too: "We chose Cinar Rugs Dubai for a small celebration."
+ * All three were flagged by the naturalness reader on the live Cinar and 1004
+ * configs (2026-08-10) with every structural gate green — the same shape of
+ * defect the medical filter above was built for, one vertical over.
+ *
+ * EN only, on purpose. JA/AR retail pools have not been read by a native
+ * speaker, and those locales are not currently offered to guests (see
+ * lib/guest-locales) — inventing patterns for output nobody reads would be
+ * guessing dressed up as coverage.
+ */
+const RETAIL_VERTICALS: ReadonlySet<Vertical> = new Set<Vertical>(["retail"]);
+
+const RETAIL_UNFIT_EN =
+  /\bnailed\b|\bcome hungry\b|\bsave room\b|\bfirst bite\b|\btasted\b|\bthe meal\b|celebration|celebrate|without writing any of it down|\bgo see\b|\bthe rotation\b|\bmy usual spots\b|\bmy regular list\b|\bfull day of errands\b|\bnew regular in me\b|\banother good one from\b|\beasy to settle in\b/i;
+
+function filterRetailVoice(pool: PoolSet, locale: ReviewLocale, vertical: Vertical): PoolSet {
+  if (locale !== "en" || !RETAIL_VERTICALS.has(vertical)) return pool;
+  const strip = (arr: string[]) => {
+    const kept = arr.filter((t) => !RETAIL_UNFIT_EN.test(t));
+    return kept.length > 0 ? kept : arr; // an empty slot would break assembly
+  };
   const out = {} as PoolSet;
   (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
     out[k] = strip(pool[k]);
@@ -979,6 +1132,31 @@ function entityLoc(
 }
 
 /**
+ * An English review must not carry a Japanese place name. entity_area is a
+ * single text column (only entity_category_label is per-locale), so a Kumamoto
+ * sushi bar published "Nice surprise to come across a sushi restaurant like
+ * this in 渡鹿." on its EN tab — 39 sentences across the two Japan stores
+ * (naturalness reader, 2026-08-10).
+ *
+ * Dropping the location is the honest fallback: the entity sentence falls back
+ * to the category-only pool, so the review still says WHAT the place is, just
+ * not where. The real fix is a per-locale area field (same shape as
+ * entity_category_label) — that needs a migration and an owner-facing input,
+ * and printing another script at a guest until then is the worse of the two.
+ */
+const SCRIPT_ALIEN_TO: Record<ReviewLocale, RegExp> = {
+  // CJK, Hangul, Arabic, Cyrillic: anything an English reader cannot read.
+  en: /[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF\u0600-\u06FF\u0400-\u04FF]/,
+  ja: /[\u0600-\u06FF]/,
+  ar: /[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/,
+};
+
+function readableLocation(value: string | null, locale: ReviewLocale): string | null {
+  if (!value) return null;
+  return SCRIPT_ALIEN_TO[locale].test(value) ? null : value;
+}
+
+/**
  * Weave the entity sentence into `text`. Returns the new text plus every
  * entity term now present, so callers extend the verbatim-protect list.
  */
@@ -992,8 +1170,8 @@ function weaveEntity(
   vertical: Vertical = "generic",
   store?: string,
 ): { text: string; protect: string[] } {
-  const area = entity?.area?.trim() || null;
-  const city = entity?.city?.trim() || null;
+  const area = readableLocation(entity?.area?.trim() || null, locale);
+  const city = readableLocation(entity?.city?.trim() || null, locale);
   const cat = entity?.cat?.trim() || null;
   if (!area && !city && !cat) return { text, protect: [] };
 
@@ -1462,7 +1640,7 @@ const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
  */
 const SERVICE_TAILS: Record<ReviewLocale, string[]> = {
   en: [
-    "Came in for {kw} and the process was {explained properly|walked through step by step|clear from the start}.",
+    "Came in for {kw} and they {explained the process properly|walked me through it step by step|made it clear from the start}.",
     "They took the time to explain {kw} before anything {started|began}.",
     "No {complaints|concerns} about {kw}.",
     "If you're {considering|looking into} {kw}, this is a {sensible|solid} place to start.",
@@ -1470,7 +1648,7 @@ const SERVICE_TAILS: Record<ReviewLocale, string[]> = {
     "The follow-up after {kw} was {thorough|genuinely good}.",
     "{Straightforward|Smooth} experience with {kw}.",
     "Went in for {kw} and left knowing exactly what {had been done|to expect next}.",
-    "Nothing was {rushed|glossed over} around {kw}.",
+    "Nothing was {rushed|glossed over} with {kw}.",
     "They answered every question I had about {kw}.",
     "{Clear|Honest} about what {kw} would and would not do.",
     "Booked {kw} and the whole thing ran {on time|to schedule}.",
@@ -1640,7 +1818,11 @@ export function buildLocalizedReview(
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
   const pool = expandPoolChoices(
-    filterMedicalVoice(resolvePoolSet(locale, vertical), locale, vertical),
+    filterRetailVoice(
+      filterMedicalVoice(resolvePoolSet(locale, vertical), locale, vertical),
+      locale,
+      vertical,
+    ),
     forkRng(seed, 0xc401ce),
   );
   const name =
@@ -1852,24 +2034,34 @@ export function buildLocalizedReview(
     for (const gkw of geoKws) {
       if (text.includes(gkw)) continue;
       const tpl = geoOrder[gi++ % geoOrder.length]!;
-      text = appendSpread(text, fill(tpl, { kw: gkw }), cfg.glue, tailSpread, locale, name);
+      text = appendSpread(text, fill(tpl, { kw: withSuperlativeArt(gkw, locale) }), cfg.glue, tailSpread, locale, name);
     }
   }
 
   // Category and service phrases: same treatment, their own frame pools. Each
   // gets one dedicated sentence, rotated, never merged into a list.
-  const weaveDedicated = (phrases: string[], pool: string[], salt: number) => {
+  const weaveDedicated = (
+    phrases: string[],
+    pool: string[],
+    salt: number,
+    shape: ((kw: string) => string) | undefined = undefined,
+  ) => {
     if (phrases.length === 0) return;
     const choiceRng = forkRng(seed, salt);
     const order = shuffle(pool.map((t) => expandChoices(t, choiceRng)), forkRng(seed, salt + 1));
     let i = 0;
     for (const kw of phrases) {
       if (text.includes(kw)) continue;
-      text = appendSpread(text, fill(order[i++ % order.length]!, { kw }), cfg.glue, tailSpread, locale, name);
+      const shaped = shape ? shape(kw) : withSuperlativeArt(kw, locale);
+      text = appendSpread(text, fill(order[i++ % order.length]!, { kw: shaped }), cfg.glue, tailSpread, locale, name);
     }
   };
   weaveDedicated(catKws, CATEGORY_TAILS[locale], 0x9e11);
-  weaveDedicated(svcKws, SERVICE_TAILS[locale], 0x9e21);
+  // A service is a countable thing you book ("the AI SEO audit"), unlike a
+  // category, which is a mass/plural head ("fresh doughnuts") and stays bare.
+  // Without this, every service frame read "They took the time to explain AI
+  // SEO audit" (naturalness reader, 2026-08-10, live mirAIreach config).
+  weaveDedicated(svcKws, SERVICE_TAILS[locale], 0x9e21, locale === "en" ? withServiceArt : undefined);
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).

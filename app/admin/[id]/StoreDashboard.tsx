@@ -18,6 +18,7 @@ import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib
 import { keywordPresetsFor } from '@/lib/keyword-presets'
 import { resolveVertical } from '@/lib/review-pools'
 import { classifyKeyword, type KeywordType } from '@/lib/review-engine'
+import { ownerLocaleOptions } from '@/lib/guest-locales'
 import type { Store, LocalizedText, SupportedLocale, StoreUpdate, KeywordTypes } from '@/types/database'
 
 // ─────────────────────────────────────────────
@@ -665,11 +666,7 @@ function ForcedKeywordManager({
 // Store Content Editor (multilingual)
 // ─────────────────────────────────────────────
 
-const LOCALES: { code: SupportedLocale; label: string }[] = [
-  { code: 'en', label: 'EN' },
-  { code: 'ja', label: 'JA' },
-  { code: 'ar', label: 'AR' },
-]
+const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
 
 type ContentState = {
   store_name: LocalizedText
@@ -680,12 +677,20 @@ type ContentState = {
 function ContentEditor({
   storeId,
   initial,
+  defaultLanguage,
 }: {
   storeId: string
   initial: ContentState
+  defaultLanguage: SupportedLocale
 }) {
+  // Only the locales guests can actually reach (see lib/guest-locales). Editing
+  // a language the store never shows produces text nobody reads and makes the
+  // owner think a tab exists on their page.
+  const locales = ownerLocaleOptions(defaultLanguage)
   const [content, setContent] = useState<ContentState>(initial)
-  const [activeLocale, setActiveLocale] = useState<SupportedLocale>('en')
+  const [activeLocale, setActiveLocale] = useState<SupportedLocale>(
+    locales.includes(defaultLanguage) ? defaultLanguage : locales[0],
+  )
   const [state, setState] = useState<SaveState>('idle')
 
   function setField(field: keyof ContentState, locale: SupportedLocale, value: string) {
@@ -717,9 +722,9 @@ function ContentEditor({
 
   return (
     <div className="space-y-4">
-      {/* Locale tabs */}
-      <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
-        {LOCALES.map(({ code, label }) => (
+      {/* Locale tabs — hidden when the store offers a single language */}
+      <div className={`gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 ${locales.length > 1 ? 'flex' : 'hidden'}`}>
+        {locales.map((code) => (
           <button
             key={code}
             onClick={() => setActiveLocale(code)}
@@ -730,7 +735,7 @@ function ContentEditor({
                 : 'text-slate-400 hover:text-slate-600',
             ].join(' ')}
           >
-            {label}
+            {LOCALE_LABELS[code]}
           </button>
         ))}
       </div>
@@ -795,6 +800,12 @@ function ContentEditor({
 // Language Selector
 // ─────────────────────────────────────────────
 
+const DEFAULT_LANGUAGE_LABELS: Record<SupportedLocale, string> = {
+  en: 'English',
+  ja: '日本語',
+  ar: 'العربية (RTL)',
+}
+
 function LanguageSelectorSection({
   storeId,
   initial,
@@ -825,9 +836,11 @@ function LanguageSelectorSection({
           text-sm text-slate-900 outline-none focus:border-slate-400
           focus:ring-2 focus:ring-slate-100 transition cursor-pointer"
       >
-        <option value="en">English</option>
-        <option value="ja">日本語</option>
-        <option value="ar">العربية (RTL)</option>
+        {ownerLocaleOptions(initial).map((code) => (
+          <option key={code} value={code}>
+            {DEFAULT_LANGUAGE_LABELS[code]}
+          </option>
+        ))}
       </select>
       <p className="text-[10px] text-slate-400">
         Sets the default locale for the customer review page. Arabic enables right-to-left layout.
@@ -1265,6 +1278,7 @@ function WhatsAppRequestSection({
   storeUrl,
   locale,
   message,
+  defaultLanguage,
   onLocale,
   onMessage,
 }: {
@@ -1272,9 +1286,13 @@ function WhatsAppRequestSection({
   storeUrl: string
   locale: WaLocale
   message: string
+  defaultLanguage: SupportedLocale
   onLocale: (l: WaLocale) => void
   onMessage: (m: string) => void
 }) {
+  // Same gate as the review page: sending a guest an Arabic invite to a page
+  // that has no Arabic tab strands them on a language we do not serve.
+  const waLocales = ownerLocaleOptions(defaultLanguage) as WaLocale[]
   const [number, setNumber] = useState('')
   const [copied, setCopied] = useState(false)
 
@@ -1297,9 +1315,9 @@ function WhatsAppRequestSection({
         no extra fees. Message <span className="font-semibold text-slate-800">only customers who gave you their number</span>.
       </p>
 
-      {/* Message language */}
-      <div className="flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
-        {(['en', 'ja', 'ar'] as WaLocale[]).map((code) => (
+      {/* Message language — hidden when only one is offered */}
+      <div className={`gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 ${waLocales.length > 1 ? 'flex' : 'hidden'}`}>
+        {waLocales.map((code) => (
           <button
             key={code}
             onClick={() => { onLocale(code); onMessage(waTemplate(code, storeName, storeUrl)) }}
@@ -2031,6 +2049,7 @@ export default function StoreDashboard({
                 storeUrl={storeUrl}
                 locale={waLocale}
                 message={waMessage}
+                defaultLanguage={store.default_language}
                 onLocale={setWaLocale}
                 onMessage={setWaMessage}
               />
@@ -2088,6 +2107,7 @@ export default function StoreDashboard({
             <SectionCard label="Store Content" icon={<Globe size={14} />}>
               <ContentEditor
                 storeId={store.id}
+                defaultLanguage={store.default_language}
                 initial={{
                   store_name: store.store_name,
                   greeting_text: store.greeting_text,

@@ -13,16 +13,21 @@ import StepFeedbackSent from "@/components/StepFeedbackSent";
 import { getUiStrings } from "@/lib/ui-strings";
 import { useFlowPersistence } from "@/lib/use-flow-persistence";
 import type { SupportedLocale } from "@/types/database";
+import { ENABLED_LOCALES } from "@/lib/guest-locales";
 
 const POSITIVE_STEPS: Step[] = ["rating", "keywords", "generating", "result"];
 
-// The `/` demo UI is English, but the generated review can be switched to Arabic
-// so the sample flow shows off guest-selectable review language.
+// The `/` demo UI is English. The review-language picker shows only locales we
+// currently offer (lib/guest-locales) — a prospect who taps a language on the
+// demo and reads broken output has been sold the defect, not the product.
 const t = getUiStrings("en");
-const DEMO_REVIEW_LOCALES: { code: SupportedLocale; label: string }[] = [
-  { code: "en", label: "English" },
-  { code: "ar", label: "العربية" },
-];
+const LOCALE_LABELS: Record<SupportedLocale, string> = {
+  en: "English",
+  ja: "日本語",
+  ar: "العربية",
+};
+const DEMO_REVIEW_LOCALES: { code: SupportedLocale; label: string }[] =
+  ENABLED_LOCALES.map((code) => ({ code, label: LOCALE_LABELS[code] }));
 
 const DEMO_STORE_ID =
   typeof process.env.NEXT_PUBLIC_DEMO_STORE_ID === "string"
