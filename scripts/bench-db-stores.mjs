@@ -112,6 +112,33 @@ function caseOffenders(text, locale, allow) {
   return [...new Set(out)];
 }
 
+/**
+ * Two structural tells no gate could see until 2026-08-13, when the owner read
+ * a live QR and found both in one review ("Short version: ... Underrated: the
+ * good value. ..."):
+ *
+ *   COLON  — a colon aside is one person's afterthought. Two or three of them
+ *            is a form being filled in. 14 of the 22 EN attribute frames are
+ *            colon-shaped, so an attribute-heavy store drew several per review.
+ *   AFTER  — sentences that OPEN as an addendum ("Also X.", "And Y, too.",
+ *            "Plus Z."). One is natural; a stack of them is the engine walking
+ *            a keyword list out loud.
+ *
+ * EN only: the JA/AR attribute frames are not colon-shaped and their additive
+ * particles are not sentence-initial, so the same regexes would measure noise.
+ */
+function colonAsides(text) {
+  return (text.match(/:\s/g) ?? []).length;
+}
+
+const AFTERTHOUGHT_OPEN =
+  /^(also\b|and\b|plus\b|another\b|on top of that|one more thing|worth (noting|adding|flagging)|(handy|useful) too|(nice|good) to see|in the plus column|counts for something|not nothing|file this under|small detail|a (detail|point) in their favou?r|one thing i did not expect)/i;
+
+function afterthoughtSentences(text, locale) {
+  if (locale !== "en") return 0;
+  return splitSentences(text, locale).filter((x) => AFTERTHOUGHT_OPEN.test(x.trim())).length;
+}
+
 const stores = (await fetchStores()).filter((s) => {
   const n = s.store_name?.en ?? Object.values(s.store_name ?? {})[0] ?? "";
   return !ONLY || n.toLowerCase().includes(ONLY.toLowerCase());
@@ -146,7 +173,7 @@ for (const s of stores) {
 
   for (const locale of locales) {
     const seen = new Set();
-    const hits = { banned: new Map(), case: new Map(), caseCtx: new Map(), pileup: 0, dupe: 0 };
+    const hits = { banned: new Map(), case: new Map(), caseCtx: new Map(), pileup: 0, dupe: 0, colon: 0, after: 0 };
     const samples = [];
 
     for (let i = 0; i < RUNS; i++) {
@@ -192,11 +219,13 @@ for (const s of stores) {
         }
       }
       if (maxPhrasesPerSentence(text, locale, merged) >= 3) hits.pileup++;
+      if (colonAsides(text) >= 2) hits.colon++;
+      if (afterthoughtSentences(text, locale) >= 3) hits.after++;
     }
 
     const bannedList = [...hits.banned.entries()];
     const caseList = [...hits.case.entries()].sort((a, b) => b[1] - a[1]);
-    const status = bannedList.length ? "FAIL" : caseList.length || hits.pileup ? "WARN" : "OK";
+    const status = bannedList.length ? "FAIL" : caseList.length || hits.pileup || hits.colon || hits.after ? "WARN" : "OK";
     if (bannedList.length) hardFail++;
 
     console.log(`[${status}] ${name} · ${locale}`);
@@ -209,6 +238,8 @@ for (const s of stores) {
       }
     }
     if (hits.pileup) console.log(`   PILEUP  ${hits.pileup}/${RUNS} reviews with 3+ phrases in one sentence`);
+    if (hits.colon) console.log(`   COLON   ${hits.colon}/${RUNS} reviews with 2+ colon asides`);
+    if (hits.after) console.log(`   AFTER   ${hits.after}/${RUNS} reviews with 3+ afterthought sentences`);
     if (hits.dupe) console.log(`   DUPE    ${hits.dupe}/${RUNS} identical repeats`);
     for (const t of samples) console.log(`   · ${t.replace(/\n+/g, " ").slice(0, 190)}`);
   }

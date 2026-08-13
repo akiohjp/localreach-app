@@ -712,6 +712,14 @@ function pickFreshFiller(
  * slot. Deliberately colon/"plus"-led (EN) or sentence-closed (JA): no article,
  * no particle, no verb agreement to break.
  */
+/**
+ * Sentence openings that announce an addendum. Shared by the tail guard and by
+ * the bench gate that measures the same thing (scripts/bench-db-stores.mjs).
+ * EN only: the JA/AR additive particles are not sentence-initial.
+ */
+const ADDITIVE_OPEN =
+  /^(also\b|and\b|plus\b|another\b|on top of that|one more thing|worth (noting|adding|flagging)|(handy|useful) too|(nice|good) to see|in the plus column|counts for something|not nothing|file this under|small detail|a (detail|point) in their favou?r|one thing i did not expect)/i;
+
 const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
   // Single-sentence ONLY. Two-sentence templates ("{kw}。この点は大きいと思い
   // ます。") split at the terminator, and each half became its own repeated
@@ -739,7 +747,10 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
     "Small detail, but a {good|welcome|nice} one: {kw}.",
     "{Worth noting|Worth adding} as well: {kw}.",
-    "{Counts for something|Not nothing} either: {kw}.",
+    // "Counts for something either" is not English — "either" needs a negative
+    // to lean on. Only the "Not nothing" half of the old choice group carried
+    // one (owner read, 2026-08-13).
+    "{Counts for something too|Not nothing either}: {kw}.",
     "And this helped: {kw}.",
     "One thing I did not expect: {kw}.",
     "A {detail|point} in their favor: {kw}.",
@@ -748,6 +759,18 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
     "File this under reasons to go back: {kw}.",
     "{Handy|Useful} too: {kw}.",
     "Another thing worth {a mention|flagging}: {kw}.",
+    // Non-additive frames. Everything above opens either as an addendum
+    // ("Also", "And", "Plus", "Another") or with a colon, so a store carrying
+    // three or more attribute pills stacked three afterthought sentences into
+    // one review however the rotation fell — 6 reviews in 40 on the live demo
+    // cafe config (2026-08-13). These carry the same phrase without announcing
+    // it as an extra. The pill never STARTS the sentence: attributes are
+    // verbatim-protected, so the capitaliser leaves a lower-case pill alone and
+    // the sentence would open in lower case.
+    "{Points|Bonus points} for {kw}.",
+    "Hard to argue with {kw}.",
+    "{Credit|Full marks} for {kw}, too.",
+    "No complaints about {kw} either.",
   ],
   // JA: the phrase is closed off with 、before the frame continues, so no
   // particle ever attaches to the keyword — grammatical for a noun, an adjective
@@ -1344,6 +1367,9 @@ function buildCore(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, 
   return fill(pick(corePool, forkRng(seed, compact ? 0x103 : 0x102)), { store, list });
 }
 
+/** Micro-openers that promise a short review (EN / JA / AR). */
+const BREVITY_OPENER = /^(short version|quick note|一言だけ|短めに|باختصار|ملاحظة سريعة)/i;
+
 function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg, compact: boolean, seed: number, locale: ReviewLocale): string {
   const openerPool = compact && pool.openersShort.length > 0 ? pool.openersShort : pool.openersLong;
   const bridgePool = compact && pool.bridgesShort.length > 0 ? pool.bridgesShort : pool.bridgesLong;
@@ -1367,8 +1393,24 @@ function buildInner(store: string, kws: string[], pool: PoolSet, cfg: LocaleCfg,
   const bridgeFirst = !compact && forkRng(seed, 0x106)() < 0.41;
   let segments = bridgeFirst ? [opener, bridge, core, closer] : [opener, core, bridge, closer];
   const rMicro = forkRng(seed, 0x10a);
-  if (!compact && pool.microOpeners.length > 0 && rMicro() < 0.11) {
-    segments = [pick(pool.microOpeners, rMicro), ...segments];
+  if (pool.microOpeners.length > 0 && rMicro() < 0.11) {
+    // A micro-opener that ANNOUNCES brevity contradicts the review it opens
+    // when that review then runs five to eight sentences — owner-caught
+    // 2026-08-13 on live output: "Short version: Stopped by ..." followed by
+    // five sentences. Which openers do that is a property of the phrase, not
+    // of the pool, so brevity-declaring openers go on COMPACT reviews only and
+    // the rest keep the long ones (before this they were long-only, which is
+    // exactly backwards).
+    const fits = pool.microOpeners.filter((m) => BREVITY_OPENER.test(m.trim()) === compact);
+    if (fits.length > 0) {
+      // On a compact review the brevity opener REPLACES the bridge instead of
+      // adding to it. Adding it kept the promise honest but pushed the review
+      // to six sentences, and the bench's bottom-heavy-wall count rose with it
+      // (2026-08-13). A short review that opens "Quick note." and then runs six
+      // sentences is the same contradiction in a smaller size.
+      const trimmed = compact && bridge ? segments.filter((x) => x !== bridge) : segments;
+      segments = [pick(fits, rMicro), ...trimmed];
+    }
   }
   return weaveParagraphs(segments.filter(Boolean), forkRng(seed, 0x108), compact, cfg.glue);
 }
@@ -1686,6 +1728,35 @@ const KEYWORD_TYPES: ReadonlySet<string> = new Set([
   "item", "service", "category", "attribute", "geo",
 ]);
 
+/**
+ * Quality adjective in front of a service / price / room noun — "good value",
+ * "quick service", "friendly staff", "cozy atmosphere". These are ATTRIBUTES,
+ * but they are SHAPED like a noun phrase, so every attribute pattern above
+ * (adjective phrases, clauses, verdicts) misses them and they land in the
+ * "item" leftover pile — the object slot for things you order. Live output on
+ * an untyped store, owner-caught 2026-08-13: "Come for the good value.",
+ * "The good value, so good.", "Underrated: the good value."
+ *
+ * Both halves stay CLOSED lists: a small quality-adjective set, and the
+ * non-consumable noun list that already exists for taste-voice filtering. A
+ * real dish keeps its item voice because its head noun is not in that list
+ * ("great coffee", "fresh doughnuts", "premium doughnuts").
+ *
+ * EN only — JA has its own predicate detector, and AR has no attribute slot
+ * (ATTRIBUTE_TAILS.ar is empty), so returning "attribute" there would drop the
+ * phrase into a tail pool that does not exist.
+ */
+const QUALITY_ADJ_EN =
+  /^(good|great|excellent|nice|solid|quick|fast|prompt|speedy|friendly|welcoming|warm|attentive|helpful|polite|professional|clean|spotless|tidy|cozy|cosy|comfortable|relaxed|calm|quiet|spacious|convenient|easy|reasonable|fair|affordable|cheap|honest|transparent|efficient|smooth|ample|free)\b/i;
+
+function isQualityNounPhrase(kw: string): boolean {
+  const t = kw.trim();
+  if (!/^[\x20-\x7E]+$/.test(t)) return false;
+  const words = t.split(/\s+/);
+  if (words.length < 2 || words.length > 3) return false;
+  return QUALITY_ADJ_EN.test(t) && NON_CONSUMABLE_EN.test(t);
+}
+
 export function classifyKeyword(
   kw: string,
   types: KeywordTypeMap | undefined,
@@ -1695,6 +1766,7 @@ export function classifyKeyword(
   if (explicit && KEYWORD_TYPES.has(explicit)) return explicit;
   if (isGeoPhrase(kw)) return "geo";
   if (isAttributeShaped(kw, locale)) return "attribute";
+  if (locale === "en" && isQualityNounPhrase(kw)) return "attribute";
   return "item";
 }
 
@@ -2108,7 +2180,22 @@ export function buildLocalizedReview(
     }
   };
   pushGroup(nounLeft, false);
-  pushGroup(attrLeft, true);
+  // Attribute pills normally get one sentence each: their frames read as an
+  // aside, and joining two clause-shaped pills produced "Another plus: the
+  // perfect for gifts plus the no artificial colors" (2026-08-02).
+  //
+  // Quality noun phrases are the exception — they conjoin bare and cleanly.
+  // Without this, a store whose whole list is that shape ("good value",
+  // "quick service", "friendly staff", "cozy atmosphere") emits one "Also X."
+  // sentence PER keyword, and the review ends in a stack of four afterthoughts
+  // (owner read of live output, 2026-08-13). Joined by hand, not by joinList:
+  // that runs withArt, and an attribute must never take an article.
+  const conjoinable = locale === "en" ? attrLeft.filter((k) => isQualityNounPhrase(k)) : [];
+  for (let i = 0; i < conjoinable.length; i += 2) {
+    const pair = conjoinable.slice(i, i + 2);
+    slots.push({ attr: true, n: pair.length, text: pair.join(" and ") });
+  }
+  pushGroup(attrLeft.filter((k) => !conjoinable.includes(k)), true);
 
   // Attribute tails bypass the PoolSet, so expandPoolChoices never sees them —
   // resolve their choice groups here or the raw "{a|b}" braces reach the guest
@@ -2162,6 +2249,38 @@ export function buildLocalizedReview(
     slots.length = 0;
     slots.push(...merged);
   }
+  // A colon aside ("Another plus: X.") reads like one person's afterthought.
+  // Two or three of them read like a form being filled in — the loudest
+  // structural tell in the owner read of live output (2026-08-13): "Short
+  // version: ... Underrated: the good value." 14 of the 22 EN attribute frames
+  // are colon-shaped, so an attribute-heavy store drew two or three per review
+  // by construction. Cap the whole review at ONE, across every tail pool, and
+  // fall back to a non-colon frame from the same pool.
+  const isColonFrame = (t: string) => /:\s/.test(t);
+  let colonBeats = (text.match(/:\s/g) ?? []).length;
+  // Same argument one level up: a sentence that OPENS as an addendum ("Also X.",
+  // "And Y, too.", "Plus Z.") is natural once, and is the engine reading a
+  // keyword list out loud by the third. A store with four attribute pills hit
+  // three or more in 6 of 40 reviews (live demo cafe config, 2026-08-13), which
+  // is why ATTRIBUTE_TAILS now carries non-additive frames to fall back to.
+  const isAdditiveFrame = (t: string) => ADDITIVE_OPEN.test(t.trim());
+  let additiveBeats = 0;
+  const avoidColon = (tpl: string, order: string[], used?: Set<string>): string => {
+    const colonBad = (t: string) => colonBeats >= 1 && isColonFrame(t);
+    const addBad = (t: string) => additiveBeats >= 2 && isAdditiveFrame(t);
+    if (!colonBad(tpl) && !addBad(tpl)) return tpl;
+    const free = order.filter((t) => !(used?.has(t) ?? false));
+    // Fall back in priority order. Asking for both at once and giving up when
+    // neither exists made this WORSE: the reject path returned the original
+    // colon frame and the second-colon count went UP (measured 2026-08-13).
+    // The colon cap is the harder rule, so a candidate that only fixes the
+    // colon still beats keeping the original.
+    return free.find((t) => !colonBad(t) && !addBad(t)) ?? free.find((t) => !colonBad(t)) ?? tpl;
+  };
+  const countBeats = (tpl: string) => {
+    if (isColonFrame(tpl)) colonBeats++;
+    if (isAdditiveFrame(tpl)) additiveBeats++;
+  };
   let ti = 0;
   let ai = 0;
   // The rotation counters below index into `order`, but `order` is re-filtered
@@ -2186,7 +2305,9 @@ export function buildLocalizedReview(
       const fresh = order.find((t) => !usedTails.has(t));
       if (fresh) tpl = fresh; // else: pool exhausted, repeating beats dropping the phrase
     }
+    tpl = avoidColon(tpl, order, usedTails);
     usedTails.add(tpl);
+    countBeats(tpl);
     text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name);
   }
 
@@ -2222,7 +2343,9 @@ export function buildLocalizedReview(
     for (const kw of phrases) {
       if (text.includes(kw)) continue;
       const shaped = shape ? shape(kw) : withSuperlativeArt(kw, locale);
-      text = appendSpread(text, fill(order[i++ % order.length]!, { kw: shaped }), cfg.glue, tailSpread, locale, name);
+      const tpl = avoidColon(order[i++ % order.length]!, order);
+      countBeats(tpl);
+      text = appendSpread(text, fill(tpl, { kw: shaped }), cfg.glue, tailSpread, locale, name);
     }
   };
   weaveDedicated(catKws, CATEGORY_TAILS[locale], 0x9e11);
