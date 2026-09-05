@@ -10,6 +10,61 @@ import { buildLocalizedReview, type KeywordTypeMap, type ReviewEntity } from "@/
 import { resolveAudience, resolveVertical, type ReviewLocale } from "@/lib/review-pools";
 import type { SupportedLocale } from "@/types/database";
 
+/**
+ * Words that are capitalised in English wherever they sit, so a keyword that
+ * starts with one is NOT merely sentence-cased. Nationalities, places, brands
+ * and calendar words that turn up in real store configs. Anything not listed
+ * stays capitalised too (a miss here keeps the owner's casing, never the
+ * reverse), so the list only needs to cover what owners actually type.
+ */
+const ALWAYS_CAPITALIZED: ReadonlySet<string> = new Set([
+  "Emirati", "Arab", "Arabic", "Arabian", "Japanese", "Korean", "Chinese", "Indian", "Italian",
+  "French", "Turkish", "Thai", "Lebanese", "Syrian", "Egyptian", "British", "English", "American",
+  "German", "Spanish", "Greek", "Mexican", "Pakistani", "Filipino", "Moroccan", "Omani", "Saudi",
+  "Kuwaiti", "Bahraini", "Qatari", "Iraqi", "Iranian", "Persian", "African", "Asian", "European",
+  "Western", "Swiss", "Belgian", "Dutch", "Australian", "Canadian", "Russian", "Vietnamese",
+  "Malaysian", "Indonesian", "Singaporean", "Nepali", "Bangladeshi", "Yemeni", "Jordanian",
+  "Sudanese", "Ethiopian", "Kenyan", "Nigerian", "Brazilian", "Mediterranean", "Levantine",
+  "Gulf", "Khaleeji", "Hereke", "Anatolian", "Ottoman", "Uzbek", "Afghan", "Kashmiri",
+  "Dubai", "Abu", "Sharjah", "Ajman", "Riyadh", "Doha", "Muscat", "Istanbul", "Cappadocia",
+  "Tokyo", "Kyoto", "Osaka", "London", "Paris", "Milan", "Google", "Michelin", "Instagram",
+  "WhatsApp", "Halal", "Ramadan", "Eid", "Christmas", "Diwali", "Monday", "Tuesday",
+  "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "January", "February", "March",
+  "April", "May", "June", "July", "August", "September", "October", "November", "December",
+]);
+
+/**
+ * How a keyword is written INSIDE a review sentence.
+ *
+ * Owners type descriptive phrases in sentence case ("Long-lasting scent",
+ * "Elegant packaging") because a form field invites it. Reproduced verbatim
+ * mid-sentence that capital is the loudest bot tell on the page: "One thing I
+ * didn't expect was the Long-lasting scent." A person writes "the
+ * long-lasting scent". So a DECLARED attribute / category / service phrase
+ * whose only capital is the first letter of an ordinary word is lowered at the
+ * boundary, before the engine sees it. Items and geo phrases keep the owner's
+ * casing: a product name is a name, and a search phrase is matched as typed.
+ *
+ * Search is case-insensitive, so the SEO mechanism is untouched; the visible
+ * promise "your phrase appears in the draft" now reads "as a person would
+ * write it in the middle of a sentence". verify-keyword-verbatim checks the
+ * same form.
+ */
+export function reviewKeywordForm(keyword: string, type?: string | null): string {
+  const kw = keyword.trim();
+  if (type !== "attribute" && type !== "category" && type !== "service") return kw;
+  const words = kw.split(/\s+/);
+  if (words.length < 2) return kw;
+  const first = words[0]!;
+  // One capital, then ordinary letters (hyphenated allowed): "Long-lasting".
+  // "UAE", "K-Beauty", "iPhone" all fail this test and stay as typed.
+  if (!/^[A-Z][a-z]+(-[a-z]+)*$/.test(first)) return kw;
+  // A capital anywhere later marks a name ("Japanese Tea Gift Set").
+  if (words.slice(1).some((w) => /^[A-Z]/.test(w))) return kw;
+  if (ALWAYS_CAPITALIZED.has(first.split("-")[0]!)) return kw;
+  return first.charAt(0).toLowerCase() + kw.slice(1);
+}
+
 export type GenerateReviewOptions = {
   nonce?: string;
   /**
@@ -100,7 +155,17 @@ export function generateReview(
       : `${Date.now()}-ssr`);
 
   const outlet = options?.outletKey?.trim() ?? "";
-  const cleaned = keywords.map((k) => k.trim()).filter(Boolean);
+  const rawTypes = (options?.keywordTypes ?? undefined) as KeywordTypeMap | undefined;
+  // Sentence-case lowering happens here, once, so every downstream check
+  // (verbatim, trimming, tails) works on the form the guest will read.
+  const cleaned = keywords
+    .map((k) => reviewKeywordForm(k, rawTypes?.[k.trim()]))
+    .filter(Boolean);
+  const keywordTypes: KeywordTypeMap | undefined = rawTypes
+    ? (Object.fromEntries(
+        Object.entries(rawTypes).map(([k, v]) => [reviewKeywordForm(k, v), v]),
+      ) as KeywordTypeMap)
+    : undefined;
   const locale = toReviewLocale(options?.locale);
   const vertical = resolveVertical(options?.category);
   // Local regulars or one-time visitors: decides which voice pools the review draws from.
@@ -128,8 +193,9 @@ export function generateReview(
     forcedCount,
     rating,
     entity,
-    (options?.keywordTypes as KeywordTypeMap | undefined) ?? undefined,
+    keywordTypes,
     audience,
+    `${options?.category ?? ""} ${entity?.cat ?? ""} ${store}`,
   );
 }
 
