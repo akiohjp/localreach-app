@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { bannedTermsFor, findBannedTerm, stripBannedSentences } from "@/lib/banned-terms";
 import { buildPrompt, clip, LANGUAGE_NAME } from "@/lib/reply-prompt";
 import { paragraphize } from "@/lib/reply-format";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -33,7 +34,12 @@ type GenerateReplyRequest = {
 // to new users" on gemini-2.5-flash and 429 (zero quota) on gemini-2.0-flash —
 // with the old order every AI reply silently fell back to the template engine.
 // The pinned models stay as fallbacks for older keys.
-const MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
+// gemini-2.0-flash was retired: it now answers 404 "no longer available" for
+// every key, so the last rung of the ladder had quietly rotted away and an AI
+// reply fell through to the template engine whenever the first two were rate
+// -limited (found 2026-08-18 while building the naturalness gate). Named
+// versions are what actually exist; a "-latest" alias moves under us.
+const MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"];
 
 // gemini-3.x (what flash-latest resolves to since 2026-07) rejects
 // thinkingBudget:0 with HTTP 400; 2.5-era thinking models NEED it or thinking
@@ -140,8 +146,9 @@ export async function POST(req: Request) {
   }
 
   const rating = Math.min(5, Math.max(1, Math.round(Number(body.rating) || 5)));
+  const storeName = clip(body.storeName, 120) || "our shop";
   const prompt = buildPrompt({
-    storeName: clip(body.storeName, 120) || "our shop",
+    storeName,
     rating,
     reviewText: clip(body.reviewText, 4000),
     language: LANGUAGE_NAME[clip(body.locale, 5)] ?? LANGUAGE_NAME.en,
@@ -152,13 +159,26 @@ export async function POST(req: Request) {
       ? body.geoKeywords.map((k) => clip(k, 80)).filter(Boolean).slice(0, 8)
       : [],
     signature: clip(body.signature, 120),
+    bannedTerms: bannedTermsFor(storeName),
   });
 
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...MODELS] : MODELS;
   for (const model of models) {
     try {
       const text = await callGemini(apiKey, model, prompt);
-      if (text) return NextResponse.json({ reply: cleanReply(text), model });
+      if (text) {
+        // Hard guard behind the prompt's FORBIDDEN WORDS line: a guest review
+        // that uses a banned term ("Persian" on a Cinar store) tempts the model
+        // to echo it. Drop the offending sentences; if nothing usable is left,
+        // fall through — a 502 sends the client to the (also filtered)
+        // template engine rather than shipping the word to the owner's phone.
+        let reply = cleanReply(text);
+        if (findBannedTerm(storeName, reply)) {
+          reply = stripBannedSentences(storeName, reply);
+          if (!reply || findBannedTerm(storeName, reply)) continue;
+        }
+        return NextResponse.json({ reply, model });
+      }
     } catch {
       /* try next model */
     }

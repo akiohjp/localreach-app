@@ -11,6 +11,7 @@
  * and posts themselves (human-gated).
  */
 
+import { findBannedTerm } from "@/lib/banned-terms";
 import { forkRng } from "@/lib/review-rng";
 import {
   REPLY_POOLS, THEME_ORDER, THEME_DETECT, THEME_PHRASE,
@@ -260,7 +261,13 @@ export function generateReply(storeName: string, options: GenerateReplyOptions):
   const sentiment = sentimentForRating(options.rating);
   const pool = REPLY_POOLS[locale][sentiment];
 
-  const { praise, gripe } = extractSpecifics(options.reviewText ?? "", locale);
+  // reactSpec/reactPair echo the guest's OWN words back into the owner's
+  // public reply — the one channel where a banned term ("Persian" on a Cinar
+  // store) can ride guest text into something the owner posts. Filter it here;
+  // every other slot draws from fixed pools.
+  const specifics = extractSpecifics(options.reviewText ?? "", locale);
+  const praise = specifics.praise.filter((s) => !findBannedTerm(store, s));
+  const gripe = specifics.gripe.filter((s) => !findBannedTerm(store, s));
   const themes = detectThemes(options.reviewText ?? "");
   const primaryTheme: Theme | null = themes[0] ?? null;
 

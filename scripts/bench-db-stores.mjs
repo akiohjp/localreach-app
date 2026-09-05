@@ -33,13 +33,9 @@ const RUNS = Number(process.argv[2]?.startsWith("--") ? 40 : process.argv[2] ?? 
 const ONLY = (process.argv.find((a) => a.startsWith("--store=")) ?? "").split("=")[1] ?? "";
 const PRINT = Number((process.argv.find((a) => a.startsWith("--print=")) ?? "").split("=")[1] ?? 2);
 
-/** Words that must never appear, per store-name substring. "*" applies to all. */
-const BANNED = {
-  Cinar: [
-    "persian", "iranian", "oriental", "kashmir", "afghan", "moroccan",
-    "tabriz", "isfahan", "qom", "carpet", "nuruosmaniye", "antalya",
-  ],
-};
+// Single source of truth, shared with the runtime guards in generate-reply
+// and reply-engine (moved 2026-09-01 so the lists cannot drift apart).
+const { BANNED_TERMS: BANNED } = await import("../lib/banned-terms.ts");
 
 /** Proper nouns that legitimately keep a capital letter mid-sentence. */
 const PROPER = /^(Turkish|Hereke|Anatolian|Japanese|Korean|Cappadocia|Avanos|Istanbul|Dubai|Nevsehir|Fatih|Sultanahmet|Grand|Al|Abu|Boston|Karak|Shin|Bibigo|CJ|Binggrae|IV|HydraFacial|AGA)/;

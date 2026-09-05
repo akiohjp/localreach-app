@@ -118,7 +118,6 @@ const EN_GENERIC: PoolSet = {
     "{Stopped into|Swung by|Dropped into} {store} on the weekend and it was a really good visit.",
     "First time at {store} and it lived up to what {friends|people|the reviews} had been {telling me|saying}.",
     "Had a {great|really good|genuinely good} time at {store}, leaving this so a few more people {give it a try|find it|try it}.",
-    "Went to {store} not expecting much and {came away really happy|left genuinely impressed|was completely won over}.",
     "{store} was recommended to me and now I see why people rave about it.",
     "Stopped by {store} {today|this week|recently} and it was {well worth the trip|worth every minute|a really good call}.",
     "Tried {store} for the first time this week and it did not disappoint.",
@@ -127,66 +126,56 @@ const EN_GENERIC: PoolSet = {
     "{store} is one of those local spots I'll be telling everyone about.",
     "A {colleague|friend|neighbour} kept mentioning {store}, so I finally went to see for myself.",
     "Ended up at {store} {more or less by chance|without planning to} and it turned out to be the right call.",
-    "{Second|Third} visit to {store} this {month|week}, which probably says it all.",
     "We chose {store} for a small celebration and it turned out to be a great pick.",
     "Was in the area with {time to spare|an hour to kill|some time} and gave {store} a {go|try|shot}.",
     "After a {long day|hectic week|full day of errands}, {store} was exactly what I needed.",
-    "Brought a {friend|colleague|relative} visiting from abroad to {store} and we both left {impressed|happy|converted}.",
+    "Brought a {friend|colleague|relative} visiting from abroad to {store} and we both left {impressed|happy}.",
     "I walked past {store} for {months|weeks} before finally going in, and I {regret waiting|should have gone sooner}.",
     "My partner picked {store} this time, and credit where it's due.",
-    "Everyone kept {telling me about|mentioning|recommending} {store}, and for once the hype {checks out|holds up|was right}.",
+    "Everyone kept {telling me about|mentioning|recommending} {store}, and the hype {checks out|holds up|was right}.",
   ],
+  // 🔑 A1 (owner decision 2026-08-18). Every template in the EN pools is now a
+  // sentence with a FINITE VERB. What came out: verbless noun phrases ("Great
+  // little visit to X.", "Quick shout-out to X."), colon frames ("My pick: X.",
+  // "Underrated: X."), left-dislocation ("X, that's the reason I'll be back."),
+  // and comma-appended verbless tags ("Solid visit to X, no complaints.").
+  // Those four shapes ARE what the owner reads as "not a sentence a person
+  // wrote" — and the same decision took repetition out of the pass/fail (A3),
+  // which is what makes the deletion affordable: a smaller pool of plain
+  // sentences now costs nothing, so none of these had to be replaced.
+  // A short pool may end up small or empty; buildInner falls back to the long
+  // pool when the short one is empty, so the slot never goes missing.
   openersShort: [
-    "Great little visit to {store}.",
-    "{store}? Definitely going back.",
-    "Really happy with {store}.",
-    "Solid visit to {store}, no complaints.",
     "{store} did not disappoint.",
     "Left {store} in a good mood.",
     "First time at {store} and I'm impressed.",
-    "Quick shout-out to {store}.",
-    "Another good one from {store}.",
-    "{store} came through again.",
     "Glad I finally tried {store}.",
     "{store} was the right call today.",
-    "No notes, {store} just did it well.",
-    "Well worth stopping in at {store}.",
   ],
   coresLong: [
     "{list} really stood out.",
-    "Loved {list}. That was the highlight for me.",
+    "I loved {list}. That was the highlight for me.",
     "{list} alone made the trip worth it.",
     "{store} absolutely nailed {list}.",
     "Honestly, {list} made the visit for me.",
-    "{list}, that's the reason I'll be going back.",
-    "Big fan of {list} here.",
     "Can't say enough good things about {list}.",
-    "What got me was {list}, genuinely good.",
     "{list} turned out even better than I expected.",
     "If I had to call out a highlight, it'd be {list}.",
     "For me it came down to {list}.",
     "We're still talking about {list}.",
     "No wonder people make a fuss about {list}.",
-    "The star of the visit was {list}, no contest.",
+    "The star of the visit was {list}.",
     "I came in curious about {list} and left convinced.",
   ],
   coresCompact: [
-    "Loved {list}.",
-    "{list}, {no notes|nailed it|exactly right}.",
-    "{list}, so good.",
-    "Highlight for me was {list}.",
-    "Go for {list}.",
+    "I loved {list}.",
+    "The highlight for me was {list}.",
     "{list} won me over.",
     "{store} nailed {list}.",
-    "Big yes to {list}.",
-    "{list} did not miss.",
-    "Come for {list}.",
-    "{list}, worth it alone.",
-    "My pick: {list}.",
   ],
   dualBlocks: [
     "{a} stood out, and {b} came close behind.",
-    "Loved {a}, and {b} came as a nice surprise too.",
+    "I loved {a}, and {b} came as a nice surprise too.",
     "{a} stood out first, then {b} sealed it.",
     "Between {a} and {b}, {store} won me over.",
     "{a} got us in the door, {b} is what we'll come back for.",
@@ -198,8 +187,8 @@ const EN_GENERIC: PoolSet = {
   // in review-engine). Bridges and fillers are constant sentences — no keyword
   // inside to provide variety — so they carry the most choice groups.
   bridgesLong: [
-    "The staff were {friendly and quick|welcoming and fast|warm and on the ball}, no waiting around.",
-    "The place was {clean and comfortable|spotless and relaxed|tidy and welcoming}, easy to settle in.",
+    "The staff were {friendly and quick|welcoming and fast|warm and on the ball}, so there was no waiting around.",
+    "The place was {clean and comfortable|spotless and relaxed|tidy and welcoming}, and it was easy to settle in.",
     "Prices felt {fair|reasonable|right} for what you {get|actually get|walk away with}.",
     "Service was {warm|attentive|genuinely friendly} without being pushy.",
     "They took care of a small request {without any fuss|like it was nothing|without blinking}.",
@@ -212,7 +201,7 @@ const EN_GENERIC: PoolSet = {
     "I never felt {rushed|hurried} at any point.",
     "{Everything|The whole visit|The whole thing} ran smoothly from start to finish.",
     "You can tell the {team|staff|people here} care about getting the details right.",
-    "{Nice, relaxed|Calm, easy|Comfortable, low-key} atmosphere, never felt rushed.",
+    "The atmosphere was {nice and relaxed|calm and easy|comfortable and low-key}, and I never felt rushed.",
     "Someone checked in on us {at the right times|now and then|when it mattered}, without hovering.",
     "Even with a steady stream of people coming in, nothing felt {chaotic|rushed|out of control}.",
     "The person looking after us {remembered everything|kept track of everything|missed nothing}.",
@@ -222,75 +211,68 @@ const EN_GENERIC: PoolSet = {
     "You get the sense the same standards apply {on a Tuesday as on a weekend|whatever day you come|whether it's quiet or slammed}.",
     "Every little interaction was polite without being {scripted|stiff|rehearsed}.",
   ],
+  // Short bridges were almost entirely verbless ("Friendly, quick service.",
+  // "Zero hassle.", "Spotless place."). The survivors keep their subject and
+  // verb; the three additions say the same things as full sentences so the
+  // compact path still has a bridge of its own.
   bridgesShort: [
-    "Friendly, quick service.",
-    "{Clean and comfortable|Spotless and comfy|Tidy and relaxed}.",
-    "{Fair|Sensible|Honest} prices too.",
     "Staff were {lovely|great|genuinely kind}.",
-    "Smooth from start to finish.",
-    "Really well {run|managed|looked after}.",
-    "Zero {hassle|fuss|friction}.",
     "Everyone was {helpful|welcoming|on it}.",
-    "{Quick|Fast|Prompt} without feeling rushed.",
-    "{Spotless|Immaculate|Very clean} place.",
+    "The service was {quick and friendly|fast and warm|prompt without being rushed}.",
+    "The place was {spotless|very clean|tidy and comfortable}.",
+    "Everything ran smoothly.",
+    "The prices were {fair|sensible|honest} too.",
   ],
   closersLong: [
     "I'd {happily|gladly|readily} recommend {store} to anyone.",
     "Will {definitely|certainly|absolutely} be back to {store}.",
     "{store} is a {solid|safe|strong} choice, give it a try.",
-    "Adding {store} to {my regular list|the rotation|my usual spots}.",
-    "If you haven't {tried|been to|checked out} {store} yet, do.",
+    "I'm adding {store} to {my regular list|the rotation|my usual spots}.",
     "Can't recommend {store} {enough|highly enough|more}.",
     "{store} has a new {regular|fan|repeat customer} in me.",
     "Already planning {my next visit to|the next trip to|round two at} {store}.",
     "I've already told {two people|a couple of friends|half my office} about {store}.",
     "Next time I won't wait {so long|this long|months} to come back to {store}.",
     "We'll be bringing {people|friends|visitors} to {store} from now on.",
-    "That's {store} on the {shortlist|regular rotation|favorites list} from now on.",
+    "{store} is on the {shortlist|regular rotation|favorites list} from now on.",
     "I left {store} glad I'd {made the effort|gone|taken the time}.",
-    "{store} {earned|deserves} this review, {simple as that|plain and simple|full stop}.",
-    "Do yourself a favor and {check out|visit|go see} {store}.",
-    "I know where I'm {going|headed|pointing people} next time the question comes up: {store}.",
   ],
   closersShort: [
     "Highly recommend {store}.",
     "Will be back.",
     "{store} gets a yes from me.",
-    "Give {store} a try.",
-    "{Solid|Strong|Consistent} all round.",
-    "Back again {soon |}for sure.",
-    "Recommend {store}.",
-    "Already looking forward to {the next visit to|going back to|stopping in again at} {store}.",
-    "{Worth it|Worth the visit|Time well spent}.",
-    "Easy recommendation.",
     "{store} delivers.",
     "Glad I {went|made the trip|stopped in}.",
   ],
   fillers: [
-    "{Little things|Small touches} like that are why I'll {pick|choose} {store} again.",
+    // "…like that" needs an antecedent, and appendSpread can land a filler as
+    // the SECOND sentence, where there is nothing for it to point back at
+    // (gate reject, 2026-08-18, Cinar Istanbul #13). Made self-contained.
+    //
+    // Owner decision 2026-09-01: no aphorisms, no meta-review self-reference,
+    // no world-weary paradox. Removed across the EN pools: "Half the battle
+    // is…", "Consistency like this is rarer…", "…take pride in their work",
+    // "I kept looking for the catch…", "…why I still read reviews", "…earned
+    // this review", "not expecting much", "for once the hype", "If every {cat}
+    // ran like this…", "If I lived closer…" (also implausible for clinics and
+    // rug stores — judge flag 2026-08-31). A review is a person reporting a
+    // visit, not commenting on life, reviews, or its own existence.
+    "The {little things|small touches} are why I'll {pick|choose} {store} again.",
     "Walked out already planning {to come back|the next visit|a return trip}.",
-    "The kind of {place|spot} you {want to tell people about|end up recommending|bring up in conversation}.",
+    "It's the kind of {place|spot} you {want to tell people about|end up recommending|bring up in conversation}.",
     "Everything just felt {easy|effortless|simple}, which I appreciate.",
-    "Exactly what I was {hoping for|after|looking for}.",
-    "Nice to find a spot this {reliable|consistent|dependable}.",
+    "It was exactly what I was {hoping for|after|looking for}.",
+    "It was nice to find a spot this {reliable|consistent|dependable}.",
     "Took a {friend's|colleague's|neighbour's} recommendation on this one and it {paid off|was worth it|proved right}.",
     "It's clearly run by people who {enjoy|care about|take pride in} what they do.",
     "Didn't feel rushed at any point, which I really {rate|appreciate|value}.",
-    "Good value for what you actually get, too.",
-    "Honestly hard to fault {the experience|the visit|any of it}.",
-    "It's {rare|not common} that a place {matches|lives up to} its reviews, but this one does.",
-    "I kept {waiting for|looking for|expecting} the catch and there {wasn't one|never was one|simply wasn't one}.",
-    "Consistency like this is {harder to find than it should be|rarer than it should be|not as common as you'd hope}.",
-    "You {notice|can feel|can tell} the difference when people take {pride|real pride|genuine pride} in their work.",
+    "The value is good for what you actually get, too.",
+    "Honestly, it's hard to fault {the experience|the visit|any of it}.",
     "I'm {fussy|picky|particular} about this kind of thing, and I left with {nothing to nitpick|no complaints|nothing I would change}.",
     "My expectations were {high|set high|already high} and they still {exceeded|surpassed} them.",
-    "Not {a single thing|one thing} I'd change about the {visit|experience|whole thing}.",
-    "Half the battle is {just doing what you promise|getting the basics right|showing up consistently}, and they do.",
-    "Came out in a better mood than I went in, which {says a lot|is rarer than it sounds|counts for a lot}.",
-    "Simple things, done {properly|right|well}.",
-    "If I lived closer I'd be here {far too often|all the time|every week}.",
+    "There isn't {a single thing|one thing} I'd change about the {visit|experience|whole thing}.",
+    "They do the simple things {properly|right|well}.",
     "It's already come up {twice|a few times|more than once} in conversation since.",
-    "{Places|Finds} like this are why I still {read|bother with|trust} reviews.",
   ],
   // No hardcoded article before {kw}: the engine supplies "the " only for
   // lowercase common-noun phrases (withArt), so proper-noun keywords stay bare.
@@ -303,40 +285,32 @@ const EN_GENERIC: PoolSet = {
   // a bot. Never split a template into two sentences ("And {kw}? Exactly as
   // good...") — the constant half becomes its own repeated sentence.
   tails: [
-    "Also have to mention {kw}.",
+    "I also have to mention {kw}.",
     "{kw} lived up to the hype.",
     "Really enjoyed {kw}.",
-    "Worth going back for {kw} alone.",
-    "Definitely try {kw}.",
     "{kw} stood out most for me.",
-    "Also a big fan of {kw}.",
-    "Also worth a mention: {kw}.",
     "I'd come back just for {kw}.",
-    "Special mention for {kw}.",
     "{kw} turned out to be a highlight as well.",
     "{kw} lived up to everything I'd heard.",
-    "Keep an eye out for {kw}.",
     "{kw} sealed it for me.",
-    "Next time I'm starting with {kw}.",
-    "Add {kw} to that list too.",
-    "{kw}, another bright spot.",
     "Glad we didn't pass on {kw}.",
     "People weren't wrong about {kw}.",
-    "A quick shout for {kw} too.",
     "{kw} rounded the visit off nicely.",
-    "You'll want to ask about {kw}.",
     "You can see the same care in {kw}.",
     "{kw} came up on the way home too.",
-    "No regrets about {kw} either.",
-    "Underrated: {kw}.",
+    "I'd go back for {kw} alone.",
+    "I also enjoyed {kw}.",
   ],
+  // The micro-opener slot was six entries and five of them were the exact shape
+  // A1 removes ("Quick note.", "Short version:", "For anyone on the fence:").
+  // It fires on ~11% of reviews, so it never carried much of the page; what is
+  // left is one sentence. Note the knock-on: BREVITY_OPENER in review-engine
+  // matches "short version"/"quick note", so with those gone the compact path
+  // simply gets no micro-opener, which is the correct outcome — a compact
+  // review that announces its own brevity was the 2026-08-13 defect.
   microOpeners: [
     "Had to leave a review.",
-    "Quick note.",
-    "Overdue review, but here it is.",
-    "Short version:",
-    "Leaving this while it's fresh.",
-    "For anyone on the fence:",
+    "I don't write many of these, but this one earned it.",
   ],
   noKeywordMid: [
     "The whole visit just went smoothly, and the service alone would bring me back to {store}.",
@@ -774,9 +748,12 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
   restaurant: {
     openersLong: [
       "We ate at {store} {recently|the other day|last week} and I figured I'd jot down what stuck with us at the table.",
-      "{Dinner|A meal|Lunch} at {store} was the kind of meal where you {walk out and actually want to say something online|leave already composing the review|start telling people about it straight away}.",
+      "{Dinner|A meal|Lunch} at {store} was the kind of meal where you {start telling people about it straight away|text a friend about it on the way home}.",
     ],
-    openersShort: ["{store}? Yeah, we'd eat there again.", "Quick take after {store}: a good meal, with a couple of standout plates."],
+    // A1: both entries were the removed shapes (a question fragment, and a
+    // colon frame with a verbless remainder). This override is concatenated
+    // onto EN_GENERIC, so the slot still has the generic short openers.
+    openersShort: [],
     coresLong: [
       "What landed best was {list}, and that held up from the first bite to the last.",
       "If you strip the meal down, it was basically {list} done with care, and that's {store}.",
@@ -788,7 +765,11 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     // "Don't skip X" / "Save room for X" only work when X is a dish. In the
     // shared pool they produced "Don't skip the patient explanation." on a rug
     // showroom (probe 2026-08-07).
-    tails: ["Save room for {kw}.", "Come hungry for {kw}.", "Don't skip {kw}."],
+    // A1: bare imperatives. "Save room for the tiramisu." is real review
+    // English, but it is not a declarative sentence, and the gate rejected the
+    // same shape on the generic pool ("Come for the intricate patterns.",
+    // 2026-08-18). The rule is the rule for every vertical or it is not a rule.
+    tails: [],
   },
   cafe: {
     openersLong: [
@@ -796,9 +777,12 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
       "Meant to make it a quick stop at {store} and ended up staying twice as long.",
     ],
     openersShort: ["{store} is a solid spot to sit and slow down for a bit."],
-    coresLong: ["The little things did it for me: {list}, and {store} clearly {cares about|sweats|thinks about} the details."],
+    // A1: the colon was doing label duty here, and this is the demo store's
+    // vertical - it was the ONLY source of colon frames left in the 1280-review
+    // exhaustive run (63 of them, 2026-08-18).
+    coresLong: ["The little things did it for me, starting with {list}, and {store} clearly {cares about|thinks about} the details."],
     closersLong: ["I'll be back to {store} next time I want somewhere calm to sit."],
-    tails: ["Save room for {kw}.", "Don't skip {kw}."],
+    tails: [],
   },
   beauty: {
     openersLong: [
@@ -889,7 +873,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
     openersShort: ["{store} gave me natural results and honest advice; I'd go back."],
     coresLong: [
       "What made the difference was {list}. At {store} the results looked like me, just better, not like a different face.",
-      "What I'd highlight: {list}. {store} clearly puts {safety ahead of speed|getting it right ahead of getting it fast|care ahead of pace over rushing}.",
+      "What I'd highlight is {list}. {store} clearly puts {safety ahead of speed|getting it right ahead of getting it fast|care ahead of pace over rushing}.",
     ],
     bridgesLong: [
       "The consultation at {store} was {thorough|unhurried|properly detailed} and hygiene was {visibly taken seriously|clearly a priority|obvious everywhere}, which put me at ease.",
@@ -902,7 +886,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
       "Worked with {store} on a move I'd been dreading, and they made the whole thing far less stressful than I expected.",
       "Dealt with {store} to find a place, and unlike a few agents I'd met, they actually listened to what I was after.",
     ],
-    openersShort: ["{store} made the property side of things straightforward; genuinely helpful."],
+    openersShort: ["{store} made the property side of things straightforward, and they were genuinely helpful."],
     coresLong: [
       "What stood out was {list}. With {store} I never felt pushed toward something that suited them more than me.",
       "The part I'd flag is {list}. {store} was straight with me about the market instead of just chasing a deal.",
@@ -928,7 +912,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
       "Had {store} handle a job at home I'd been nervous about, and they turned it around cleaner than I'd hoped.",
       "Got a few quotes and went with {store}; the finished work made it clear that was the right call.",
     ],
-    openersShort: ["{store} did tidy, on-time work and stuck to the quote; no complaints."],
+    openersShort: ["{store} did tidy, on-time work and stuck to the quote, so I have no complaints."],
     coresLong: [
       "What sold me was {list}. At {store} the final bill matched the quote and the finish held up to a close look.",
       "The part worth mentioning is {list}. {store} kept the site tidy and did what they said they would, when they said.",
@@ -941,7 +925,7 @@ const EN_VERTICAL: Partial<Record<Vertical, Partial<PoolSet>>> = {
       "Signed up at {store} not sure it'd stick, and it's turned into something I actually look forward to.",
       "Started lessons at {store} for the family, and the progress showed up faster than any of us expected.",
     ],
-    openersShort: ["{store} makes learning feel doable; genuinely glad we started."],
+    openersShort: ["{store} makes learning feel doable, and I'm genuinely glad we started."],
     coresLong: [
       "What made it work was {list}. At {store} the teaching met me where I was instead of a one-size-fits-all script.",
       "The thing I'd point to is {list}. {store} keeps it encouraging without dumbing anything down.",
@@ -1250,15 +1234,14 @@ const EN_AGENCY: PoolSet = {
     "What sold me on {store} was how they explained {things|everything|the plan} before we paid a {dirham|single dirham|fils}.",
     "Working with {store} is the first time online marketing has actually felt {understandable|manageable|transparent} to me.",
   ],
+  // A1 (2026-08-18), same rule as EN_GENERIC: finite verb required. Out went
+  // "Solid, honest work from X.", "Happy client of X here.", "No regrets
+  // choosing X.", "Quick review for the team at X." (all verbless) and
+  // "Straightforward and professional, that's X." (left-dislocation).
   openersShort: [
     "Really glad we hired {store}.",
     "{store} does what they say they'll do.",
-    "Solid, honest work from {store}.",
-    "Happy client of {store} here.",
     "{store} has been great to work with.",
-    "No regrets choosing {store}.",
-    "Straightforward and professional, that's {store}.",
-    "Quick review for the team at {store}.",
     "Six months in with {store} and the numbers speak for themselves.",
     "{store} came recommended by another owner, and now I see why.",
   ],
@@ -1276,13 +1259,11 @@ const EN_AGENCY: PoolSet = {
   ],
   coresCompact: [
     "They handled {list} really well.",
-    "Great work on {list}.",
-    "{list}, done properly.",
+    "They did great work on {list}.",
     "{list} alone made it worth it.",
-    "Really pleased with {list}.",
+    "We're really pleased with {list}.",
     "{list} exceeded what I expected.",
     "{store} delivered on {list}.",
-    "Top marks for {list}.",
   ],
   dualBlocks: [
     "{a} made the first impression, and {b} has kept us happy since.",
@@ -1301,19 +1282,19 @@ const EN_AGENCY: PoolSet = {
     "Deadlines were {kept|met|hit} without me having to chase anyone.",
   ],
   bridgesShort: [
-    "Fast replies, {clear|straight|useful} answers.",
-    "No {jargon|buzzwords|sales talk}, no pressure.",
-    "Fair, transparent pricing.",
     "They actually {report|show|share} the numbers.",
-    "Easy to communicate with.",
-    "Reliable month after month.",
+    "They reply fast and the answers are {clear|straight|useful}.",
+    "There's no {jargon|sales talk} and no pressure.",
+    "The pricing is fair and transparent.",
+    "They're easy to communicate with.",
+    "They've been reliable month after month.",
   ],
   closersLong: [
     "I'd recommend {store} to any {small business|SME|business owner} here.",
     "If your customers can't find you online, {talk to|call|try} {store}.",
     "We're {staying with|keeping|sticking with} {store} for the {long run|foreseeable future|long haul}.",
     "Happy to recommend {store} to other {business owners|owners|SMEs}.",
-    "{store} has earned our trust, and that takes {some doing|real work|more than most manage}.",
+    "{store} has earned our trust, and that takes some doing.",
     "Already recommended {store} to {two other owners|a couple of owners|other businesses} I know.",
     "If you're on the fence about {store}, the free {audit|scan|check} is an easy {place to start|first step|way in}.",
     "{store} will be handling our {marketing|online side|digital presence} for the foreseeable future.",
@@ -1322,28 +1303,27 @@ const EN_AGENCY: PoolSet = {
     "Recommend {store} without hesitation.",
     "Glad we found {store}.",
     "{store} gets our vote.",
-    "Worth every dirham.",
+    "They're worth every dirham.",
     "We're sticking with them.",
-    "Recommended for any SME.",
-    "Five stars well earned.",
+    "I'd recommend them to any SME.",
   ],
   fillers: [
     "It's rare to find a provider this {straightforward|easy to deal with|honest}.",
-    "They do what they promise, which {shouldn't be rare, but it is|is rarer than it should be}.",
+    "They do what they promise.",
     "As an owner, that saves me time I don't have.",
     "You can tell they actually care whether it works.",
-    "Refreshing after some of the agencies we've dealt with.",
+    "It's refreshing after some of the agencies we've dealt with.",
     "The whole thing has been {hassle-free|painless|smooth}.",
     "It just works, and I can get on with running the business.",
-    "Good people to deal with, too.",
+    "They're good people to deal with, too.",
     "The invoice matches the quote, every time.",
     "I stopped worrying about this side of the business {months ago|a while back|early on}.",
     "Everything gets explained before it gets billed.",
     "They flag problems before we notice them.",
     "Everything felt honest from the first call.",
-    "No upselling, no drama.",
+    "There was no upselling and no drama.",
     "They made something confusing feel {manageable|straightforward|easy to follow}.",
-    "Exactly the kind of support a small business needs.",
+    "It's exactly the kind of support a small business needs.",
     // The agency pool is exclusive (no generic merge), so it carries a whole
     // store's page on its own. At 16 fillers the top line landed 13x per 100
     // against a cap of 12 (bench, 2026-08-10, once real keyword types put
@@ -1351,8 +1331,8 @@ const EN_AGENCY: PoolSet = {
     "{Questions|Emails} get answered the same {day|working day}.",
     "We always know {what is running|where things stand} without asking.",
     "The reporting is {short and readable|plain enough to act on}.",
-    "They said what they could not do, which {built trust fast|told me plenty}.",
-    "No {jargon|buzzwords} for the sake of it.",
+    "They said what they could not do, which built trust fast.",
+    "There's no {jargon|buzzwords} for the sake of it.",
     "Scope changes get {priced before the work|agreed up front}.",
     "They work like part of the team rather than a supplier.",
     "It has been {steady|consistent} month after month.",
@@ -1360,23 +1340,20 @@ const EN_AGENCY: PoolSet = {
     "They understood the business before touching anything.",
   ],
   tails: [
-    "Also have to mention {kw}.",
+    "I also have to mention {kw}.",
     "{kw} alone {justified the fee|earned the fee|paid for itself}.",
     "Really happy with {kw} too.",
     "{kw} turned out better than expected.",
-    "Ask them about {kw}.",
     "They handled {kw} just as well.",
     "{kw} exceeded the brief.",
-    "Credit where due for {kw}.",
     "{kw} keeps proving useful.",
     "{kw} really stood out for us.",
-    "No complaints about {kw} either.",
     "{kw} was handled without any fuss.",
-    "Special mention for {kw}.",
+    "They deserve credit for {kw} too.",
   ],
   microOpeners: [
-    "Overdue review.",
-    "Quick note from a client.",
+    "This review is overdue.",
+    "I'm writing this as a client of theirs.",
   ],
   noKeywordMid: [
     "The whole engagement has been smooth, and the communication alone would keep us with {store}.",

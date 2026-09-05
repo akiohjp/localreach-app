@@ -20,6 +20,9 @@ export function buildPrompt(p: {
   tone: string; geoPhrase: string; geoKeywords: string[]; signature: string;
   /** Natural business noun, e.g. "udon restaurant" — lets the reply say WHAT it is. */
   categoryNoun?: string;
+  /** Store-specific forbidden vocabulary (lib/banned-terms). The route also
+   *  post-filters the output; this line just stops most violations upstream. */
+  bannedTerms?: readonly string[];
 }): string {
   const sentiment = p.rating >= 4 ? "positive" : p.rating <= 2 ? "negative" : "mixed";
   const kwList = p.geoKeywords.slice(0, 8).map((k) => `"${k}"`).join(", ");
@@ -49,6 +52,7 @@ ${sentiment === "positive"
 - Length: 4 to 7 sentences (${sentiment === "negative" ? "keep it focused and sincere" : "substantial, not a two-liner"}).`}
 - Voice: a real human owner. ${p.tone === "professional" ? "Courteous and composed, but still personal." : "Warm, personal, lightly conversational."} Use contractions. Vary sentence length. No corporate boilerplate ("we strive to", "your satisfaction is our priority"), no exclamation spam, and DO NOT start with "Thank you for" or "Thanks for" (start some other natural way).
 - NEVER invent facts you were not given: no email addresses, phone numbers, links, opening hours, discounts, or compensation offers. "Reach out to us directly" is fine; a made-up contact detail is not.
+${p.bannedTerms?.length ? `- FORBIDDEN WORDS: never use ${p.bannedTerms.map((t) => `"${t}"`).join(", ")} in any form, even if the review itself uses them. Respond to that part of the review without repeating the word.` : ""}
 - Never use em dashes or en dashes.
 ${sentiment === "negative"
     ? `- This is an apology: ${ratingOnly ? "stay general (you don't know the details), take responsibility for the experience anyway" : "acknowledge the specific failures plainly, take responsibility without excuses"}, and invite the guest to contact you directly to make it right. Do NOT include marketing phrases, keywords, or the neighbourhood. Stay humble.`

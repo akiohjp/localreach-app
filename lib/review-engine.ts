@@ -118,13 +118,27 @@ function looksSentenceCased(phrase: string): boolean {
   return !words.slice(1).some((w) => /^[A-Z][a-z]/.test(w));
 }
 
-function withArt(phrase: string): string {
+/**
+ * @param typedItem the owner has SAID this keyword names something orderable
+ *   (stores.keyword_types = "item"), rather than the engine guessing from the
+ *   string.
+ *
+ * Title Case on its own still means "this is a name, send it out bare" —
+ * "the Dubai Marina" and "the Michelin Quality" are both wrong, and the
+ * synthetic audit probes exactly that. But a Title-Cased DISH is not a name in
+ * the same sense: "I loved Garlic Knots." and "Herby Chicken Caesar sealed it
+ * for me." were rejected on the live Pitfire config (2026-08-18), and both
+ * want "the". The two cases are indistinguishable from the string, which is
+ * why the owner's declared type decides and the guess path is left alone.
+ */
+function withArt(phrase: string, typedItem = false): string {
   // Never double a determiner the keyword already carries. Was "the" only, so
   // the keyword "a thoughtful gift" came out as "the a thoughtful gift" on the
   // live Let It Dough! config (naturalness reader, 2026-08-10).
   if (LEADING_DETERMINER.test(phrase)) return phrase;
   if (/^[a-z]/.test(phrase)) return `the ${phrase}`;
-  return looksSentenceCased(phrase) ? `the ${phrase}` : phrase;
+  if (looksSentenceCased(phrase)) return `the ${phrase}`;
+  return typedItem ? `the ${phrase}` : phrase;
 }
 
 /**
@@ -318,6 +332,47 @@ const TASTE_TEMPLATE_JA = /(美味し|食べ|試して|目当て|やられ)/;
  * consumable. Falls back to the unfiltered pool if nothing survives — an empty
  * slot would break assembly.
  */
+/**
+ * A2, the other half: a review must not say the same thing twice in its own
+ * voice and then again as a keyword.
+ *
+ * The body pools are constant sentences about service, cleanliness, pace and
+ * value — and so are half the attribute pills an owner types. When they
+ * collide the review reads as a list being padded out, which is the "stack of
+ * template lines" failure however grammatical each sentence is:
+ *
+ *   "The service was quick and friendly. I'd also point out the quick service
+ *    and the cozy atmosphere."      (gate reject, 2026-08-18, demo store #52)
+ *
+ * So the CONSTANT slots drop any line that repeats a content word the review
+ * is already committed to carrying verbatim. Deliberately narrow: whole words
+ * of five letters or more, stopwords excluded, and never applied if it would
+ * leave the pool with fewer than three lines — a thin pool is its own defect,
+ * and this rule is not worth trading one for.
+ */
+const ECHO_STOPWORDS = new Set([
+  "about", "after", "again", "along", "there", "their", "these", "those", "which",
+  "while", "would", "could", "should", "every", "place", "spot", "store", "thing", "things",
+  "really", "quite", "still", "other", "first", "great", "good",
+]);
+function echoWords(kws: string[]): string[] {
+  const out = new Set<string>();
+  for (const k of kws) {
+    for (const w of k.toLowerCase().split(/[^a-z]+/)) {
+      if (w.length >= 5 && !ECHO_STOPWORDS.has(w)) out.add(w);
+    }
+  }
+  return [...out];
+}
+function dropKeywordEchoes(pool: string[], kws: string[], locale: ReviewLocale): string[] {
+  if (locale !== "en" || pool.length < 4) return pool;
+  const words = echoWords(kws);
+  if (words.length === 0) return pool;
+  const re = new RegExp(`\\b(${words.join("|")})\\b`, "i");
+  const kept = pool.filter((t) => !re.test(t));
+  return kept.length >= 3 ? kept : pool;
+}
+
 function filterTasteVoice(pool: string[], locale: ReviewLocale, kws: string[]): string[] {
   if (pool.length === 0) return pool;
   if (locale === "ja") {
@@ -467,7 +522,9 @@ function oxford(p: string[]): string {
   return `${p.slice(0, -1).join(", ")}, and ${p[p.length - 1]}`;
 }
 function joinListEn(phrases: string[], rng: () => number): string {
-  const p = phrases.filter(Boolean).map(withArt);
+  // NOT `.map(withArt)`: map passes the index as the second argument, which
+  // became `typedItem` and articled every phrase after the first.
+  const p = phrases.filter(Boolean).map((x) => withArt(x));
   if (p.length <= 1) return p[0] ?? "";
   if (p.length === 2) {
     // Two items read best joined with "and"; a bare comma ("A, B was great")
@@ -478,7 +535,11 @@ function joinListEn(phrases: string[], rng: () => number): string {
     // where the first item ends (naturalness reader, 2026-08-10, live Let It
     // Dough! config, both runs). "plus" keeps the boundary visible.
     if (p.some((x) => /\band\b/i.test(x))) return `${p[0]} plus ${p[1]}`;
-    return rng() < 0.82 ? `${p[0]} and ${p[1]}` : `${p[0]} plus ${p[1]}`;
+    // "plus" now appears ONLY where it is doing that disambiguation work. As a
+    // random 18% alternative to "and" it read as marketing copy - "I also have
+    // to mention the natural ingredients plus Brulee Me Away." (gate reject,
+    // 2026-08-18, live Let It Dough! config). A guest writes "and".
+    return `${p[0]} and ${p[1]}`;
   }
   if (p.length === 3) {
     const r = rng();
@@ -720,57 +781,101 @@ function pickFreshFiller(
 const ADDITIVE_OPEN =
   /^(also\b|and\b|plus\b|another\b|on top of that|one more thing|worth (noting|adding|flagging)|(handy|useful) too|(nice|good) to see|in the plus column|counts for something|not nothing|file this under|small detail|a (detail|point) in their favou?r|one thing i did not expect)/i;
 
-const ATTRIBUTE_TAILS: Record<ReviewLocale, string[]> = {
+const ATTRIBUTE_TAILS: Record<ReviewLocale | "enNegative" | "enPredicate" | "enOffering", string[]> = {
   // Single-sentence ONLY. Two-sentence templates ("{kw}。この点は大きいと思い
   // ます。") split at the terminator, and each half became its own repeated
   // refrain on stores with many attribute keywords — measured 2026-08-03 on the
   // live Tsukasa config: the bare "‹›。" half 20x/100, the constant half 11x.
   // Stores whose keyword lists are attribute-heavy draw this slot constantly,
   // so it carries choice groups like the other hot slots.
+  // 🔑 A1 (owner decision 2026-08-18). This pool was 26 frames and 22 of them
+  // were colon asides ("Another plus: X.") or verbless addenda ("Handy too: X.",
+  // "No complaints about X either."). Both shapes are on the owner's fail list,
+  // and the colon aside is the one they named twice from live output.
+  //
+  // Deleting without replacing was not an option here, unlike everywhere else:
+  // an attribute pill is a verbatim guarantee, so an empty pool would DROP a
+  // keyword the guest tapped. The replacements all put the pill in an OBJECT
+  // position after a finite verb, which is the only position that survives
+  // every pill shape we actually see in live configs — a bare noun phrase
+  // ("good value"), a compound ("English-speaking staff") and a whole clause
+  // ("no pressure to buy") all read the same after "mention" or "credit for".
+  // The pill still never STARTS the sentence: it is verbatim-protected, so the
+  // capitaliser leaves it lower-case and the sentence would open in lower case.
+  // EN attribute pills come in three grammatical shapes and they do NOT share a
+  // frame. The colon appositive used to hide that — "Another plus: X." takes a
+  // noun phrase, an adjective and a whole clause without complaint, which is
+  // exactly why it was there. With colons gone (A1) the shapes have to be told
+  // apart, or the pill lands in an object slot without its article: 26 of the
+  // 64 demo-store combinations were rejected for "I should mention cozy
+  // atmosphere too." on the first exhaustive run (2026-08-18).
+  //
+  // en          — quality NOUN phrases ("cozy atmosphere", "quick service").
+  //               The pill arrives already carrying "the" (withArt), so these
+  //               are ordinary object-position sentences.
+  // enNegative  — pills that are a negative clause ("no pressure to buy", "no
+  //               artificial colors"). They take no article and cannot follow
+  //               a copula; they need an existential to sit in.
+  // enPredicate — pills that are adjectival or a provenance claim ("family
+  //               friendly", "locally sourced", "perfect for gifts"). They ARE
+  //               the predicate, so a copula is the only thing that fits.
   en: [
-    "Another plus: {kw}.",
-    "{Also worth mentioning|Worth flagging too}: {kw}.",
-    "One more thing{ I liked|}: {kw}.",
-    "Plus {kw}, which I {appreciated|rate}.",
-    // An attribute pill can be a bare adjective phrase ("family friendly"), and
-    // only appositive frames take that shape — "The same goes for family
-    // friendly." is not a sentence anyone writes.
-    "Also on the list: {kw}.",
-    "Another point in its favor: {kw}.",
-    "And {kw}, too, which {helps|matters|makes a difference}.",
-    // Not "It's also {kw}": attribute pills are routinely whole clauses ("no
-    // pressure to buy"), and the copula then produces "It's also no pressure
-    // to buy." (naturalness reader, 2026-08-10, live Cinar Istanbul config).
-    "Also {kw}, {for what that's worth|and that helps|no small thing}.",
-    "In the plus column: {kw}.",
-    "On top of that, {kw}.",
-    "Also {kw}, which {sealed it|tipped the scales|settled it} for me.",
-    "Small detail, but a {good|welcome|nice} one: {kw}.",
-    "{Worth noting|Worth adding} as well: {kw}.",
-    // "Counts for something either" is not English — "either" needs a negative
-    // to lean on. Only the "Not nothing" half of the old choice group carried
-    // one (owner read, 2026-08-13).
-    "{Counts for something too|Not nothing either}: {kw}.",
-    "And this helped: {kw}.",
-    "One thing I did not expect: {kw}.",
-    "A {detail|point} in their favor: {kw}.",
-    "Also true: {kw}.",
-    "{Nice|Good} to see as well: {kw}.",
-    "File this under reasons to go back: {kw}.",
-    "{Handy|Useful} too: {kw}.",
-    "Another thing worth {a mention|flagging}: {kw}.",
-    // Non-additive frames. Everything above opens either as an addendum
-    // ("Also", "And", "Plus", "Another") or with a colon, so a store carrying
-    // three or more attribute pills stacked three afterthought sentences into
-    // one review however the rotation fell — 6 reviews in 40 on the live demo
-    // cafe config (2026-08-13). These carry the same phrase without announcing
-    // it as an extra. The pill never STARTS the sentence: attributes are
-    // verbatim-protected, so the capitaliser leaves a lower-case pill alone and
-    // the sentence would open in lower case.
-    "{Points|Bonus points} for {kw}.",
-    "Hard to argue with {kw}.",
-    "{Credit|Full marks} for {kw}, too.",
-    "No complaints about {kw} either.",
+    "I also have to mention {kw}.",
+    "I should mention {kw} too.",
+    "It's worth mentioning {kw} as well.",
+    "I'd also point out {kw}.",
+    "They deserve credit for {kw} too.",
+    "I have to give them credit for {kw}.",
+    "They get points for {kw} as well.",
+    "I appreciated {kw} too.",
+    "One thing I didn't expect was {kw}.",
+    "I rate them for {kw} as well.",
+    "I noticed {kw} straight away.",
+    "The other thing I'd flag is {kw}.",
+  ],
+  // Negative pills already carry their own determiner, so they need the SAME
+  // object-position frames as the noun family, just without withArt. Not an
+  // existential ("There was {kw}."): a negative pill can be plural ("no
+  // artificial colors") and the copula would have to agree with something the
+  // engine cannot see. The mention verbs are number-neutral.
+  // Perception verbs ONLY — notice/see, not like/appreciate. Under a liking
+  // verb the negation flips scope ("I liked no artificial colors" = liked
+  // nothing) and under a copula it equates ("What I liked most was no
+  // artificial colors" — gate reject, both runs, 2026-08-31, live Let It
+  // Dough! config; same family as the "I also have to mention" reject of
+  // 2026-08-18). A negative pill is something a guest NOTICED or was relieved
+  // to see; the frames say only that. Still number-neutral - "there is/are no
+  // artificial colors" would have to agree with a noun the template cannot see.
+  enNegative: [
+    // "You can tell they take {kw} seriously." was here for a day and got
+    // rejected by both gate runs on "no pressure to buy" (2026-09-01, Cinar
+    // Cappadocia #15): "take no pressure to buy seriously" parses as taking
+    // no pressure. A clause-shaped negative pill cannot sit inside another
+    // verb phrase; only see/notice frames hold for every negative shape.
+    "I noticed {kw} straight away.",
+    "I was glad to see {kw}.",
+    "It was nice to see {kw}.",
+    "I was happy to see {kw}.",
+    "Seeing {kw} was reassuring.",
+  ],
+  // Number-neutral on purpose: an offering pill is routinely plural ("Great
+  // options for drinks") and routinely Title-cased by the owner, so nothing
+  // here may agree with it or re-case it.
+  enOffering: [
+    "They also have {kw}.",
+    "They have {kw} as well.",
+    "I should mention they have {kw}.",
+    "It's worth knowing they have {kw}.",
+    "They cover {kw} too.",
+    "I'd also point out that they have {kw}.",
+  ],
+  enPredicate: [
+    "It's also {kw}.",
+    "The place is also {kw}.",
+    "I'd add that it's {kw}.",
+    "It is {kw} as well.",
+    "It's {kw} too, which matters to us.",
+    "One more thing I noticed is that it's {kw}.",
   ],
   // JA: the phrase is closed off with 、before the frame continues, so no
   // particle ever attaches to the keyword — grammatical for a noun, an adjective
@@ -963,28 +1068,37 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
   // on a store's whole page. Structural variety matters more than count: these
   // deliberately mix recommendation, discovery, habit and plain-statement
   // shapes rather than reshuffling one sentence.
+  // A1 (2026-08-18): this sentence appears in EVERY review, so it is the most
+  // -read frame on a store's page — and half the pool was verbless ("Solid rug
+  // store right in the Grand Bazaar.", "Handy spot if you're in X and after a
+  // Y.", "A rug store in X that actually delivers."). Verbless frames get their
+  // subject back rather than being deleted, for the same reason as
+  // SERVICE_TAILS: one frame per review means a thin pool becomes a refrain.
+  // The frame that OPENED with {loc} is gone outright — {loc} is verbatim
+  // -protected, so capitalizeSentenceStartsEn leaves it alone and the sentence
+  // shipped in lower case ("the Grand Bazaar was missing a rug store like
+  // this." — 2026-08-18 baseline read, review 14).
   en: [
-    "My {go-to|first-choice} {cat} in {loc} now.",
-    "Glad to have this {cat} {in|here in|right in} {loc}.",
+    "This is my {go-to|first-choice} {cat} in {loc} now.",
+    "I'm glad to have this {cat} {in|here in|right in} {loc}.",
     "If you're {near|around|anywhere near} {loc}, this is the {cat} to try.",
-    "{Solid|Dependable|Quality} {cat} right in {loc}.",
-    "{Good|Great|Reassuring} to have a {cat} like this {around|near} {loc}.",
-    "Handy {spot|place|stop} if you're {in|around} {loc} and after a {cat}.",
-    "Didn't expect to find a {cat} {this good|of this standard|this solid} in {loc}.",
-    "{loc} {needed|was missing|has been waiting for} a {cat} like this.",
+    "It's a {solid|dependable|quality} {cat} right in {loc}.",
+    "It's {good|great|reassuring} to have a {cat} like this {around|near} {loc}.",
+    "It's a handy {spot|place|stop} if you're {in|around} {loc} and after a {cat}.",
+    "I didn't expect to find a {cat} {this good|of this standard|this solid} in {loc}.",
     // "a proper X" is British-marked as an intensifier; a US reader hears it
     // as foreign. Neutral branches only (owner note 2026-08-07).
-    "A {real|genuinely good|seriously good} {cat}, right here in {loc}.",
+    "It's a {real|genuinely good|seriously good} {cat}, right here in {loc}.",
     "We're {lucky|fortunate|glad} to have this {cat} in {loc}.",
     "If you {live|work|spend time} around {loc}, keep this {cat} {on your list|in mind|bookmarked}.",
-    "Nice surprise to {come across|find|stumble on} a {cat} like this in {loc}.",
-    "Whenever I'm {in|around|passing through} {loc}, this is my {cat} of choice.",
+    "It was a nice surprise to {come across|find|stumble on} a {cat} like this in {loc}.",
+    "It's the {cat} I'll be choosing whenever I'm {in|around|passing through} {loc}.",
     "Anyone around {loc} should give this {cat} a {look|try|chance}.",
-    "It's become our {regular|default|usual} {cat} whenever we're in {loc}.",
-    "A {cat} in {loc} that actually {delivers|comes through|holds up}.",
-    "Happy to finally have a {decent|good|solid} {cat} close by in {loc}.",
+    "This will be our {regular|default|usual} {cat} whenever we're in {loc}.",
+    "It's a {cat} in {loc} that actually {delivers|comes through|holds up}.",
+    "I'm happy to finally have a {decent|good|solid} {cat} close by in {loc}.",
     "You don't come across a {cat} like this in {loc} {every day|often|all that often}.",
-    "Ended up here {looking|hunting|searching} for a {cat} in {loc} and {got lucky|struck gold|found a keeper}.",
+    "I ended up here {looking|hunting|searching} for a {cat} in {loc} and {got lucky|struck gold|found a keeper}.",
     "{Of|Among} the {cat} options {in|around} {loc}, this is the one I'd {pick again|go back to|stick with}.",
   ],
   ja: [
@@ -1030,16 +1144,15 @@ const ENTITY_BOTH: Record<ReviewLocale, string[]> = {
  */
 const ENTITY_BOTH_B2B: Record<ReviewLocale, string[]> = {
   en: [
-    "Best {cat} we've {worked with|dealt with|hired} in {loc}.",
+    "They're the best {cat} we've {worked with|dealt with|hired} in {loc}.",
     "If you {need|are looking for|are hunting for} a {cat} in {loc}, {start here|this is the place to start|look here first}.",
-    "The {cat} I'd {recommend|point out|suggest} to {anyone|any owner|any business} in {loc}.",
-    "Glad we {found|came across|landed on} a {cat} like this in {loc}.",
-    "{Reliable|Dependable|Trustworthy} {cat} for anyone {based|operating|doing business} in {loc}.",
-    "Hard to find a {better|more reliable|more straightforward} {cat} in {loc}.",
+    "They're the {cat} I'd {recommend|point out|suggest} to {anyone|any owner|any business} in {loc}.",
+    "I'm glad we {found|came across|landed on} a {cat} like this in {loc}.",
+    "They're a {reliable|dependable|trustworthy} {cat} for anyone {based|operating|doing business} in {loc}.",
+    "It's hard to find a {better|more reliable|more straightforward} {cat} in {loc}.",
     "For a business in {loc}, having a {cat} you can {trust|rely on|count on} matters, and this is one.",
     "We compared a few {cat} options in {loc} and landed here, {no regrets|glad we did|good call}.",
-    "A {cat} in {loc} that {does what it says it will|delivers what it promises|keeps its word}.",
-    "Other {companies|owners|businesses} in {loc} keep asking who our {cat} is.",
+    "They're a {cat} in {loc} that {does what it says it will|delivers what it promises|keeps its word}.",
   ],
   ja: [
     "{loc}で{cat}を探しているなら、ここを{おすすめします|推します|すすめたいです}。",
@@ -1062,12 +1175,12 @@ const ENTITY_BOTH_B2B: Record<ReviewLocale, string[]> = {
 
 const ENTITY_LOC_ONLY_B2B: Record<ReviewLocale, string[]> = {
   en: [
-    "Great to have them working in {loc}.",
-    "Worth knowing about if you're based in {loc}.",
-    "A real asset for businesses in {loc}.",
+    "It's great to have them working in {loc}.",
+    "They're worth knowing about if you're based in {loc}.",
+    "They're a real asset for businesses in {loc}.",
     "If your company operates around {loc}, keep them in mind.",
     "Being local to {loc} makes working with them easy.",
-    "Plenty of options in {loc}, but these are the ones we stayed with.",
+    "There are plenty of options in {loc}, but these are the ones we stayed with.",
   ],
   ja: [
     "{loc}で事業をしているなら知っておいて損はありません。",
@@ -1085,10 +1198,10 @@ const ENTITY_LOC_ONLY_B2B: Record<ReviewLocale, string[]> = {
 
 const ENTITY_CAT_ONLY_B2B: Record<ReviewLocale, string[]> = {
   en: [
-    "Exactly what you want from a {cat}.",
-    "One of the better {cat} options out there.",
-    "A {cat} that communicates clearly and delivers on time.",
-    "The rare {cat} that makes things simpler, not more complicated.",
+    "They're exactly what you want from a {cat}.",
+    "They're one of the better {cat} options out there.",
+    "They're a {cat} that communicates clearly and delivers on time.",
+    "They're the rare {cat} that makes things simpler, not more complicated.",
     "As a {cat}, they hold themselves to a high standard.",
     "You can tell this {cat} cares about long-term clients, not one-off jobs.",
   ],
@@ -1109,16 +1222,16 @@ const ENTITY_CAT_ONLY_B2B: Record<ReviewLocale, string[]> = {
 
 const ENTITY_LOC_ONLY: Record<ReviewLocale, string[]> = {
   en: [
-    "Worth the {trip|drive|detour} out to {loc}.",
-    "Great addition to {loc}.",
+    "It's worth the {trip|drive|detour} out to {loc}.",
+    "It's a great addition to {loc}.",
     "If you're around {loc}, stop by.",
-    "Nice to have a place like this in {loc}.",
-    "One more reason to like {loc}.",
-    "Handy if you work around {loc}.",
+    "It's nice to have a place like this in {loc}.",
+    "It's one more reason to like {loc}.",
+    "It's handy if you work around {loc}.",
     "We were in {loc} anyway and I'm glad we {stopped|came in|made the stop}.",
     "Being in {loc} makes it an easy stop for us.",
-    "Easy to get to if you're in {loc}.",
-    "{loc} locals, take note.",
+    "It's easy to get to if you're in {loc}.",
+    "Anyone living in {loc} should know about it.",
   ],
   ja: [
     "{loc}という{場所も便利です|立地も助かります|場所なのも便利です}。",
@@ -1155,16 +1268,18 @@ const ENTITY_CAT_ONLY: Record<ReviewLocale, string[]> = {
   // on any vowel-initial category ("A Asian supermarket"), which is the rule
   // stated above this block but not followed here.
   en: [
-    "{Exactly|Pretty much} what a good {cat} should be.",
-    "One of the better {cat} options {around|in the area|I've come across}.",
-    "You can tell this {cat} is run {with care|properly|by people who care}.",
-    "The kind of {cat} {you hope to stumble on|you want to find|that's easy to recommend}.",
+    "It's {exactly|pretty much} what a good {cat} should be.",
+    "It's one of the better {cat} options {around|in the area|I've come across}.",
+    // "by people who care" dropped 2026-09-01: it collided with the filler
+    // "It's clearly run by people who care about what they do" inside one
+    // review, and the pruned pools make that draw more likely.
+    "You can tell this {cat} is run {with care|properly}.",
+    "It's the kind of {cat} {you want to find|that's easy to recommend}.",
     "As far as a {cat} goes, this one {gets it right|has it sorted|does it properly}.",
     "This {cat} {does the simple things properly|gets the basics right|takes the details seriously}.",
-    "If every {cat} ran like this, {I'd complain a lot less|there'd be a lot less to complain about}.",
-    "{Good|Nice|Reassuring} to find this sort of {cat}.",
-    "The sort of {cat} you can {trust|rely on|recommend without hesitating}.",
-    "{Nothing|Not much} I'd change about this {cat}.",
+    "It was {good|nice|reassuring} to find this sort of {cat}.",
+    "It's the sort of {cat} you can {trust|rely on|recommend without hesitating}.",
+    "There's {nothing|not much} I'd change about this {cat}.",
   ],
   ja: [
     "{cat}としては{文句なしです|申し分ないです|言うことなしです}。",
@@ -1530,6 +1645,15 @@ function capStoreMentions(
       if (locale === "en" && sub === "here" && /\b(to|at|in|from|near|about|of)\s*$/i.test(before)) {
         sub = "this place";
       }
+      // The mirror-image error, and the one that actually shipped: "them" is an
+      // OBJECT pronoun. It reads right after a preposition ("we'll stay with
+      // them") and is ungrammatical as a subject — "Them will be handling our
+      // online side for the foreseeable future." went out on the live
+      // mirAIreach config (gate reject, 2026-08-18). Where the slot is a
+      // subject, use a noun phrase.
+      if (locale === "en" && sub === "them" && !/\b(to|at|in|with|from|near|about|of|for|than)\s*$/i.test(before)) {
+        sub = "the team";
+      }
       if (locale === "en" && sentenceStart) {
         sub = sub.charAt(0).toUpperCase() + sub.slice(1);
       }
@@ -1590,6 +1714,104 @@ function capitalizeSentenceStartsEn(text: string, protect: readonly string[]): s
  * name shape, found 2026-08-01). The name is verbatim-protected, so the fix is
  * to drop the template's redundant terminator, never the name's own.
  */
+/**
+ * A frame like "Glad I finally tried {store}." with a store name that ends in
+ * "!" yields "Let It Dough!." — dedupeTerminators keeps only the "!",
+ * destroying the evidence that a sentence really ended there, and
+ * capitalizeSentenceStartsEn then refuses to touch the next word because the
+ * "!" sits inside the protected store name (mid-sentence "Came to Let It
+ * Dough! for the first time" must stay lowercase — 2026-07-29). So the
+ * boundary is repaired HERE, while the frame's own "." still marks it:
+ * capitalize the next word unless it opens a verbatim-protected lowercase
+ * phrase (the verbatim guarantee outranks capitalization). The "." is
+ * consumed either way. Live repro: "Glad I finally tried Let It Dough! the
+ * birthday doughnut box won me over." (2026-09-01).
+ */
+function capitalizeAfterBangPeriodEn(text: string, protect: readonly string[]): string {
+  const lowerProtected = protect.filter((p) => p && /^[a-z]/.test(p));
+  return text.replace(
+    /([!?])\.(\s+)([a-z])/g,
+    (_m, bang: string, gap: string, ch: string, offset: number) => {
+      const tail = text.slice(offset + 2 + gap.length);
+      const opensProtected = lowerProtected.some((p) => tail.startsWith(p));
+      return `${bang}${gap}${opensProtected ? ch : ch.toUpperCase()}`;
+    },
+  );
+}
+
+/**
+ * Owner feedback 2026-09-01: "普通はこういう風に書かない" — a short-bucket
+ * review was six standalone verdict sentences in a row ("Glad I finally tried
+ * Let It Dough! The birthday doughnut box won me over. Everything ran
+ * smoothly. …"), which is also what the naturalness judge keeps calling a
+ * "stack of taglines". People connect those thoughts: "The birthday doughnut
+ * box won me over, and everything ran smoothly." This pass joins up to two
+ * adjacent SHORT sentences with ", and" under conservative guards:
+ *   - both sentences ≤ 65 chars and the pair ≤ 110, so long lines never run on
+ *   - the first must end in "." (never across a real "!" / "?")
+ *   - the second must open with a safe lowerable subject (The/It/They/I/…) —
+ *     a sentence opening with a verbatim keyword or proper noun is left alone
+ *   - neither half may already contain an ", and"/", but" of its own
+ *   - a terminator inside a protected phrase ("Let It Dough!") is not a
+ *     sentence break, so those boundaries are never touched
+ */
+const CONJOIN_SUBJECT_EN =
+  /^(The|It|They|We|I|Everything|Everyone|Staff|Prices?|Service|There|This|That|Nothing)\b/;
+function conjoinShortSentencesEn(text: string, protect: readonly string[], rng: () => number): string {
+  const paragraphs = text.split(/\n{2,}/);
+  const out = paragraphs.map((para) => {
+    const inProtected = new Uint8Array(para.length);
+    for (const p of protect) {
+      if (!p || !/[.!?]/.test(p)) continue;
+      let from = 0;
+      for (;;) {
+        const at = para.indexOf(p, from);
+        if (at === -1) break;
+        for (let i = at; i < at + p.length && i < para.length; i++) inProtected[i] = 1;
+        from = at + p.length;
+      }
+    }
+    const parts: string[] = [];
+    let start = 0;
+    for (let i = 0; i < para.length; i++) {
+      if (/[.!?]/.test(para[i]!) && !inProtected[i] && para[i + 1] === " ") {
+        parts.push(para.slice(start, i + 1));
+        start = i + 2;
+      }
+    }
+    if (start < para.length) parts.push(para.slice(start));
+
+    let merges = 0;
+    const joined: string[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      const a = parts[i]!, b = parts[i + 1];
+      const eligible =
+        merges < 2 && b !== undefined &&
+        a.endsWith(".") && a.length <= 65 && b.length <= 65 && a.length + b.length <= 110 &&
+        CONJOIN_SUBJECT_EN.test(b) &&
+        // Either half already carrying a comma or an "and" (its own clause,
+        // a list, or a keyword like "Karak and doughnuts") would turn the
+        // merge into a run-on / and-chain — audit:reviews caught 5 crammed
+        // sentences on the first, looser version of this guard.
+        !a.includes(",") && !b.includes(",") &&
+        !/\band\b/i.test(a) && !/\band\b/i.test(b) &&
+        rng() < 0.55;
+      if (eligible) {
+        // "I" keeps its capital; the other safe subjects lowercase cleanly.
+        const keepsCase = b!.startsWith("I ") || b!.startsWith("I'");
+        const bAdj = keepsCase ? b! : b![0]!.toLowerCase() + b!.slice(1);
+        joined.push(`${a.slice(0, -1)}, and ${bAdj}`);
+        merges++;
+        i++;
+      } else {
+        joined.push(a);
+      }
+    }
+    return joined.join(" ");
+  });
+  return out.join(PARAGRAPH_GAP);
+}
+
 function dedupeTerminators(text: string): string {
   return text
     .replace(/([.!?])[.!?]+/g, "$1")
@@ -1749,6 +1971,33 @@ const KEYWORD_TYPES: ReadonlySet<string> = new Set([
 const QUALITY_ADJ_EN =
   /^(good|great|excellent|nice|solid|quick|fast|prompt|speedy|friendly|welcoming|warm|attentive|helpful|polite|professional|clean|spotless|tidy|cozy|cosy|comfortable|relaxed|calm|quiet|spacious|convenient|easy|reasonable|fair|affordable|cheap|honest|transparent|efficient|smooth|ample|free)\b/i;
 
+/**
+ * Which of the three EN attribute frame families a pill belongs to, and how the
+ * pill itself has to be rendered. See the note above ATTRIBUTE_TAILS.
+ *
+ * "There was {kw} at any point." only reads right for a negative pill, which is
+ * why the family is chosen by the pill and not by the seed.
+ */
+type AttrShape = "noun" | "negative" | "predicate" | "offering";
+const NEGATIVE_PILL = /^(no|not|zero|without)\b/i;
+// "Great options for drinks", "Good spot for groups": a quality adjective, a
+// NOUN, then "for". The noun is the head, so the business HAS it — it is not
+// what the business IS. Without this they fell in with "great for groups" and
+// took a copula: "It is Great options for drinks as well." (gate reject,
+// 2026-08-18, live Let It Dough! config).
+const OFFERING_PILL = /^(great|good|excellent|nice|solid|perfect)\s+\w+\s+for\b/i;
+function attributeShape(kw: string): AttrShape {
+  const t = kw.trim();
+  if (NEGATIVE_PILL.test(t)) return "negative";
+  if (OFFERING_PILL.test(t)) return "offering";
+  if (isQualityNounPhrase(t)) return "noun";
+  // A bare noun phrase the quality-adjective test does not recognise ("English
+  // -speaking staff", "worldwide shipping", "heirloom quality") still needs an
+  // article, not a copula: "It's also worldwide shipping." is not English.
+  // Adjectival and provenance pills are the ones isAttributeShaped catches.
+  return isAttributeShaped(t, "en") ? "predicate" : "noun";
+}
+
 function isQualityNounPhrase(kw: string): boolean {
   const t = kw.trim();
   if (!/^[\x20-\x7E]+$/.test(t)) return false;
@@ -1786,26 +2035,28 @@ const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
     // same reason. Number-neutral throughout: the slot takes a plural class
     // and a mass noun alike, so any is/was here is a grammar error on half
     // the stores.
-    "Good {range|selection|choice} of {kw}.",
+    // A1 (2026-08-18): the verbless half of this pool is gone ("Good range of
+    // X.", "Plenty of X to choose from.", "No shortage of X here.") along with
+    // the one colon frame ("That is what I keep coming here for: X."). The
+    // survivors already had a subject and a verb; three got their dropped
+    // subject back rather than being deleted, because this pool fires once per
+    // category keyword and a store can carry several.
     "They {know|really know} their {kw}.",
-    "This is where I {go|come} for {kw}.",
-    "Plenty of {kw} to {choose from|pick from}.",
-    "Worth a look if you {want|need} {kw}.",
-    "No shortage of {kw} {here|at this place}.",
+    "This is where I'll be {going|coming} for {kw}.",
+    "They have plenty of {kw} to {choose from|pick from}.",
     "They clearly {care about|take pride in} their {kw}.",
-    "That is what I {come|keep coming} here for: {kw}.",
-    "{Solid|Strong} {lineup|selection} when it comes to {kw}.",
-    "If you are after {kw}, they have it {covered|sorted}.",
+    "If you are after {kw}, they have you {covered|sorted}.",
     "You can tell they {focus on|specialize in} {kw}.",
-    "No {complaints|notes} on their {kw}.",
-    "Hard to {fault|criticize} their {kw}.",
-    "Good {variety|range} in their {kw}.",
+    "I have no {complaints|notes} about their {kw}.",
+    "They carry a good {variety|range} of {kw}.",
     "Not many places do {kw} {this well|properly}.",
-    "{Genuinely|Really} good {kw} {here|in this place}.",
+    "They do {genuinely|really} good {kw} here.",
     "They had what I was looking for in their {kw}.",
-    "Came for {kw} and {found exactly that|was not disappointed}.",
+    "I came for {kw} and {found exactly that|was not disappointed}.",
     "I would {come back|make the trip} for the {kw} alone.",
     "They are {a step above|ahead of most} when it comes to {kw}.",
+    "I couldn't {fault|criticize} their {kw}.",
+    "They keep a {solid|strong} {lineup|selection} of {kw}.",
   ],
   ja: [
     "{kw}の{品揃え|ラインナップ}が{良かったです|しっかりしていました}。",
@@ -1830,28 +2081,31 @@ const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
  */
 const SERVICE_TAILS: Record<ReviewLocale, string[]> = {
   en: [
-    "Came in for {kw} and they {explained the process properly|walked me through it step by step|made it clear from the start}.",
+    // A1 (2026-08-18): verbless frames rewritten with their subject rather than
+    // deleted — a clinic or an agency routes EVERY keyword through this pool,
+    // so cutting it in half would leave one frame carrying the page.
+    "I came in for {kw} and they {explained the process properly|walked me through it step by step|made it clear from the start}.",
     "They took the time to explain {kw} before anything {started|began}.",
-    "No {complaints|concerns} about {kw}.",
+    "I have no {complaints|concerns} about {kw}.",
     "If you're {considering|looking into} {kw}, this is a {sensible|solid} place to start.",
-    "Happy with how they handled {kw}.",
+    "I was happy with how they handled {kw}.",
     "The follow-up after {kw} was {thorough|genuinely good}.",
-    "{Straightforward|Smooth} experience with {kw}.",
-    "Went in for {kw} and left knowing exactly what {had been done|to expect next}.",
+    "It was a {straightforward|smooth} experience with {kw}.",
+    "I went in for {kw} and left knowing exactly what {had been done|to expect next}.",
     "Nothing about {kw} felt rushed.",
     "They answered every question I had about {kw}.",
-    "{Clear|Honest} about what {kw} would and would not do.",
-    "Booked {kw} and the whole thing ran {on time|to schedule}.",
-    "{Simple|Easy} to get started with {kw}.",
+    "They were {clear|honest} about what {kw} would and would not do.",
+    "I booked {kw} and the whole thing ran {on time|to schedule}.",
+    "It was {simple|easy} to get started with {kw}.",
     "They were {upfront|clear} about {kw} from the start.",
-    "{No surprises|Nothing unexpected} with {kw}.",
+    "There were {no surprises|no hold-ups} with {kw}.",
     "Everything about {kw} was {explained in plain terms|easy to follow}.",
-    "{Glad|Happy} I went to them for {kw}.",
+    "I'm {glad|happy} I went to them for {kw}.",
     "They made {kw} straightforward.",
     "I would go back to them for {kw}.",
     "They knew what they were doing with {kw}.",
-    "{Fair|Sensible} pricing for {kw}.",
-    "No {delays|hold-ups} with {kw}.",
+    "Their pricing for {kw} was {fair|sensible}.",
+    "They delivered {kw} without any delays.",
   ],
   ja: [
     "{kw}について{丁寧に説明してもらえました|きちんと説明がありました}。",
@@ -1882,7 +2136,11 @@ const GEO_TAILS: string[] = [
   // here in its PURPOSE reading, which needs a plain noun head in front of it.
   // Not "hard to find better {kw}": that is the comparative ENTITY_BOTH rules
   // out by name, and "You won't do much better for {kw}" already covers it.
-  "{Solid|Reliable} choice for {kw}.",
+  // A1 (2026-08-18): the verbless frames are gone — "Solid choice for X.",
+  // "My go-to for X now.", "Sets the bar for X.", "Top of my list for X.",
+  // "Worth the trip for X.", "The one I keep recommending for X.", "Exactly
+  // what I needed for X." Every survivor has a subject and a finite verb.
+  "This is a {solid|reliable} choice for {kw}.",
   // "As far as X goes" forces singular agreement, and keywords are routinely
   // plural ("naturally dyed rugs") -> "As far as ... rugs in Cappadocia goes"
   // is a visible grammar error (owner read-through 2026-08-07). "When it comes
@@ -1890,9 +2148,9 @@ const GEO_TAILS: string[] = [
   "When it comes to {kw}, this is {the place|the spot|the one to know}.",
   "For {kw}, this is {my pick|the spot|where I'd send people}.",
   "If you're after {kw}, {this is it|look no further|start here}.",
-  "My {go-to|first stop} for {kw} {now|these days}.",
+  "This is my {go-to|first stop} for {kw} now.",
   "You won't {do|find} much better for {kw}.",
-  "Sets the {bar|standard} for {kw}.",
+  "They set the {bar|standard} for {kw}.",
   "When someone asks about {kw}, this is {my answer|the name I give|where I point them}.",
   // "Ticks the boxes" is British-marked; "checks" reads neutral to a US ear.
   // Pitfire's management is a US native speaker (owner note 2026-08-07).
@@ -1903,17 +2161,18 @@ const GEO_TAILS: string[] = [
   // 2026-08-07, first as "Ticks every box for natural dye rugs in Cappadocia").
   "If you're {after|looking for} {kw}, this {checks every box|checks all the boxes}.",
   "For {kw}, I would {start here|look here first}.",
-  "Top of my list for {kw}.",
+  "They're top of my list for {kw}.",
   "Anyone {hunting|searching} for {kw} should {look here|start here}.",
   "That {ended|settled} my search for {kw}.",
-  "{Bookmark|Save|Note} {this one|this place} for {kw}.",
+  "I'd {bookmark|save|note} {this one|this place} for {kw}.",
   "Whenever someone asks about {kw}, I {point them here|send them here}.",
-  "I stopped {looking|searching} once I found {this place|them} for {kw}.",
-  "Worth going to them for {kw}.",
-  "Ask me about {kw} and this is the answer.",
-  "{Exactly|Just} what I needed for {kw}.",
-  "The one I {keep recommending|recommend} for {kw}.",
-  "{Worth the trip|Worth going out of your way} for {kw}.",
+  "I stopped {looking|searching} for {kw} once I found this place.",
+  "It's worth going to them for {kw}.",
+  "They were {exactly|just} what I needed for {kw}.",
+  // "They're the one I recommend" clashed they(plural)/one(singular) — gate
+  // reject run B, 2026-09-01, live 1004 Gourmet. "the place" is number-safe.
+  "This is the place I recommend for {kw}.",
+  "They're worth the trip if you want {kw}.",
 ];
 
 function isForeignPhrase(kw: string, locale: ReviewLocale): boolean {
@@ -2056,6 +2315,11 @@ export function buildLocalizedReview(
     store.trim() ||
     (locale === "ja" ? "こちらのお店" : locale === "ar" ? "هذا المكان" : "this establishment");
   const allKeywords = [...new Set(kws.map((k) => k.trim()).filter(Boolean))];
+  // Constant slots only. The keyword slots have to carry the keyword; it is the
+  // BODY that must not say it a second time in its own words.
+  for (const slot of ["bridgesLong", "bridgesShort", "fillers", "noKeywordMid"] as const) {
+    pool[slot] = dropKeywordEchoes(pool[slot], allKeywords, locale);
+  }
 
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
@@ -2075,6 +2339,10 @@ export function buildLocalizedReview(
   // Geo search phrases are pulled out BEFORE the core/tail machinery: they
   // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
   const typeOf = (k: string) => classifyKeyword(k, keywordTypes, locale);
+  // Only an EXPLICIT type counts here. classifyKeyword falls back to a guess
+  // for an untyped store, and the guess must not be allowed to put an article
+  // in front of a proper name.
+  const isDeclaredItem = (k: string) => (keywordTypes?.[k.trim()] ?? "") === "item";
   const geoAll = locale === "en" ? keywords.filter((k) => typeOf(k) === "geo") : [];
   // Each geo phrase gets its own dedicated sentence, and nothing capped how
   // many. Cinar Istanbul types eight of them, the guest picker has no
@@ -2116,7 +2384,24 @@ export function buildLocalizedReview(
   // few nouns the core simply gets shorter (or empty) and the attribute phrases
   // all leave through the appositive tails — never "Loved the family friendly".
   const coreNouns = shuffled.filter((k) => typeOf(k) !== "attribute");
-  const coreKws = coreNouns.slice(0, coreCount);
+  // Owners routinely type overlapping phrases ("72-hour dough" AND "72-hour
+  // artisan dough"). Side by side in one list sentence they read as a stutter:
+  // "I came in curious about the 72-hour dough and the 72-hour artisan dough
+  // and left convinced." (gate reject, 2026-08-18, live Pitfire config). Both
+  // still appear verbatim - the second leaves through an ordinary tail, a
+  // sentence away, where the overlap is invisible.
+  const contentWords = (k: string) =>
+    new Set(k.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 5));
+  const coreKws: string[] = [];
+  for (const cand of coreNouns) {
+    if (coreKws.length >= coreCount) break;
+    const cw = contentWords(cand);
+    const overlaps = coreKws.some((chosen) => {
+      for (const w of contentWords(chosen)) if (cw.has(w)) return true;
+      return false;
+    });
+    if (!overlaps) coreKws.push(cand);
+  }
   const longPhrases =
     coreKws.reduce((n, k) => n + k.length, 0) > 90 ||
     coreKws.some((k) => k.split(/\s+/).length > 5);
@@ -2126,10 +2411,16 @@ export function buildLocalizedReview(
 
   // Every keyword is attribute-shaped → no noun exists for the core sentence.
   // Build the keyword-free skeleton instead; the tails carry all the phrases.
+  // Pre-shape the core phrases so the declared type reaches the {list} slot:
+  // joinListEn would otherwise run the guess-only withArt and send a typed
+  // dish out bare. withArt is idempotent, so running again inside joinListEn
+  // changes nothing.
+  const coreDisplay =
+    locale === "en" ? coreKws.map((k) => withArt(k, isDeclaredItem(k))) : coreKws;
   let text =
     coreKws.length === 0
       ? reviewNoKeywords(name, pool, cfg, seed, locale)
-      : buildInner(name, coreKws, pool, cfg, compact, seed, locale);
+      : buildInner(name, coreDisplay, pool, cfg, compact, seed, locale);
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
   // Reserve room for what still has to be woven after this pass: at least one
   // keyword tail and the entity sentence. Without the reserve the filler pass
@@ -2159,7 +2450,7 @@ export function buildLocalizedReview(
   // sentence carrying all four: "Definitely try the aesthetic treatments in
   // Dubai and Weight Management Programme and Medical Wellness Check and
   // Anti-Aging Treatment." (found 2026-08-02 by the live-config bench).
-  const slots: { text: string; attr: boolean; n: number }[] = [];
+  const slots: { text: string; attr: boolean; n: number; shape?: AttrShape }[] = [];
   const pushGroup = (group: string[], attr: boolean) => {
     if (group.length >= 4 && !attr) {
       for (let i = 0; i < group.length; i += 2) {
@@ -2169,14 +2460,24 @@ export function buildLocalizedReview(
           n: pair.length,
           text:
             pair.length === 2
-              ? cfg.joinList(pair, forkRng(seed, 0x7c00 + i))
-              : locale === "en" ? withArt(pair[0]!) : pair[0]!,
+              ? cfg.joinList(
+                  locale === "en" ? pair.map((k) => withArt(k, isDeclaredItem(k))) : pair,
+                  forkRng(seed, 0x7c00 + i),
+                )
+              : locale === "en" ? withArt(pair[0]!, isDeclaredItem(pair[0]!)) : pair[0]!,
         });
       }
       return;
     }
     for (const kw of group) {
-      slots.push({ attr, n: 1, text: attr ? kw : locale === "en" ? withArt(kw) : kw });
+      if (!attr) {
+        slots.push({ attr, n: 1, text: locale === "en" ? withArt(kw, isDeclaredItem(kw)) : kw });
+        continue;
+      }
+      const shape = locale === "en" ? attributeShape(kw) : "predicate";
+      // A noun-shaped attribute takes its article exactly like an object tail;
+      // negative and predicate pills must stay bare.
+      slots.push({ attr, n: 1, shape, text: shape === "noun" && locale === "en" ? withArt(kw) : kw });
     }
   };
   pushGroup(nounLeft, false);
@@ -2190,10 +2491,18 @@ export function buildLocalizedReview(
   // sentence PER keyword, and the review ends in a stack of four afterthoughts
   // (owner read of live output, 2026-08-13). Joined by hand, not by joinList:
   // that runs withArt, and an attribute must never take an article.
-  const conjoinable = locale === "en" ? attrLeft.filter((k) => isQualityNounPhrase(k)) : [];
+  // Only NOUN-shaped pills conjoin, and each half keeps its own article:
+  // "the cozy atmosphere and the quick service". Joined bare they produced
+  // "credit for cozy atmosphere and quick service" (2026-08-18 exhaustive run).
+  const conjoinable = locale === "en" ? attrLeft.filter((k) => attributeShape(k) === "noun") : [];
   for (let i = 0; i < conjoinable.length; i += 2) {
     const pair = conjoinable.slice(i, i + 2);
-    slots.push({ attr: true, n: pair.length, text: pair.join(" and ") });
+    slots.push({
+      attr: true,
+      n: pair.length,
+      shape: "noun",
+      text: locale === "en" ? pair.map((k) => withArt(k)).join(" and ") : pair.join(" and "),
+    });
   }
   pushGroup(attrLeft.filter((k) => !conjoinable.includes(k)), true);
 
@@ -2201,10 +2510,22 @@ export function buildLocalizedReview(
   // resolve their choice groups here or the raw "{a|b}" braces reach the guest
   // (caught 2026-08-03: the diversity gate printed an unexpanded group).
   const attrChoiceRng = forkRng(seed, 0x7a2c);
-  const attrOrder = shuffle(
-    ATTRIBUTE_TAILS[locale].map((t) => expandChoices(t, attrChoiceRng)),
-    forkRng(seed, 0x7a22),
-  );
+  const attrOrderFor = (shape: AttrShape | undefined): string[] => {
+    const key =
+      locale !== "en"
+        ? locale
+        : shape === "negative"
+          ? "enNegative"
+          : shape === "predicate"
+            ? "enPredicate"
+            : shape === "offering"
+              ? "enOffering"
+              : "en";
+    return shuffle(
+      ATTRIBUTE_TAILS[key].map((t) => expandChoices(t, attrChoiceRng)),
+      forkRng(seed, 0x7a22),
+    );
+  };
   const budget = sentenceBudget(bucket.kind);
   // The beat budget must NEVER drop a keyword — every selected phrase is a
   // verbatim guarantee (the first cut of this guard broke it: 2 of 4 keywords
@@ -2249,25 +2570,38 @@ export function buildLocalizedReview(
     slots.length = 0;
     slots.push(...merged);
   }
-  // A colon aside ("Another plus: X.") reads like one person's afterthought.
-  // Two or three of them read like a form being filled in — the loudest
-  // structural tell in the owner read of live output (2026-08-13): "Short
-  // version: ... Underrated: the good value." 14 of the 22 EN attribute frames
-  // are colon-shaped, so an attribute-heavy store drew two or three per review
-  // by construction. Cap the whole review at ONE, across every tail pool, and
-  // fall back to a non-colon frame from the same pool.
+  // 🔑 A2 (owner decision 2026-08-18) — the composition rule for ONE review.
+  //
+  // A1 took the colon frames out of the pools, but the DEFECT the owner reads
+  // is not the punctuation, it is the move: a sentence whose only job is to
+  // bolt one more item onto a review that has already been written. "Another
+  // plus: X." and "I should mention X too." are the same move in different
+  // clothes, and the owner's fail condition is "short set-pieces stacked up",
+  // not "a colon appeared". So the cap moves from the punctuation to the move,
+  // and drops from two to ONE aside per review — with two or more, the review
+  // stops being one person talking and becomes a form being filled in.
+  //
+  // The cap never drops a keyword: when no non-aside frame is left, the aside
+  // is used anyway. A verbatim phrase outranks the composition rule.
   const isColonFrame = (t: string) => /:\s/.test(t);
   let colonBeats = (text.match(/:\s/g) ?? []).length;
-  // Same argument one level up: a sentence that OPENS as an addendum ("Also X.",
-  // "And Y, too.", "Plus Z.") is natural once, and is the engine reading a
-  // keyword list out loud by the third. A store with four attribute pills hit
-  // three or more in 6 of 40 reviews (live demo cafe config, 2026-08-13), which
-  // is why ATTRIBUTE_TAILS now carries non-additive frames to fall back to.
-  const isAdditiveFrame = (t: string) => ADDITIVE_OPEN.test(t.trim());
-  let additiveBeats = 0;
+  // Aside = announces an addendum, either at the front ("Also X.", "Plus Y.")
+  // or at the back ("… X too.", "… Y as well."). The back half is new with the
+  // A1 rewrite: the replacement attribute frames are declarative sentences, so
+  // they no longer OPEN as an addendum, but "I appreciated X too." is still the
+  // same beat and still stacks the same way.
+  const ADDITIVE_TAIL = /\b(too|as well|either|also|straight away)\s*[.!?]*$/i;
+  const isAdditiveFrame = (t: string) =>
+    ADDITIVE_OPEN.test(t.trim()) || ADDITIVE_TAIL.test(t.trim());
+  // Seeded from what the skeleton ALREADY says, not from zero. The opener,
+  // filler and closer pools contain aside beats of their own ("The value is
+  // good for what you actually get, too."), and starting the count at zero let
+  // a tail add a second one to a review that had already spent its allowance —
+  // which is exactly the stack the rule exists to stop.
+  let additiveBeats = splitSentences(text, locale, name).filter(isAdditiveFrame).length;
   const avoidColon = (tpl: string, order: string[], used?: Set<string>): string => {
     const colonBad = (t: string) => colonBeats >= 1 && isColonFrame(t);
-    const addBad = (t: string) => additiveBeats >= 2 && isAdditiveFrame(t);
+    const addBad = (t: string) => additiveBeats >= 1 && isAdditiveFrame(t);
     if (!colonBad(tpl) && !addBad(tpl)) return tpl;
     const free = order.filter((t) => !(used?.has(t) ?? false));
     // Fall back in priority order. Asking for both at once and giving up when
@@ -2293,7 +2627,20 @@ export function buildLocalizedReview(
     // Noun tails additionally drop taste voice when this phrase is not something
     // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30; the EN
     // equivalent "nailed the friendly team" — 2026-07-31).
-    const order = slot.attr ? attrOrder : filterTasteVoice(tailOrder, locale, [slot.text]);
+    const orderAll = slot.attr ? attrOrderFor(slot.shape) : filterTasteVoice(tailOrder, locale, [slot.text]);
+    // A pill that arrives with its own lower-case determiner ("a thoughtful
+    // gift") is verbatim-protected, so capitalizeSentenceStartsEn leaves it
+    // alone and a {kw}-initial frame ships a sentence starting in lower case:
+    // "a thoughtful gift and the friendly service came up on the way home
+    // too." (gate reject, 2026-08-18, live Let It Dough! config). Capitalising
+    // it would edit a phrase we promised to reproduce exactly, so the frame
+    // moves instead of the keyword.
+    const order =
+      locale === "en" && /^[a-z]/.test(slot.text)
+        ? (orderAll.filter((t) => !t.trimStart().startsWith("{kw}")).length >= 3
+            ? orderAll.filter((t) => !t.trimStart().startsWith("{kw}"))
+            : orderAll)
+        : orderAll;
     if (order.length === 0) continue;
     // Rotation keeps consecutive tails off the same template; the move check
     // then rejects one that repeats a rhetorical beat already in the review.
@@ -2368,8 +2715,10 @@ export function buildLocalizedReview(
     text = capStoreMentions(text, name, locale, forkRng(seed, 0xca9), vertical);
   }
   text = normalizeDashes(text);
+  if (locale === "en") text = capitalizeAfterBangPeriodEn(text, [...protectAll, name]);
   text = dedupeTerminators(text);
   if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);
+  if (locale === "en") text = conjoinShortSentencesEn(text, [...protectAll, name], forkRng(seed, 0xc0a1));
   // Paragraphing decided ONCE, from the finished text. See layoutParagraphs.
   return layoutParagraphs(text, locale, forkRng(seed, 0x9a17), name);
 }
