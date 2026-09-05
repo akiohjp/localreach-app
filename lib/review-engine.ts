@@ -729,11 +729,14 @@ function weaveParagraphs(parts: string[], _rng: () => number, _compact: boolean,
  * occasionally stand alone before the closer, so padding reads as passing
  * remarks woven through the review.
  */
-function appendSpread(full: string, sentence: string, glue: string, rng: () => number, locale: ReviewLocale = "en", store?: string): string {
+function appendSpread(full: string, sentence: string, glue: string, rng: () => number, locale: ReviewLocale = "en", store?: string, atEnd = false): string {
   const flat = oneLineCollapse(normalizeParagraphFormatting(full).replace(/\n+/g, locale === "ja" ? "" : " "));
   const frag = oneLineCollapse(sentence);
   if (!frag) return flat;
   if (!flat) return frag;
+  // A story frame is one authored piece; a remark dropped into its middle
+  // breaks the thread it was written with. Leftovers go after it.
+  if (atEnd) return `${flat}${glue}${frag}`;
   const parts = splitSentences(flat, locale, store);
   if (parts.length < 3) return `${flat}${glue}${frag}`;
   // Land the remark BEFORE the closing sentence most of the time: everything
@@ -1436,6 +1439,7 @@ function weaveEntity(
   vertical: Vertical = "generic",
   store?: string,
   audience: Audience = "local",
+  atEnd = false,
 ): { text: string; protect: string[] } {
   const area = readableLocation(entity?.area?.trim() || null, locale);
   const city = readableLocation(entity?.city?.trim() || null, locale);
@@ -1473,7 +1477,7 @@ function weaveEntity(
   // have it close by". Same filter the base pools get.
   if (audience === "visitor") pool = stripRegularVoiceLines(pool, locale);
   const sentence = fillEntity(expandChoices(pick(pool, rng), rng), loc ?? "", cat ?? "");
-  return { text: appendSpread(text, sentence, cfg.glue, rng, locale, store), protect };
+  return { text: appendSpread(text, sentence, cfg.glue, rng, locale, store, atEnd), protect };
 }
 
 /** True when trimming would delete a verbatim keyword the review must keep. */
@@ -2813,7 +2817,7 @@ export function buildLocalizedReview(
     tpl = avoidColon(tpl, order, usedTails);
     usedTails.add(tpl);
     countBeats(tpl);
-    text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name);
+    text = appendSpread(text, fill(tpl, { kw: slot.text }), cfg.glue, tailSpread, locale, name, !!storyText);
   }
 
   // Geo search phrases: one dedicated sentence each, rotated frames, never
@@ -2829,7 +2833,7 @@ export function buildLocalizedReview(
     for (const gkw of geoKws) {
       if (text.includes(gkw)) continue;
       const tpl = geoOrder[gi++ % geoOrder.length]!;
-      text = appendSpread(text, fill(tpl, { kw: withGeoArt(gkw, locale) }), cfg.glue, tailSpread, locale, name);
+      text = appendSpread(text, fill(tpl, { kw: withGeoArt(gkw, locale) }), cfg.glue, tailSpread, locale, name, !!storyText);
     }
   }
 
@@ -2850,7 +2854,7 @@ export function buildLocalizedReview(
       const shaped = shape ? shape(kw) : withSuperlativeArt(kw, locale);
       const tpl = avoidColon(order[i++ % order.length]!, order);
       countBeats(tpl);
-      text = appendSpread(text, fill(tpl, { kw: shaped }), cfg.glue, tailSpread, locale, name);
+      text = appendSpread(text, fill(tpl, { kw: shaped }), cfg.glue, tailSpread, locale, name, !!storyText);
     }
   };
   weaveDedicated(catKws, forAudience(CATEGORY_TAILS[locale]), 0x9e11);
@@ -2863,7 +2867,7 @@ export function buildLocalizedReview(
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
   const woven = weaveEntity(
-    text, decideEntity(entity, vertical, geoKws.length > 0, forkRng(seed, 0xe1a0)), locale, cfg, seed, rating, vertical, name, audience,
+    text, decideEntity(entity, vertical, geoKws.length > 0, forkRng(seed, 0xe1a0)), locale, cfg, seed, rating, vertical, name, audience, !!storyText,
   );
   text = woven.text;
   const protectAll = [...shuffled, ...geoKws, ...catKws, ...svcKws, ...woven.protect];
