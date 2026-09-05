@@ -17,8 +17,8 @@
  */
 
 import { forkRng } from "@/lib/review-rng";
-import type { ReviewLocale, Vertical, PoolSet } from "@/lib/review-pools";
-import { resolvePoolSet, NON_VISIT_VERTICALS } from "@/lib/review-pools";
+import type { ReviewLocale, Vertical, PoolSet, Audience } from "@/lib/review-pools";
+import { resolvePoolSet, NON_VISIT_VERTICALS, stripRegularVoiceLines } from "@/lib/review-pools";
 
 // ---------------------------------------------------------------- helpers ----
 
@@ -1348,6 +1348,36 @@ function readableLocation(value: string | null, locale: ReviewLocale): string | 
 }
 
 /**
+ * Whether THIS review carries the dedicated entity sentence ("a {cat} in
+ * {loc}").
+ *
+ * Until 2026-09-06 the answer was always yes, and a store whose core phrases
+ * are buyer-search geo phrases ("hand-knotted wool rugs in Istanbul") shipped
+ * TWO place sentences in every review: the geo frame and, a sentence later,
+ * "my go-to rug store in the Grand Bazaar now". Read side by side across a
+ * listing that is the SEO layer showing, not a guest talking (owner read of
+ * live Cinar output, 2026-09-06). So:
+ *   - a woven geo phrase already anchors the place: no entity sentence;
+ *   - otherwise the entity sentence lands in ENTITY_CHANCE of reviews, so the
+ *     category noun still reaches the listing without sitting in every review;
+ *   - B2B verticals keep it every time: a client review that never names what
+ *     the firm is and where it works is the one case where the sentence IS the
+ *     content, and audit-review-generation pins that.
+ */
+const ENTITY_CHANCE = 0.6;
+function decideEntity(
+  entity: ReviewEntity | undefined,
+  vertical: Vertical,
+  hasGeoPhrase: boolean,
+  rng: () => number,
+): ReviewEntity | undefined {
+  if (!entity) return undefined;
+  if (NON_VISIT_VERTICALS.has(vertical)) return entity;
+  if (hasGeoPhrase) return undefined;
+  return rng() < ENTITY_CHANCE ? entity : undefined;
+}
+
+/**
  * Weave the entity sentence into `text`. Returns the new text plus every
  * entity term now present, so callers extend the verbatim-protect list.
  */
@@ -1360,6 +1390,7 @@ function weaveEntity(
   rating: number,
   vertical: Vertical = "generic",
   store?: string,
+  audience: Audience = "local",
 ): { text: string; protect: string[] } {
   const area = readableLocation(entity?.area?.trim() || null, locale);
   const city = readableLocation(entity?.city?.trim() || null, locale);
@@ -1393,6 +1424,9 @@ function weaveEntity(
     const measured = pool.filter((t) => !SUPERLATIVE_RE.test(t));
     if (measured.length > 0) pool = measured;
   }
+  // A tourist has no "go-to rug store in the Grand Bazaar" and is not "glad to
+  // have it close by". Same filter the base pools get.
+  if (audience === "visitor") pool = stripRegularVoiceLines(pool, locale);
   const sentence = fillEntity(expandChoices(pick(pool, rng), rng), loc ?? "", cat ?? "");
   return { text: appendSpread(text, sentence, cfg.glue, rng, locale, store), protect };
 }
@@ -2300,17 +2334,24 @@ export function buildLocalizedReview(
   rating = 5,
   entity?: ReviewEntity,
   keywordTypes?: KeywordTypeMap,
+  audience: Audience = "local",
 ): string {
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
   const pool = expandPoolChoices(
     filterRetailVoice(
-      filterMedicalVoice(resolvePoolSet(locale, vertical), locale, vertical),
+      filterMedicalVoice(resolvePoolSet(locale, vertical, audience), locale, vertical),
       locale,
       vertical,
     ),
     forkRng(seed, 0xc401ce),
   );
+  // The category / service / attribute / geo frames live outside the PoolSet,
+  // so the visitor filter has to be applied to them here as well: "I would
+  // come back for the silk rugs alone" reached a tourist's draft through
+  // CATEGORY_TAILS after the base pools were already clean (2026-09-06).
+  const forAudience = (lines: string[]): string[] =>
+    audience === "visitor" ? stripRegularVoiceLines(lines, locale) : lines;
   const name =
     store.trim() ||
     (locale === "ja" ? "こちらのお店" : locale === "ar" ? "هذا المكان" : "this establishment");
@@ -2324,7 +2365,9 @@ export function buildLocalizedReview(
   if (allKeywords.length === 0) {
     const cfg0 = { ...LOCALE_CFG[locale], ...pickLenBucket(locale, seed, rating, 0) };
     let t0 = reviewNoKeywords(name, pool, cfg0, seed, locale);
-    const woven0 = weaveEntity(t0, entity, locale, cfg0, seed, rating, vertical, name);
+    const woven0 = weaveEntity(
+      t0, decideEntity(entity, vertical, false, forkRng(seed, 0xe1a0)), locale, cfg0, seed, rating, vertical, name, audience,
+    );
     t0 = normalizeDashes(capStoreMentions(woven0.text, name, locale, forkRng(seed, 0xca9), vertical));
     if (locale === "en") t0 = capitalizeSentenceStartsEn(t0, [name, ...woven0.protect]);
     return t0;
@@ -2522,7 +2565,7 @@ export function buildLocalizedReview(
               ? "enOffering"
               : "en";
     return shuffle(
-      ATTRIBUTE_TAILS[key].map((t) => expandChoices(t, attrChoiceRng)),
+      forAudience(ATTRIBUTE_TAILS[key]).map((t) => expandChoices(t, attrChoiceRng)),
       forkRng(seed, 0x7a22),
     );
   };
@@ -2664,7 +2707,7 @@ export function buildLocalizedReview(
   if (geoKws.length > 0) {
     const geoChoiceRng = forkRng(seed, 0x9e01);
     const geoOrder = shuffle(
-      GEO_TAILS.map((t) => expandChoices(t, geoChoiceRng)),
+      forAudience(GEO_TAILS).map((t) => expandChoices(t, geoChoiceRng)),
       forkRng(seed, 0x9e02),
     );
     let gi = 0;
@@ -2695,16 +2738,18 @@ export function buildLocalizedReview(
       text = appendSpread(text, fill(tpl, { kw: shaped }), cfg.glue, tailSpread, locale, name);
     }
   };
-  weaveDedicated(catKws, CATEGORY_TAILS[locale], 0x9e11);
+  weaveDedicated(catKws, forAudience(CATEGORY_TAILS[locale]), 0x9e11);
   // A service is a countable thing you book ("the AI SEO audit"), unlike a
   // category, which is a mass/plural head ("fresh doughnuts") and stays bare.
   // Without this, every service frame read "They took the time to explain AI
   // SEO audit" (naturalness reader, 2026-08-10, live mirAIreach config).
-  weaveDedicated(svcKws, serviceTailsFor(vertical, locale), 0x9e21, locale === "en" ? withServiceArt : undefined);
+  weaveDedicated(svcKws, forAudience(serviceTailsFor(vertical, locale)), 0x9e21, locale === "en" ? withServiceArt : undefined);
 
   // Entity sentence goes in BEFORE the final length pass so trimming can never
   // delete it (its terms join the verbatim-protect list).
-  const woven = weaveEntity(text, entity, locale, cfg, seed, rating, vertical, name);
+  const woven = weaveEntity(
+    text, decideEntity(entity, vertical, geoKws.length > 0, forkRng(seed, 0xe1a0)), locale, cfg, seed, rating, vertical, name, audience,
+  );
   text = woven.text;
   const protectAll = [...shuffled, ...geoKws, ...catKws, ...svcKws, ...woven.protect];
 
@@ -2744,11 +2789,18 @@ export function buildLocalizedReview(
 // split the same way is the tell. Thresholds are the floor BELOW which a break
 // never happens, and the odds above it scale with length (owner note
 // 2026-08-07: "改行も自然にしよう" — 48/60 reviews were exactly 2 paragraphs).
+// 2026-09-06 (owner read of live output): a blank line in the middle of a
+// 60-word review reads as machine layout, and Google's edit box makes it
+// worse by showing the gap at full height. Every review ships as ONE block.
+// The length-scaled break logic below is kept intact behind this switch so
+// the decision can be reversed in one place.
+const PARAGRAPH_BREAKS = false;
 const PARA_MIN_SIZE = { en: 70, ja: 150 } as const; // never break below this
 const PARA_TWO_SIZE = { en: 150, ja: 320 } as const; // three paragraphs need this
 function layoutParagraphs(text: string, locale: ReviewLocale, rng: () => number, store?: string): string {
   const flat = oneLineCollapse(text.replace(/\n+/g, " "));
   if (!flat) return "";
+  if (!PARAGRAPH_BREAKS) return flat;
   const size = locale === "ja" ? cjkCount(flat) : wordCount(flat);
   const parts = splitSentences(flat, locale, store);
   const min = locale === "ja" ? PARA_MIN_SIZE.ja : PARA_MIN_SIZE.en;

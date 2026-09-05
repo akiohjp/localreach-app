@@ -66,6 +66,111 @@ const EMPTY: PoolSet = {
  * because their keywords overlap; realestate / home / education are matched
  * before retail because "shop/store/店" is greedy.
  */
+/**
+ * Who writes the review: a LOCAL who can plausibly come back, or a VISITOR who
+ * is in town once. The distinction is orthogonal to the vertical: a rug gallery
+ * beside the Grand Bazaar and a souvenir shop are both "retail", but their
+ * reviewers are tourists, and a tourist never has a "go-to rug store" or
+ * "adds it to the rotation". Owner read of live Cinar output, 2026-09-06: the
+ * regular-customer voice was the loudest remaining tell after the fragment and
+ * repeat-visit fixes shipped.
+ *
+ * Heuristic on the free-text category for now. A per-store column is the real
+ * home for this (same shape as entity_category_label); until then this is the
+ * single place to extend.
+ */
+export type Audience = "local" | "visitor";
+
+const VISITOR_CATEGORY_RE =
+  /\b(rugs?|carpets?|kilims?|antiques?|gallery|souvenirs?|gift shop|handicrafts?|handcraft|bazaar|tours?|travel|excursions?|attractions?|museums?|hammam|cruises?|sightseeing)\b|絨毯|ラグ|カーペット|土産|観光|ツアー|骨董|ギャラリー|工芸/i;
+
+export function resolveAudience(category: string | null | undefined): Audience {
+  const c = (category ?? "").trim();
+  if (!c) return "local";
+  return VISITOR_CATEGORY_RE.test(c) ? "visitor" : "local";
+}
+
+/**
+ * Lines only a repeat customer can write: coming back, the rotation, the
+ * neighbourhood, "my go-to". Applied to every pool a visitor-audience store
+ * draws from (base pools, entity frames, geo frames). A slot is filtered only
+ * when something survives; an empty slot would break assembly.
+ */
+const REGULAR_VOICE_RE: Record<ReviewLocale, RegExp> = {
+  en: /\b(go-to|first-choice|first stop|close by|nearby|next time|from now on|regulars?|the rotation|usual spots|whenever (i'm|we're|i am|we are)|every time|be back|coming back|come back|back again|revisit|round two|repeat customer|new fan|already planning|bringing (people|friends|visitors)|local spots?|neighbou?rhood|on (my|your) list|shortlist|favou?rites? list|bookmark(ed)?|live around|work around|spend time around|pick again|go back to|stick with|telling everyone|my (next|usual)|passing through)\b/i,
+  ja: /(また行き|また来|通い|常連|次回|リピート|近所|ご近所|行きつけ|定番|恒例|お決まり|ここばかり|他に行かなく|次に|次は)/,
+  ar: /(في المرة القادمة|سأعود|نعود|المفضل|كل مرة)/,
+};
+
+export function stripRegularVoiceLines(lines: string[], locale: ReviewLocale): string[] {
+  const re = REGULAR_VOICE_RE[locale];
+  const kept = lines.filter((line) => !re.test(line));
+  return kept.length > 0 ? kept : lines;
+}
+
+function stripRegularVoice(pool: PoolSet, locale: ReviewLocale): PoolSet {
+  const out = { ...pool } as PoolSet;
+  (Object.keys(pool) as (keyof PoolSet)[]).forEach((k) => {
+    out[k] = stripRegularVoiceLines(pool[k], locale);
+  });
+  return out;
+}
+
+/**
+ * What a one-time visitor actually writes: the trip, the afternoon, being a
+ * first-timer, sending other travellers. No claims about the business itself
+ * (those are the keywords' job), no dashes, every line a full sentence.
+ */
+const EN_VISITOR: Partial<PoolSet> = {
+  openersLong: [
+    "We came across {store} while exploring the area on our trip and ended up staying far longer than we had planned.",
+    "Visited {store} as part of a day of sightseeing, and it turned out to be the part of the day we talked about most.",
+    "{store} was a stop we had not planned on our trip, and it ended up being one of the highlights.",
+    "We had one free afternoon on our trip and spent a good part of it at {store}, with no regrets.",
+    "Found {store} on our second day in town, walked in out of curiosity, and left genuinely impressed.",
+    "I'm writing this from the airport because {store} was the part of the trip I most wanted to put down somewhere.",
+  ],
+  openersShort: [
+    "{store} turned out to be a highlight of our trip.",
+    "Stopped into {store} while travelling and I'm glad we did.",
+    "{store} was well worth the stop on our trip.",
+    "One afternoon at {store} and it made the whole trip feel worthwhile.",
+  ],
+  bridgesLong: [
+    "They were patient with visitors who knew very little about the subject and explained things properly.",
+    "There was no hard sell at any point, which matters when you are travelling and half expecting one.",
+    "We were made to feel welcome as visitors rather than treated as passing trade.",
+    "They took the time to answer our questions even though it was clear we were only in town for a few days.",
+    "Nobody rushed us, and nobody followed us around, which is not a given in a place full of tourists.",
+  ],
+  bridgesShort: [
+    "No hard sell, which we appreciated as visitors.",
+    "Everything was explained clearly to us as first-timers.",
+    "They looked after us well even though we were only in town briefly.",
+    "It felt relaxed, not like a tourist stop.",
+  ],
+  closersLong: [
+    "If you are visiting the area, {store} is worth an hour of your trip.",
+    "Anyone travelling through should put {store} on their itinerary.",
+    "It was one of the better hours of our trip, and I'd send other travellers to {store} without hesitation.",
+    "We'd recommend {store} to anyone spending a few days in the area.",
+    "Of everything we did that day, {store} is the part I'd tell other travellers not to skip.",
+  ],
+  closersShort: [
+    "It's worth a stop if you are in town.",
+    "I'd tell other travellers to visit {store}.",
+    "{store} made our trip better.",
+    "Glad we made time for {store}.",
+  ],
+  fillers: [
+    "We left with a much better understanding than we came in with.",
+    "It's the kind of place that makes a trip feel like more than sightseeing.",
+    "Our only regret is not having more time there.",
+    "Even the people in our group who were not that interested at first ended up enjoying it.",
+    "It was a welcome change of pace from the rest of the day.",
+  ],
+};
+
 export function resolveVertical(category: string | null | undefined): Vertical {
   const c = (category ?? "").toLowerCase();
   if (!c) return "generic";
@@ -1646,11 +1751,14 @@ function stripVisitVoice(pool: PoolSet, locale: ReviewLocale): PoolSet {
  * so merging GENERIC would leak visit/place phrasing ("went to", "the kind of
  * place") into service-provider reviews. Other non-visit verticals keep GENERIC
  * with its visit-only lines stripped. */
-export function resolvePoolSet(locale: ReviewLocale, vertical: Vertical): PoolSet {
+export function resolvePoolSet(locale: ReviewLocale, vertical: Vertical, audience: Audience = "local"): PoolSet {
   if (vertical === "agency") return AGENCY[locale] ?? AGENCY.en;
   const raw = GENERIC[locale] ?? GENERIC.en;
   const base = NON_VISIT_VERTICALS.has(vertical) ? stripVisitVoice(raw, locale) : raw;
-  if (vertical === "generic") return base;
-  const flavour = VERTICAL[locale]?.[vertical];
-  return flavour ? mergePool(base, flavour) : base;
+  const flavour = vertical === "generic" ? undefined : VERTICAL[locale]?.[vertical];
+  const merged = flavour ? mergePool(base, flavour) : base;
+  if (audience !== "visitor" || NON_VISIT_VERTICALS.has(vertical)) return merged;
+  // Visitor audience: drop the repeat-customer lines, add the traveller's own.
+  const stripped = stripRegularVoice(merged, locale);
+  return locale === "en" ? mergePool(stripped, EN_VISITOR) : stripped;
 }

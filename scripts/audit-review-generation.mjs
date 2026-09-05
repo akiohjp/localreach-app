@@ -139,24 +139,47 @@ async function main() {
     /Ask (about|them about) (the )?Motor City/i, /try (the )?Dubai\b/i,
     /Definitely try (the )?udon restaurant\b/i,
   ];
-  let entAreaMiss = 0, entCatMiss = 0, entDupe = 0, entMisuse = 0, entCity = 0;
+  let entAreaMiss = 0, entCatMiss = 0, entDupe = 0, entMisuse = 0, entCity = 0, entHalf = 0, paraBreaks = 0;
   const entSet = new Set();
   for (let i = 0; i < N; i++) {
     const t = generateReview("Maru Udon", ["handmade udon", "tempura"], entOpts("en"));
     entSet.add(t);
     if (!t.includes("Motor City")) entAreaMiss++;
     if (!t.includes("udon restaurant")) entCatMiss++;
+    // The entity sentence is all-or-nothing: area and category arrive together.
+    if (t.includes("Motor City") !== t.includes("udon restaurant")) entHalf++;
+    // 2026-09-06: one block, always. A blank line mid-review is a bot tell.
+    if (/\n/.test(t)) paraBreaks++;
     if (t.split("Motor City").length - 1 > 1) entDupe++;
     if (KW_MISUSE.some((re) => re.test(t))) entMisuse++;
     if (t.includes("Dubai")) entCity++;
   }
   // Dedupe guard: a forced keyword already carrying the area must NOT produce a
   // second area mention from the entity layer.
-  let entForcedDupe = 0;
+  let entForcedDupe = 0, entWithGeo = 0;
   for (let i = 0; i < 120; i++) {
     const t = generateReview("Maru Udon", ["best udon in Motor City", "tempura"], entOpts("en", { forcedCount: 1 }));
     if (t.split("Motor City").length - 1 > 1) entForcedDupe++;
+    // 2026-09-06: a geo phrase already anchors the place, so the dedicated
+    // "{cat} in {loc}" sentence must not land on top of it (two place
+    // sentences per review was the SEO layer showing, live Cinar output).
+    if (t.includes("udon restaurant")) entWithGeo++;
   }
+  // ---- visitor audience (2026-09-06): tourists don't have a go-to rug store ----
+  const REGULAR_VOICE = /\b(go-to|first-choice|be back|coming back|come back|from now on|next time|the rotation|usual spots|close by|nearby|regulars?|repeat customer|round two|revisit|bookmark)\b/i;
+  let visitorRegular = 0, visitorBreaks = 0, visitorGeoAndEntity = 0;
+  const visitorSamples = [];
+  for (let i = 0; i < 200; i++) {
+    const t = generateReview("Cinar Rugs Istanbul", ["hand-knotted wool rugs in Istanbul", "silk rugs", "rug weaving demonstration"], {
+      nonce: createReviewNonce(), outletKey: "visitor|rug store|#122024", locale: "en", category: "rug store", forcedCount: 1,
+      entity: { area: null, city: "Istanbul", categoryLabel: { en: "rug store" } },
+      keywordTypes: { "hand-knotted wool rugs in Istanbul": "geo", "silk rugs": "category", "rug weaving demonstration": "item" },
+    });
+    if (REGULAR_VOICE.test(t)) { visitorRegular++; if (visitorSamples.length < 3) visitorSamples.push(t.match(REGULAR_VOICE)[0] + " <- " + t.slice(0, 110)); }
+    if (/\n/.test(t)) visitorBreaks++;
+    if (t.includes("rug store")) visitorGeoAndEntity++;
+  }
+  if (visitorSamples.length) console.log("visitor regular-voice samples:\n  " + visitorSamples.join("\n  "));
   // JA + AR: locale label used (not the EN one), area present.
   let entJaMiss = 0, entArMiss = 0;
   for (let i = 0; i < 120; i++) {
@@ -293,8 +316,18 @@ async function main() {
   assert(attrMissing === 0, `EN: attribute keywords still appear verbatim (missing in ${attrMissing})`);
   assert(punctName === 0, `EN: store name ending in "!"/"." does not capitalize the next word (got ${punctName})`);
   assert(arDoubleFi === 0, `AR: entity location never doubles "في" (got ${arDoubleFi})`);
-  assert(entAreaMiss === 0, `entity: area in every review (missing ${entAreaMiss})`);
-  assert(entCatMiss === 0, `entity: category noun in every review (missing ${entCatMiss})`);
+  // 2026-09-06 (owner read of live output): the entity sentence in EVERY review
+  // read as the SEO layer showing. Visit verticals now carry it in a share of
+  // reviews (ENTITY_CHANCE in review-engine.ts); B2B verticals still always.
+  const entRate = 1 - entAreaMiss / N;
+  assert(entRate > 0.45 && entRate < 0.75, `entity: area in a share of reviews, not all (present in ${(entRate * 100).toFixed(0)}%)`);
+  assert(entHalf === 0, `entity: area and category noun arrive together or not at all (split ${entHalf})`);
+  assert(entCatMiss === entAreaMiss, `entity: category noun present exactly when the area is (area miss ${entAreaMiss}, cat miss ${entCatMiss})`);
+  assert(paraBreaks === 0, `layout: one block, no paragraph breaks (got ${paraBreaks}/${N})`);
+  assert(entWithGeo === 0, `entity: a woven geo phrase suppresses the entity sentence (got ${entWithGeo}/120)`);
+  assert(visitorRegular === 0, `visitor audience: no repeat-customer voice for a rug store (got ${visitorRegular}/200)`);
+  assert(visitorBreaks === 0, `visitor audience: one block (got ${visitorBreaks}/200)`);
+  assert(visitorGeoAndEntity === 0, `visitor audience: geo phrase present → no "{cat}" entity sentence (got ${visitorGeoAndEntity}/200)`);
   assert(entDupe === 0, `entity: area never mentioned twice (got ${entDupe})`);
   assert(entMisuse === 0, `entity: never routed through {kw} object templates (got ${entMisuse})`);
   // EN no longer pairs area + city: "in Dubai Hills, Dubai" reads like a
@@ -303,9 +336,10 @@ async function main() {
   // モーターシティ" is how people actually speak.
   assert(entCity === 0, `EN entity: city never appended to the area (got ${entCity}/${N})`);
   assert(entForcedDupe === 0, `entity: forced keyword carrying the area → no double mention (got ${entForcedDupe})`);
-  assert(entJaMiss === 0, `entity JA: area + JA category label woven (missed ${entJaMiss})`);
-  assert(entArMiss === 0, `entity AR: area + AR category label woven (missed ${entArMiss})`);
-  assert(entNoKw === 0, `entity: woven even with zero keywords configured (missed ${entNoKw})`);
+  const share = (miss, n) => 1 - miss / n;
+  assert(share(entJaMiss, 120) > 0.4 && share(entJaMiss, 120) < 0.8, `entity JA: area + JA category label in a share of reviews (present ${(share(entJaMiss, 120) * 100).toFixed(0)}%)`);
+  assert(share(entArMiss, 120) > 0.4 && share(entArMiss, 120) < 0.8, `entity AR: area + AR category label in a share of reviews (present ${(share(entArMiss, 120) * 100).toFixed(0)}%)`);
+  assert(share(entNoKw, 120) > 0.4 && share(entNoKw, 120) < 0.8, `entity: zero-keyword stores still get it in a share of reviews (present ${(share(entNoKw, 120) * 100).toFixed(0)}%)`);
   assert(entLeak === 0, `entity: no leakage into stores without entity fields (got ${entLeak})`);
   assert(entSet.size === N, `entity: reviews still all unique (${entSet.size}/${N})`);
   assert(nameMissing === 0, `SEO: store name present in every review (missing ${nameMissing})`);

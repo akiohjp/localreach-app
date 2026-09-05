@@ -7,7 +7,7 @@
  */
 
 import { buildLocalizedReview, type KeywordTypeMap, type ReviewEntity } from "@/lib/review-engine";
-import { resolveVertical, type ReviewLocale } from "@/lib/review-pools";
+import { resolveAudience, resolveVertical, type ReviewLocale } from "@/lib/review-pools";
 import type { SupportedLocale } from "@/types/database";
 
 export type GenerateReviewOptions = {
@@ -103,6 +103,8 @@ export function generateReview(
   const cleaned = keywords.map((k) => k.trim()).filter(Boolean);
   const locale = toReviewLocale(options?.locale);
   const vertical = resolveVertical(options?.category);
+  // Local regulars or one-time visitors: decides which voice pools the review draws from.
+  const audience = resolveAudience(options?.category);
   // Fold locale + vertical into the entropy so switching language/industry rotates cleanly.
   const seed = computeReviewSeed(store, cleaned, nonce, `${outlet}\0${locale}\0${vertical}`);
   const forcedCount = Math.max(0, Math.min(options?.forcedCount ?? 0, cleaned.length));
@@ -127,6 +129,7 @@ export function generateReview(
     rating,
     entity,
     (options?.keywordTypes as KeywordTypeMap | undefined) ?? undefined,
+    audience,
   );
 }
 
