@@ -19,6 +19,7 @@
 import { forkRng } from "@/lib/review-rng";
 import type { ReviewLocale, Vertical, PoolSet, Audience } from "@/lib/review-pools";
 import { resolvePoolSet, NON_VISIT_VERTICALS, stripRegularVoiceLines } from "@/lib/review-pools";
+import { buildStory, resolveStoryFlavor, storyFamilyFor, type StorySize } from "@/lib/review-stories";
 
 // ---------------------------------------------------------------- helpers ----
 
@@ -235,6 +236,50 @@ function withSuperlativeArt(phrase: string, locale: ReviewLocale): string {
   if (locale !== "en") return phrase;
   if (LEADING_DETERMINER.test(phrase)) return phrase;
   return SUPERLATIVE_HEAD.test(phrase) ? `the ${phrase}` : phrase;
+}
+
+/**
+ * A geo phrase whose head is a singular COUNT noun for a place ("Emirati
+ * perfume house in Dubai") cannot stand bare in English: "if you want Emirati
+ * perfume house in Dubai" (owner read, RMK demo, 2026-09-06). Plural and mass
+ * heads ("silk rugs in Dubai", "udon in Dubai") are fine bare, and so is
+ * everything the closed list below does not name, so a miss costs nothing.
+ */
+const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
+  "house", "shop", "store", "boutique", "clinic", "studio", "salon", "gym", "restaurant",
+  "cafe", "bar", "hotel", "garage", "school", "agency", "dealer", "showroom", "gallery", "spa",
+  "bakery", "pharmacy", "market", "supermarket", "workshop", "center", "centre", "office",
+  "firm", "dentist", "doctor", "florist", "atelier", "place", "spot", "lounge", "kitchen",
+  "bistro", "eatery", "grocer", "perfumery", "parlour", "parlor", "barber",
+]);
+
+/**
+ * Attribute pills that are a PREDICATE in disguise: a participle or "worth"
+ * phrase the shape detector reads as a noun phrase ("made in the UAE", "worth
+ * the price"). In an object slot they came out as "the made in the UAE"
+ * (owner read, RMK demo, 2026-09-06); after a copula they read as intended.
+ */
+const STORY_PREDICATE =
+  /^(made|based|sourced|produced|crafted|designed|handmade|hand-made|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|halal|locally|freshly|newly|proudly|fully)\b/i;
+
+/**
+ * "Item" pills that name a quality or a service rather than a thing you buy
+ * ("friendly service", "natural ingredients" is left alone). Routed to the
+ * attribute slots of a story frame.
+ */
+const STORY_QUALITY_ITEM =
+  /\b(service|staff|team|crew|value|prices?|pricing|atmosphere|ambien[ct]e|vibe|seating|parking|wi-?fi|delivery|booking|reservation|hospitality|welcome|ingredients|flavou?rs|recipes?|craftsmanship|quality|detail|patterns?)\b/i;
+
+function withGeoArt(phrase: string, locale: ReviewLocale): string {
+  if (locale !== "en") return phrase;
+  if (LEADING_DETERMINER.test(phrase)) return phrase;
+  if (SUPERLATIVE_HEAD.test(phrase)) return `the ${phrase}`;
+  const m = /^(.*?)\s+(in|near|around|at|on|by|off)\s+/i.exec(phrase);
+  const headPart = (m ? m[1]! : phrase).trim();
+  const head = headPart.split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
+  if (!COUNT_PLACE_HEADS.has(head)) return phrase;
+  const article = /^[aeiou]/i.test(headPart) && !/^(uni|use|eu|one)/i.test(headPart) ? "an" : "a";
+  return `${article} ${phrase}`;
 }
 
 /**
@@ -2024,6 +2069,10 @@ function attributeShape(kw: string): AttrShape {
   const t = kw.trim();
   if (NEGATIVE_PILL.test(t)) return "negative";
   if (OFFERING_PILL.test(t)) return "offering";
+  // "made in the UAE", "worth the price": a participle or "worth" phrase is a
+  // predicate however noun-like it looks; in an object frame it came out as
+  // "They deserve credit for the made in the UAE" (RMK demo, 2026-09-06).
+  if (STORY_PREDICATE.test(t)) return "predicate";
   if (isQualityNounPhrase(t)) return "noun";
   // A bare noun phrase the quality-adjective test does not recognise ("English
   // -speaking staff", "worldwide shipping", "heirloom quality") still needs an
@@ -2335,6 +2384,8 @@ export function buildLocalizedReview(
   entity?: ReviewEntity,
   keywordTypes?: KeywordTypeMap,
   audience: Audience = "local",
+  /** Free text about the business (category, entity label, name) for the story flavour. */
+  flavorHint = "",
 ): string {
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
@@ -2377,8 +2428,8 @@ export function buildLocalizedReview(
   const keywords = selectWovenKeywords(kwPool, fcUsable, seed);
   // Length bucket is chosen AFTER keyword selection: the woven count decides
   // how short a review can honestly be while keeping every phrase verbatim.
-  const bucket = pickLenBucket(locale, seed, rating, keywords.length);
-  const cfg = { ...LOCALE_CFG[locale], ...bucket };
+  let bucket = pickLenBucket(locale, seed, rating, keywords.length);
+  let cfg = { ...LOCALE_CFG[locale], ...bucket };
   // Geo search phrases are pulled out BEFORE the core/tail machinery: they
   // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
   const typeOf = (k: string) => classifyKeyword(k, keywordTypes, locale);
@@ -2417,6 +2468,66 @@ export function buildLocalizedReview(
     ...shuffledRaw.filter((k) => typeOf(k) !== "attribute"),
     ...shuffledRaw.filter((k) => typeOf(k) === "attribute"),
   ];
+
+  // ---- story path: one authored narrative instead of a stack of slot sentences ----
+  // EN, local audience, visit verticals with a frame family (retail /
+  // restaurant / cafe). The frame absorbs the phrases it has slots for; every
+  // phrase it does not absorb still goes out through the tail machinery below,
+  // so the verbatim guarantee is exactly what it was. See lib/review-stories.ts.
+  let storyText: string | null = null;
+  const family = locale === "en" && audience === "local" ? storyFamilyFor(vertical) : null;
+  if (family) {
+    const rStory = forkRng(seed, 0x57021);
+    // Same spread of lengths as the slot path (short / medium / long, 4-star
+    // shorter), except that a five-phrase selection never lands in a short
+    // frame: the phrases it could not hold would come out as tails, which is
+    // the stack this path exists to avoid.
+    const size: StorySize =
+      keywords.length >= 5 && bucket.kind === "short" ? "medium" : bucket.kind;
+    // An owner sometimes types a service or a quality as an "item" ("friendly
+    // service"). In an object slot that reads "picked up the friendly
+    // service"; as an attribute it reads as it should.
+    const itemIsQuality = (k: string) => typeOf(k) === "item" && STORY_QUALITY_ITEM.test(k);
+    const objs = shuffled
+      .filter((k) => typeOf(k) !== "attribute" && !itemIsQuality(k))
+      .map((k) => withArt(k, isDeclaredItem(k)));
+    const attrsNoun = shuffled
+      .filter((k) => (typeOf(k) === "attribute" && attributeShape(k) === "noun" && !STORY_PREDICATE.test(k)) || itemIsQuality(k))
+      .map((k) => withArt(k));
+    const preds = shuffled.filter(
+      (k) => typeOf(k) === "attribute" && (attributeShape(k) === "predicate" || (attributeShape(k) === "noun" && STORY_PREDICATE.test(k))),
+    );
+    const svcs = svcKws.map((k) => withServiceArt(k));
+    const geos = geoKws.map((k) => withGeoArt(k, locale));
+    // Same fork and salt as the entity decision below, so a frame only names
+    // the place when the entity sentence would have been allowed anyway, and
+    // the later weave then finds the terms present and adds nothing.
+    const placeAllowed = !!decideEntity(entity, vertical, geoKws.length > 0, forkRng(seed, 0xe1a0));
+    const storyArea = readableLocation(entity?.area?.trim() || null, locale);
+    const storyCity = readableLocation(entity?.city?.trim() || null, locale);
+    const story = buildStory({
+      family,
+      flavor: resolveStoryFlavor(flavorHint),
+      size,
+      store: name,
+      cat: entity?.cat?.trim() || null,
+      loc: storyArea ?? storyCity,
+      allowPlace: placeAllowed,
+      objs,
+      ranges: catKws,
+      attrs: attrsNoun,
+      preds,
+      svcs,
+      geos,
+      rng: rStory,
+    });
+    if (story) {
+      storyText = story.text;
+      const base = LEN_BUCKETS.en[story.size];
+      bucket = keywords.length >= 7 ? { ...base, max: Math.round(base.max * 1.15) } : base;
+      cfg = { ...LOCALE_CFG[locale], ...bucket };
+    }
+  }
 
   // Only a small CORE of keywords goes into the {list} sentence (see LIST_CAP);
   // the rest are appended as natural single-keyword tails below. This is the
@@ -2461,14 +2572,18 @@ export function buildLocalizedReview(
   const coreDisplay =
     locale === "en" ? coreKws.map((k) => withArt(k, isDeclaredItem(k))) : coreKws;
   let text =
-    coreKws.length === 0
+    storyText ??
+    (coreKws.length === 0
       ? reviewNoKeywords(name, pool, cfg, seed, locale)
-      : buildInner(name, coreDisplay, pool, cfg, compact, seed, locale);
+      : buildInner(name, coreDisplay, pool, cfg, compact, seed, locale));
   // protect ALL verbatim keywords from length-trimming, not just the core ones.
   // Reserve room for what still has to be woven after this pass: at least one
   // keyword tail and the entity sentence. Without the reserve the filler pass
   // ate the whole budget and the review ran two beats long anyway.
-  text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled, locale, Math.max(3, sentenceBudget(bucket.kind) - 2));
+  // A story frame is sized by its author; it is neither padded nor trimmed here.
+  if (!storyText) {
+    text = tuneLength(text, name, pool, cfg, seed, 0x301, shuffled, locale, Math.max(3, sentenceBudget(bucket.kind) - 2));
+  }
 
   if (!text.includes(name)) {
     text = appendToLast(text, `(${name})`, cfg.glue);
@@ -2714,7 +2829,7 @@ export function buildLocalizedReview(
     for (const gkw of geoKws) {
       if (text.includes(gkw)) continue;
       const tpl = geoOrder[gi++ % geoOrder.length]!;
-      text = appendSpread(text, fill(tpl, { kw: withSuperlativeArt(gkw, locale) }), cfg.glue, tailSpread, locale, name);
+      text = appendSpread(text, fill(tpl, { kw: withGeoArt(gkw, locale) }), cfg.glue, tailSpread, locale, name);
     }
   }
 
@@ -2753,7 +2868,9 @@ export function buildLocalizedReview(
   text = woven.text;
   const protectAll = [...shuffled, ...geoKws, ...catKws, ...svcKws, ...woven.protect];
 
-  text = tuneLength(text, name, pool, cfg, seed, 0x302, protectAll, locale, sentenceBudget(bucket.kind));
+  // A story never takes a generic filler: it is already one piece, and a
+  // platitude appended to it is exactly the seam this path removes.
+  text = tuneLength(text, name, storyText ? { ...pool, fillers: [] } : pool, cfg, seed, 0x302, protectAll, locale, sentenceBudget(bucket.kind));
   // Cap store-name mentions at 2 (SEO-spam tell). Skipped when a woven keyword
   // itself contains the name, so the verbatim-keyword guarantee is never broken.
   if (!protectAll.some((k) => k.includes(name))) {
@@ -2763,7 +2880,9 @@ export function buildLocalizedReview(
   if (locale === "en") text = capitalizeAfterBangPeriodEn(text, [...protectAll, name]);
   text = dedupeTerminators(text);
   if (locale === "en") text = capitalizeSentenceStartsEn(text, [...protectAll, name]);
-  if (locale === "en") text = conjoinShortSentencesEn(text, [...protectAll, name], forkRng(seed, 0xc0a1));
+  // The conjoin pass repairs slot-assembled stacks; on authored prose it only
+  // manufactures run-ons.
+  if (locale === "en" && !storyText) text = conjoinShortSentencesEn(text, [...protectAll, name], forkRng(seed, 0xc0a1));
   // Paragraphing decided ONCE, from the finished text. See layoutParagraphs.
   return layoutParagraphs(text, locale, forkRng(seed, 0x9a17), name);
 }
