@@ -78,6 +78,15 @@ t("check: the store name at most once", () => {
   assert.equal(checkReviewDraft(text, EN_CTX).reason, "store_name_repeated");
 });
 
+t("check: a hedge under a high rating is rejected, unless it is the guest's own words", () => {
+  const hedged = EN_GOOD + " Overall it was just okay though.";
+  assert.equal(checkReviewDraft(hedged, EN_CTX).reason, "hedge:just okay");
+  assert.equal(checkReviewDraft(hedged, { ...EN_CTX, rating: 4 }).reason, "hedge:just okay");
+  assert.equal(checkReviewDraft(hedged, { ...EN_CTX, note: "it was just okay but the staff were lovely" }).ok, true);
+  const ja = "仕事帰りに寄りました。ドーナツはふわふわで、スタッフの方の対応も丁寧でした。味はまあまあです。";
+  assert.equal(checkReviewDraft(ja, { locale: "ja", rating: 4, keywords: ["ふわふわ"], storeName: "x" }).reason, "hedge:まあまあ");
+});
+
 t("note: bounded, single line, printable", () => {
   assert.equal(sanitizeGuestNote("  the pistachio\none\twas   gone fast "), "the pistachio one was gone fast");
   assert.equal(sanitizeGuestNote("x".repeat(500)).length, 200);
@@ -121,6 +130,8 @@ t("prompt: the place line is skipped when a tapped phrase already names the area
   });
   assert.ok(!p.includes("what and where it is"));
   assert.ok(p.includes("25 to 50 words"));
+  assert.ok(p.includes("No reservations, no 'not perfect', no 'just okay'"));
+  assert.ok(!p.includes("reservation is fine"));
   assert.ok(p.includes("They typed nothing else."));
 });
 

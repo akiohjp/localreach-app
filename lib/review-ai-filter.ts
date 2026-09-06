@@ -46,6 +46,41 @@ export const AI_TELL_PHRASES: readonly string[] = [
   "sumptuous",
 ];
 
+/**
+ * Lukewarm wording a happy rating must not carry. 4 and 5 stars are both high
+ * marks, so a draft under either is rejected if it hedges, unless the guest's
+ * own note is what the hedge came from (their words are kept as written).
+ */
+export const HEDGE_PHRASES: readonly string[] = [
+  "just okay",
+  "just ok",
+  "not perfect",
+  "wasn't perfect",
+  "was not perfect",
+  "wasn't quite",
+  "was not quite",
+  "could be better",
+  "could have been better",
+  "nothing special",
+  "room for improvement",
+  "only downside",
+  "the only thing",
+  "a bit disappointing",
+  "slightly disappointing",
+  "not the best",
+  "hit or miss",
+  "so-so",
+  "mediocre",
+  "average at best",
+  "left a bit to be desired",
+  "まあまあ",
+  "普通でした",
+  "いまいち",
+  "イマイチ",
+  "惜しい",
+  "残念",
+];
+
 /** Length rails per locale. Words for EN/AR, characters (no spaces) for JA. */
 export const LENGTH_RAILS: Record<SupportedLocale, { min: number; max: number; unit: "words" | "chars" }> = {
   en: { min: 12, max: 95, unit: "words" },
@@ -124,6 +159,8 @@ export type DraftContext = {
   rating: number;
   keywords: string[];
   storeName: string;
+  /** The guest's own words, when given: a hedge that comes from them is theirs to keep. */
+  note?: string;
 };
 
 /**
@@ -171,6 +208,12 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   const name = ctx.storeName.trim();
   if (name.length >= 3 && countOccurrences(lower, name.toLowerCase()) > 1) {
     return { ok: false, reason: "store_name_repeated" };
+  }
+
+  if (!(ctx.note ?? "").trim()) {
+    for (const phrase of HEDGE_PHRASES) {
+      if (lower.includes(phrase.toLowerCase())) return { ok: false, reason: `hedge:${phrase}` };
+    }
   }
 
   return { ok: true, text: t };

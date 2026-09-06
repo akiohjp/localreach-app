@@ -196,7 +196,7 @@ for (const c of cases) {
         continue;
       }
       const text = cleanReviewDraft(r.text);
-      const verdict = checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store });
+      const verdict = checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store, note: c.note });
       if (verdict.ok) okCount++;
       console.log(`  [${i + 1}] ${r.model} ${r.latencyMs} ms  ${verdict.ok ? "PASS" : `REJECT ${verdict.reason}`}`);
       console.log(`      ${text}`);

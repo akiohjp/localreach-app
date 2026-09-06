@@ -86,10 +86,17 @@ export function lengthRule(locale: SupportedLocale, rating: number): string {
     : "2 to 3 sentences, roughly 25 to 50 words";
 }
 
+/**
+ * 4 and 5 are both high marks. A 4 is a happy customer who is a touch less
+ * effusive, not a customer with a complaint: the first live 4-star drafts
+ * carried "just okay overall" and "wasn't quite our favourite", which read as
+ * a lukewarm review under a rating the guest meant as praise (owner
+ * direction, 2026-09-06). Only the guest's own words may carry a reservation.
+ */
 function toneRule(rating: number): string {
   return rating >= 5
     ? "Clearly happy, still plain. Never mention stars, ratings or scores."
-    : "Warm but measured: it was good, not perfect. One small, generic reservation is fine, but do not invent a specific problem. Never mention stars, ratings or scores.";
+    : "Clearly positive and glad they came, a little more matter-of-fact than gushing. No reservations, no 'not perfect', no 'just okay', nothing that reads as a complaint or a comparison to something better. Never mention stars, ratings or scores.";
 }
 
 export function buildReviewPrompt(p: ReviewPromptInput): string {

@@ -234,7 +234,7 @@ export async function POST(req: Request) {
     lastModel = result.model;
     let text = cleanReviewDraft(result.text);
     if (findBannedTerm(storeName, text)) text = stripBannedSentences(storeName, text);
-    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName });
+    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName, note });
     if (!verdict.ok) {
       lastReason = verdict.reason;
       lastCandidate = text;
