@@ -150,3 +150,9 @@ npx vercel --prod
 2. `GEMINI_API_KEY` が**課金有効**の鍵であること（`node scripts/test-gemini-tier.mjs` → PAID）。無料枠のままだと日次上限で黙ってテンプレートに落ちる。
 3. デプロイ後、マスター管理画面の **AI Draft** トグルで 1 店舗だけ ON → `npm run ai:drafts` で実際の下書きを読む。
 4. `npm run audit:all` に `test:ai-review`（フィルタ・プロンプトの単体チェック）が含まれる。
+
+---
+
+## 7. 短縮 QR リンク（qr.miraireach.ae、2026-09-06 追加）
+
+詳細は [[SHORT-QR-LINKS-JA]]。順番: `20260906180000_store_slugs.sql` を適用 → Cloudflare で CNAME `qr` → `cname.vercel-dns.com`（DNS only）→ Vercel の Domains に `qr.miraireach.ae` を追加 → 環境変数 `NEXT_PUBLIC_QR_HOST=qr.miraireach.ae` を入れて再デプロイ。`/store/<uuid>` は永久に有効。

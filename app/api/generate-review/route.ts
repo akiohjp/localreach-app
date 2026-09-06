@@ -15,6 +15,7 @@ import { checkReviewDraft, cleanReviewDraft, sanitizeGuestNote } from "@/lib/rev
 import { generateWithLadder, reviewModelsFromEnv } from "@/lib/review-ai";
 import { NON_VISIT_VERTICALS, resolveAudience, resolveVertical } from "@/lib/review-pools";
 import { getLocalizedText, type SupportedLocale } from "@/types/database";
+import { qrHost } from "@/lib/store-links";
 
 /**
  * AI guest review draft (Gemini) — public, per-store opt-in.
@@ -74,6 +75,7 @@ function isAllowedOrigin(req: Request): boolean {
     const host = new URL(origin).hostname;
     const app = process.env.NEXT_PUBLIC_APP_URL ? new URL(process.env.NEXT_PUBLIC_APP_URL).hostname : "";
     if (app && host === app) return true;
+    if (host === qrHost()) return true;
     if (host.endsWith(".vercel.app")) return true;
     if (host === "localhost" || host === "127.0.0.1") return true;
   } catch {

@@ -13,6 +13,7 @@ type StoreRow = {
   isActive: boolean
   expiresAt: string | null
   aiDrafts: boolean
+  slug: string | null
   createdAt: string
   customerCount: number
 }
@@ -479,7 +480,7 @@ function AddStoreModal({ onClose, onCreated }: {
 // Main Dashboard
 // ─────────────────────────────────────────────
 
-export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] }) {
+export default function MasterDashboard({ rows: initial, qrHost }: { rows: StoreRow[]; qrHost?: string | null }) {
   const router = useRouter()
   const [rows, setRows]           = useState(initial)
   const [pending, setPending]         = useState<string | null>(null)
@@ -488,6 +489,17 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
   const [infoMsg, setInfoMsg]        = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const [copiedLink, setCopiedLink] = useState<string | null>(null)
+
+  async function copyShortLink(id: string, url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedLink(id)
+      setTimeout(() => setCopiedLink((cur) => (cur === id ? null : cur)), 1500)
+    } catch {
+      window.prompt('Copy the link', url)
+    }
+  }
 
   function openModal()    { setInfoMsg(null); setIsModalOpen(true) }
   function closeModal()   { setIsModalOpen(false) }
@@ -675,6 +687,18 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
                         <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                           {row.id.slice(0, 8)}&hellip;
                         </p>
+                        {qrHost && row.slug && (
+                          <button
+                            type="button"
+                            onClick={() => copyShortLink(row.id, `https://${qrHost}/${row.slug}`)}
+                            title="Copy the short guest link"
+                            className="mt-1 inline-flex items-center gap-1 text-[11px] font-mono text-slate-500
+                              hover:text-slate-900 transition-colors"
+                          >
+                            {copiedLink === row.id ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+                            {qrHost}/{row.slug}
+                          </button>
+                        )}
                       </div>
                       <button
                         onClick={() => handleExportCSV(row.id, row.name)}

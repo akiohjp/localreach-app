@@ -7,6 +7,7 @@ import { isStoreCurrentlyActive } from '@/lib/subscription'
 import { getLocalizedText } from '@/types/database'
 import { localesForStore } from '@/lib/guest-locales'
 import { qrPngDataUrl } from '@/lib/qr'
+import { guestReviewUrl } from '@/lib/store-links'
 import PrintCard from './PrintCard'
 
 export const metadata: Metadata = {
@@ -37,7 +38,7 @@ export default async function PrintCardPage({
     const proto = h.get('x-forwarded-proto') ?? 'https'
     appUrl = host ? `${proto}://${host}` : 'http://localhost:3000'
   }
-  const storeUrl = `${appUrl}/store/${store.id}`
+  const storeUrl = guestReviewUrl(store, appUrl)
 
   // 1024px so the QR stays crisp at print DPI — the dashboard's 320px preview
   // is a screen thumbnail and prints visibly soft at card size.

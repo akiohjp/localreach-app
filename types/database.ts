@@ -105,6 +105,8 @@ export type Database = {
           reply_settings?: ReplySettings | null;
           /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
           ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
           /** Google Place ID for results reporting (rating/review-count snapshots). */
           google_place_id?: string | null;
 
@@ -137,6 +139,8 @@ export type Database = {
           reply_settings?: ReplySettings | null;
           /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
           ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
 
           created_at?: string;
           updated_at?: string;
@@ -167,6 +171,8 @@ export type Database = {
           reply_settings?: ReplySettings | null;
           /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
           ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
 
           created_at?: string;
           updated_at?: string;
@@ -439,6 +445,8 @@ export type Database = {
           contact_dial_code: string;
           /** Whether the QR page should ask /api/generate-review for a Gemini draft first. */
           ai_review_enabled: boolean;
+          /** Short-link code; the /r/[slug] page looks stores up by it. */
+          slug: string;
         };
         Relationships: [];
       };

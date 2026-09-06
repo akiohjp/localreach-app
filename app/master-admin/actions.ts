@@ -10,6 +10,8 @@ export type NewStoreRow = {
   expiresAt: string | null
   /** stores.ai_review_enabled — Gemini guest drafts (billed per call). */
   aiDrafts: boolean
+  /** stores.slug — short guest link code (DB-generated; null until the page refreshes). */
+  slug: string | null
   createdAt: string
   customerCount: number
 }
@@ -184,6 +186,7 @@ export async function createStore(payload: {
         isActive: store.is_active,
         expiresAt: null,
         aiDrafts: false,
+        slug: null,
         createdAt: store.created_at,
         customerCount: 0,
       },
