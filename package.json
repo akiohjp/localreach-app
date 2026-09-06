@@ -17,6 +17,7 @@
     "test:links": "npx tsx scripts/test-store-links.mjs",
     "ai:sample": "npx tsx scripts/test-gemini-review.mjs",
     "ai:drafts": "npx tsx scripts/read-ai-drafts.mjs",
+    "sales:list": "npx tsx scripts/sales-list.mjs",
     "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal && npm run test:ai-review && npm run test:links"
   },
   "dependencies": {
