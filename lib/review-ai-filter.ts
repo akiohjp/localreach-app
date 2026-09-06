@@ -83,9 +83,9 @@ export const HEDGE_PHRASES: readonly string[] = [
 
 /** Length rails per locale. Words for EN/AR, characters (no spaces) for JA. */
 export const LENGTH_RAILS: Record<SupportedLocale, { min: number; max: number; unit: "words" | "chars" }> = {
-  en: { min: 12, max: 95, unit: "words" },
-  ar: { min: 10, max: 90, unit: "words" },
-  ja: { min: 25, max: 220, unit: "chars" },
+  en: { min: 12, max: 130, unit: "words" },
+  ar: { min: 10, max: 120, unit: "words" },
+  ja: { min: 25, max: 280, unit: "chars" },
 };
 
 /** The guest's optional free-text line: bounded, printable, one line. */

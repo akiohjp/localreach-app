@@ -65,7 +65,7 @@ t("check: quotes, emoji, hashtags, scores, contact details, markdown are rejecte
 
 t("check: length rails per locale", () => {
   assert.equal(checkReviewDraft("Friendly Staff, Fresh doughnuts, nice.", EN_CTX).reason, "too_short:5");
-  const long = Array.from({ length: 40 }, () => "very").join(" ") + " " + EN_GOOD + " " + Array.from({ length: 30 }, () => "nice").join(" ");
+  const long = Array.from({ length: 80 }, () => "very").join(" ") + " " + EN_GOOD + " " + Array.from({ length: 30 }, () => "nice").join(" ");
   assert.ok(checkReviewDraft(long, EN_CTX).reason.startsWith("too_long:"));
   const ja = "仕事帰りに寄りました。ドーナツが本当にふわふわで、スタッフの方の対応も丁寧でした。また買いに行きます。";
   assert.equal(measureLength(ja, "ja"), ja.length);
@@ -129,7 +129,8 @@ t("prompt: the place line is skipped when a tapped phrase already names the area
     categoryNoun: "doughnut shop",
   });
   assert.ok(!p.includes("what and where it is"));
-  assert.ok(p.includes("25 to 50 words"));
+  assert.ok(p.includes("45 to 75 words"));
+  assert.ok(p.includes("Never from new facts."));
   assert.ok(p.includes("No reservations, no 'not perfect', no 'just okay'"));
   assert.ok(!p.includes("reservation is fine"));
   assert.ok(p.includes("They typed nothing else."));
@@ -140,7 +141,7 @@ t("prompt: service businesses and visitor audiences change the voice rules", () 
   assert.ok(p.includes("service business"));
   assert.ok(p.includes("visiting the city"));
   const ja = buildReviewPrompt({ storeName: "麺屋", locale: "ja", rating: 5, keywords: ["つけ麺"] });
-  assert.ok(ja.includes("60〜160 文字程度"));
+  assert.ok(ja.includes("110〜200 文字程度"));
   assert.ok(ja.includes("Language: Japanese"));
 });
 

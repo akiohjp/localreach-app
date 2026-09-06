@@ -76,14 +76,21 @@ function hintFor(kw: string, types?: Record<string, string> | null): string {
   return "as written";
 }
 
+/**
+ * Length: the first live drafts ran 35 to 65 words, which the owner read as a
+ * little short next to real Google reviews (2026-09-06). Raised by about a
+ * third; the extra length has to come from the tapped phrases, not from new
+ * facts (see the rule in buildReviewPrompt), or a longer draft is just a
+ * longer place to invent things.
+ */
 export function lengthRule(locale: SupportedLocale, rating: number): string {
   const happy = rating >= 5;
   if (locale === "ja") {
-    return happy ? "2〜4 文、60〜160 文字程度" : "2〜3 文、50〜120 文字程度";
+    return happy ? "3〜5 文、110〜200 文字程度" : "3〜4 文、90〜160 文字程度";
   }
   return happy
-    ? "2 to 4 sentences, roughly 30 to 70 words"
-    : "2 to 3 sentences, roughly 25 to 50 words";
+    ? "3 to 5 sentences, roughly 55 to 90 words"
+    : "3 to 4 sentences, roughly 45 to 75 words";
 }
 
 /**
@@ -143,6 +150,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   const rules: string[] = [
     `- First person, past tense, one paragraph, ${lengthRule(p.locale, rating)}. ${toneRule(rating)}`,
     "- Sound like a person typing on their phone right after: everyday words, uneven sentence length, no polish. A slightly flat sentence beats a fancy one.",
+    "- Get the length from saying a little more about each tapped phrase (what it was actually like, why it mattered to them) and from how they felt about the place as a whole. Never from new facts.",
   ];
   if (keywords.length) {
     rules.push(
