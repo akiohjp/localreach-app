@@ -23,7 +23,7 @@ function t(name, fn) {
 
 const EN_CTX = { locale: "en", rating: 5, keywords: ["Friendly Staff", "Fresh doughnuts"], storeName: "Let It Dough" };
 const EN_GOOD =
-  "Went in for a quick coffee and ended up staying longer than planned. The Friendly Staff kept checking on us without hovering, and the Fresh doughnuts were still warm. Easy place to recommend.";
+  "Went in for a quick coffee and ended up staying longer than planned. The Friendly Staff kept checking on us without hovering, and the Fresh doughnuts were still warm when they came out. We ended up taking a box home as well and they were just as good the next morning. Easy place to recommend.";
 
 t("clean: strips fences, quotes, labels; one paragraph; no long dashes", () => {
   const raw = '```\n"Review: Loved it — really.\n\nWill be back – soon."\n```';
@@ -49,7 +49,7 @@ t("check: AI tells are rejected unless the guest tapped them", () => {
   assert.equal(checkReviewDraft(text, EN_CTX).ok, false);
   assert.equal(checkReviewDraft(text, EN_CTX).reason, "ai_tell:hidden gem");
   const tapped = { ...EN_CTX, keywords: ["Hidden Gem"] };
-  const okText = "Honestly a Hidden Gem for a weekday breakfast, and the coffee was fine too, nothing fancy about the place.";
+  const okText = "Honestly a Hidden Gem for a weekday breakfast, and the coffee was fine too, nothing fancy about the place. We sat by the window for a good hour and nobody rushed us, which is rare around here, and the pastries kept coming out warm from the back.";
   assert.equal(checkReviewDraft(okText, tapped).ok, true);
   assert.ok(AI_TELL_PHRASES.includes("nestled"));
 });
@@ -69,10 +69,14 @@ t("check: length rails per locale", () => {
   assert.equal(checkReviewDraft("Friendly Staff, Fresh doughnuts, nice.", EN_CTX).reason, "too_short:5");
   const long = Array.from({ length: 80 }, () => "very").join(" ") + " " + EN_GOOD + " " + Array.from({ length: 30 }, () => "nice").join(" ");
   assert.ok(checkReviewDraft(long, EN_CTX).reason.startsWith("too_long:"));
-  const ja = "仕事帰りに寄りました。ドーナツが本当にふわふわで、スタッフの方の対応も丁寧でした。また買いに行きます。";
+  const ja = "仕事帰りに寄りました。ドーナツが本当にふわふわで、口に入れた瞬間に生地の軽さが分かります。スタッフの方の対応も丁寧で、初めてでも選びやすいように一つずつ説明してくれました。箱で持ち帰った分も翌朝まで美味しかったので、また買いに行きます。";
   assert.equal(measureLength(ja, "ja"), ja.length);
   assert.equal(checkReviewDraft(ja, { locale: "ja", rating: 5, keywords: ["ふわふわ"], storeName: "レット・イット・ドウ" }).ok, true);
   assert.equal(checkReviewDraft("短いです。", { locale: "ja", rating: 5, keywords: [], storeName: "x" }).reason, "too_short:5");
+  // The floor depends on the rating: 38 words is thin for a 5 and fine for a 4.
+  const thin = "Best udon in Dubai. I came here for the handmade udon noodles and was really impressed by the authentic sanuki-style udon. I ordered the Niku Beef udon alongside the Paitan Chicken, and everything tasted so fresh and comforting, start to finish.";
+  assert.equal(checkReviewDraft(thin, { locale: "en", rating: 5, keywords: [], storeName: "Maru Udon" }).reason, "too_short:41");
+  assert.equal(checkReviewDraft(thin, { locale: "en", rating: 4, keywords: [], storeName: "Maru Udon" }).ok, true);
 });
 
 t("check: the store name at most once", () => {
@@ -122,7 +126,7 @@ t("prompt: the place line is skipped when a tapped phrase already names the area
     categoryNoun: "doughnut shop",
   });
   assert.ok(!p.includes("what and where it is"));
-  assert.ok(p.includes("45 to 75 words"));
+  assert.ok(p.includes("55 to 90 words"));
   assert.ok(p.includes("Never from new facts."));
   assert.ok(p.includes("No reservations, no 'not perfect', no 'just okay'"));
   assert.ok(!p.includes("reservation is fine"));
@@ -134,7 +138,7 @@ t("prompt: service businesses and visitor audiences change the voice rules", () 
   assert.ok(p.includes("service business"));
   assert.ok(p.includes("visiting the city"));
   const ja = buildReviewPrompt({ storeName: "麺屋", locale: "ja", rating: 5, keywords: ["つけ麺"] });
-  assert.ok(ja.includes("110〜200 文字程度"));
+  assert.ok(ja.includes("140〜240 文字程度"));
   assert.ok(ja.includes("Language: Japanese"));
 });
 

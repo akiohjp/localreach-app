@@ -93,6 +93,17 @@ const CASES = [
     note: "",
   },
   {
+    // The owner's 2026-09-06 test: four taps plus a short note came back at 38
+    // words. A note must not shrink the draft.
+    store: "Maru Udon",
+    category: "japanese restaurant",
+    entity: { area: "Business Bay", city: "Dubai", noun: { en: "udon restaurant", ja: "うどん店", ar: "مطعم أودون" } },
+    keywords: ["handmade udon noodles", "sanuki-style udon", "Niku Beef udon", "Paitan Chicken"],
+    keywordTypes: { "handmade udon noodles": "category", "sanuki-style udon": "category", "Niku Beef udon": "item", "Paitan Chicken": "item" },
+    rating: 5,
+    note: "Best udon in dubai",
+  },
+  {
     // Soft-ban fixture: Cinar never says "carpet", but guests search with it.
     // The phrase may carry the word; nothing else in the draft may.
     store: "Cinar Rugs Dubai",

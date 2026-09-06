@@ -89,13 +89,16 @@ function hintFor(kw: string, types?: Record<string, string> | null): string {
  * longer place to invent things.
  */
 export function lengthRule(locale: SupportedLocale, rating: number): string {
+  // Stated a notch above the real target: the lite models undershoot a length
+  // instruction by roughly a fifth (measured 2026-09-06), and the filter's
+  // floor (LENGTH_RAILS) catches the ones that still come back thin.
   const happy = rating >= 5;
   if (locale === "ja") {
-    return happy ? "3〜5 文、110〜200 文字程度" : "3〜4 文、90〜160 文字程度";
+    return happy ? "4〜6 文、140〜240 文字程度" : "3〜5 文、110〜190 文字程度";
   }
   return happy
-    ? "3 to 5 sentences, roughly 55 to 90 words"
-    : "3 to 4 sentences, roughly 45 to 75 words";
+    ? "4 to 6 sentences, roughly 70 to 110 words"
+    : "3 to 5 sentences, roughly 55 to 90 words";
 }
 
 /**
@@ -157,7 +160,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   const rules: string[] = [
     `- First person, past tense, one paragraph, ${lengthRule(p.locale, rating)}. ${toneRule(rating)}`,
     "- Sound like a person typing on their phone right after: everyday words, uneven sentence length, no polish. A slightly flat sentence beats a fancy one.",
-    "- Get the length from saying a little more about each tapped phrase (what it was actually like, why it mattered to them) and from how they felt about the place as a whole. Never from new facts.",
+    "- Get the length from the tapped phrases: give each one its own sentence or two about what it was actually like (texture, taste, how it felt, how it compared to what they expected) and why it mattered to them, then close with how they felt about the place as a whole or who they would send there. Never from new facts.",
   ];
   if (keywords.length) {
     rules.push(
@@ -166,11 +169,11 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   }
   if (note) {
     rules.push(
-      "- Their own words are the heart of the review: keep every detail and the meaning, fix only grammar and spelling, translate into the review language if needed, and add nothing they did not say.",
+      "- Their own words are the heart of the review: keep every detail and the meaning (fix grammar, spelling and capitalisation; translate into the review language if needed) and never contradict them. Their words are the core, not the whole review: still write to the full length above by going into the tapped phrases, and do not add facts that are in neither.",
     );
   }
   rules.push(
-    "- Do not invent specifics: no dishes, products, prices, names, dates, waiting times, occasions or companions beyond what is given above. If all you know is a phrase, stay at the level of that phrase.",
+    "- Do not invent specifics: no dishes, products, prices, names, dates, waiting times, occasions or companions beyond what is given above. If all you know is a phrase, stay at the level of that phrase. Several tapped dishes or items simply means they had them; never invent a partner or friend to explain who had what.",
     `- Mention "${store}" at most once, or not at all. Do not start the review with the business name.`,
   );
   if (place) {

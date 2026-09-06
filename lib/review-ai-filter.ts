@@ -46,11 +46,16 @@ export const AI_TELL_PHRASES: readonly string[] = [
   "sumptuous",
 ];
 
-/** Length rails per locale. Words for EN/AR, characters (no spaces) for JA. */
-export const LENGTH_RAILS: Record<SupportedLocale, { min: number; max: number; unit: "words" | "chars" }> = {
-  en: { min: 12, max: 130, unit: "words" },
-  ar: { min: 10, max: 120, unit: "words" },
-  ja: { min: 25, max: 280, unit: "chars" },
+/**
+ * Length rails per locale. Words for EN/AR, characters (no spaces) for JA.
+ * The floor depends on the rating (a 5 is expected to say more than a 4):
+ * a draft under it is regenerated, because "thin" was the owner's reading of
+ * a 38-word draft on 2026-09-06.
+ */
+export const LENGTH_RAILS: Record<SupportedLocale, { min4: number; min5: number; max: number; unit: "words" | "chars" }> = {
+  en: { min4: 35, min5: 45, max: 130, unit: "words" },
+  ar: { min4: 30, min5: 40, max: 120, unit: "words" },
+  ja: { min4: 75, min5: 100, max: 300, unit: "chars" },
 };
 
 /** The guest's optional free-text line: bounded, printable, one line. */
@@ -134,11 +139,6 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   const t = text.trim();
   if (!t) return { ok: false, reason: "empty" };
 
-  const rails = LENGTH_RAILS[ctx.locale];
-  const len = measureLength(t, ctx.locale);
-  if (len < rails.min) return { ok: false, reason: `too_short:${len}` };
-  if (len > rails.max) return { ok: false, reason: `too_long:${len}` };
-
   if (EMOJI_RE.test(t)) return { ok: false, reason: "emoji" };
   if (HASHTAG_RE.test(t)) return { ok: false, reason: "hashtag" };
   if (/\*\*|^#{1,6}\s|```/m.test(t)) return { ok: false, reason: "markdown" };
@@ -172,6 +172,13 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   if (name.length >= 3 && countOccurrences(lower, name.toLowerCase()) > 1) {
     return { ok: false, reason: "store_name_repeated" };
   }
+
+  // Length last, so a draft with a content defect reports that defect.
+  const rails = LENGTH_RAILS[ctx.locale];
+  const len = measureLength(t, ctx.locale);
+  const min = ctx.rating >= 5 ? rails.min5 : rails.min4;
+  if (len < min) return { ok: false, reason: `too_short:${len}` };
+  if (len > rails.max) return { ok: false, reason: `too_long:${len}` };
 
   return { ok: true, text: t };
 }
