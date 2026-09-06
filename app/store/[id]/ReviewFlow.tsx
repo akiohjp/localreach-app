@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createReviewNonce, generateReview } from '@/lib/assembler'
 import StepRating from '@/components/StepRating'
 import StepKeywords from '@/components/StepKeywords'
@@ -53,6 +53,17 @@ const LANG_LABEL: Record<SupportedLocale, string> = {
  */
 const GENERATE_DELAY_MS = 900
 
+/**
+ * AI drafts: how long the client waits for /api/generate-review before the
+ * template engine answers instead. The route's own budget is 7.5 s, so a
+ * normal failure returns well before this; the timeout is for a hung socket.
+ */
+const AI_TIMEOUT_MS = 9000
+/** The "crafting" bar's duration while the model writes (typical 2-3 s). */
+const AI_GENERATE_DELAY_MS = 2600
+/** Route calls per guest flow (first draft + rewrites); beyond it, template. */
+const AI_MAX_CALLS = 3
+
 type Props = {
   storeId: string
   storeName: string       // pre-resolved by Server Component (locale-aware)
@@ -84,6 +95,12 @@ type Props = {
   entityCategoryLabel?: Record<string, string> | null
   /** stores.keyword_types — what each keyword names. See classifyKeyword. */
   keywordTypes?: Record<string, string> | null
+  /**
+   * stores.ai_review_enabled — ask /api/generate-review for a Gemini-written
+   * draft first. The template engine stays the fallback on any failure, so a
+   * store with this on never loses the instant path. Master-admin switch.
+   */
+  aiDrafts?: boolean
 }
 
 export default function ReviewFlow({
@@ -105,6 +122,7 @@ export default function ReviewFlow({
   entityCity,
   entityCategoryLabel,
   keywordTypes,
+  aiDrafts = false,
 }: Props) {
   const entity = {
     area: entityArea ?? null,
@@ -127,6 +145,12 @@ export default function ReviewFlow({
   // The guest picks which language the REVIEW is generated in (independent of the
   // page UI). Defaults to the page locale.
   const [reviewLocale, setReviewLocale] = useState<SupportedLocale>(locale)
+  // The guest's optional own words (AI drafts only). Not persisted: it feeds
+  // the generation that follows it and the rewrites on the result screen.
+  const [guestNote, setGuestNote] = useState('')
+  // Route calls in this guest's flow. A shared staff tablet starts a new flow
+  // per guest (reset / proceedToGenerate), so the cap is per flow, not per load.
+  const aiCalls = useRef(0)
 
   // Options for the review-language picker: the page locale first, then the other
   // locales THIS store offers. It used to always append EN + AR (a UAE-only
@@ -186,9 +210,62 @@ export default function ReviewFlow({
    */
   const [forcedOffered, setForcedOffered] = useState<string[]>([])
 
+  /** The zero-API draft. One place for the options every call site shares. */
+  function templateDraft(kws: string[], loc: SupportedLocale, ratingValue: number): string {
+    return generateReview(storeName, kws, {
+      nonce: createReviewNonce(),
+      outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
+      locale: loc,
+      category: businessCategory,
+      rating: ratingValue,
+      entity,
+      keywordTypes,
+    })
+  }
+
+  /**
+   * Ask the route for a Gemini draft. Null on every failure path (switch off,
+   * nothing to write, cap, limit, timeout, rejected draft) so the caller falls
+   * back to the template engine without caring why.
+   */
+  async function requestAiDraft(
+    kws: string[],
+    loc: SupportedLocale,
+    ratingValue: number,
+    note: string,
+  ): Promise<string | null> {
+    if (!aiDrafts) return null
+    if (kws.length === 0 && !note.trim()) return null
+    if (aiCalls.current >= AI_MAX_CALLS) return null
+    const attempt = aiCalls.current
+    aiCalls.current += 1
+    try {
+      const res = await fetch('/api/generate-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, keywords: kws, locale: loc, rating: ratingValue, note, attempt }),
+        signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+      })
+      if (!res.ok) return null
+      const data = (await res.json()) as { review?: unknown }
+      return typeof data.review === 'string' && data.review.trim() ? data.review.trim() : null
+    } catch {
+      return null
+    }
+  }
+
+  /** AI first when the store has it on; template otherwise or on any failure. */
+  async function draftFor(kws: string[], loc: SupportedLocale, ratingValue: number, note: string): Promise<string> {
+    return (await requestAiDraft(kws, loc, ratingValue, note)) ?? templateDraft(kws, loc, ratingValue)
+  }
+
   // ratingValue is passed explicitly because handleRating calls this right
   // after setRating — the `rating` state is still stale in that same tick.
-  async function proceedToGenerate(guestSelected: string[], ratingValue: number = rating) {
+  async function proceedToGenerate(
+    guestSelected: string[],
+    ratingValue: number = rating,
+    note: string = guestNote,
+  ) {
     // Exactly what the guest left switched on — nothing is appended here. The
     // store's core phrases reach this point only because the guest kept them
     // ticked in StepKeywords, which is what makes them the guest's own content
@@ -196,18 +273,13 @@ export default function ReviewFlow({
     const merged = dedupeKeywords(guestSelected)
     setSelectedKeywords(merged)
     setStep('generating')
-    await new Promise((r) => setTimeout(r, GENERATE_DELAY_MS))
-    setReviewText(
-      generateReview(storeName, merged, {
-        nonce: createReviewNonce(),
-        outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
-        locale: reviewLocale,
-        category: businessCategory,
-        rating: ratingValue,
-        entity,
-        keywordTypes,
-      }),
-    )
+    aiCalls.current = 0
+    // The template engine is instant; the AI route is not. Both keep the short
+    // "crafting" beat so the step registers; the AI wait is bounded by the
+    // route's budget and AI_TIMEOUT_MS before the template answers instead.
+    const minWait = new Promise((r) => setTimeout(r, GENERATE_DELAY_MS))
+    const [, text] = await Promise.all([minWait, draftFor(merged, reviewLocale, ratingValue, note)])
+    setReviewText(text)
     setStep('result')
   }
 
@@ -215,17 +287,9 @@ export default function ReviewFlow({
    * Regenerate the current review in a specific language (guest picked it on the
    * result step). Returns the new text so StepResult can swap its local copy.
    */
-  function generateInLocale(loc: SupportedLocale): string {
+  async function generateInLocale(loc: SupportedLocale): Promise<string> {
     setReviewLocale(loc)
-    const next = generateReview(storeName, selectedKeywords, {
-      nonce: createReviewNonce(),
-      outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
-      locale: loc,
-      category: businessCategory,
-      rating,
-      entity,
-      keywordTypes,
-    })
+    const next = await draftFor(selectedKeywords, loc, rating, guestNote)
     setReviewText(next)
     return next
   }
@@ -277,8 +341,9 @@ export default function ReviewFlow({
     setForcedOffered(picked)
   }
 
-  async function handleKeywords(guestSelected: string[]) {
-    await proceedToGenerate(guestSelected)
+  async function handleKeywords(guestSelected: string[], note: string) {
+    setGuestNote(note)
+    await proceedToGenerate(guestSelected, rating, note)
   }
 
   const cleanForced = [...new Set(forcedKeywords.map((k) => k.trim()).filter(Boolean))]
@@ -309,6 +374,8 @@ export default function ReviewFlow({
     setReviewText('')
     setSelectedKeywords([])
     setReviewLocale(locale)
+    setGuestNote('')
+    aiCalls.current = 0
   }
 
   return (
@@ -381,12 +448,18 @@ export default function ReviewFlow({
               keywords={pillKeywords}
               allowGuestSkip={allowGuestKeywordSkip}
               initialSelected={forcedOffered}
+              noteEnabled={aiDrafts}
               onConfirm={handleKeywords}
             />
           )}
 
           {step === 'generating' && (
-            <StepGenerating t={t} brandColor={brandColor} durationMs={GENERATE_DELAY_MS} />
+            <StepGenerating
+              t={t}
+              brandColor={brandColor}
+              durationMs={aiDrafts ? AI_GENERATE_DELAY_MS : GENERATE_DELAY_MS}
+              subtitle={aiDrafts ? t.generating.subtitleAi : undefined}
+            />
           )}
 
           {step === 'result' && (
@@ -403,16 +476,7 @@ export default function ReviewFlow({
               onReviewTextChange={setReviewText}
               contactChannel={contactChannel}
               contactDialCode={contactDialCode ?? undefined}
-              onRegenerate={() =>
-                generateReview(storeName, selectedKeywords, {
-                  nonce: createReviewNonce(),
-                  outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
-                  locale: reviewLocale,
-                  category: businessCategory,
-                            rating,
-                  entity,
-                  keywordTypes,
-                })}
+              onRegenerate={() => draftFor(selectedKeywords, reviewLocale, rating, guestNote)}
             />
           )}
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, X, Eye, EyeOff, Loader2, Plus, BarChart2, Copy, Printer, Check, LogOut } from 'lucide-react'
-import { createStore, masterSetStoreActive, masterSetStoreExpiry, masterExportCustomersCsv } from './actions'
+import { createStore, masterSetStoreActive, masterSetStoreExpiry, masterSetStoreAiDrafts, masterExportCustomersCsv } from './actions'
 import { logoutMasterAction } from './login/actions'
 import type { NewStoreRow } from './actions'
 
@@ -12,6 +12,7 @@ type StoreRow = {
   name: string
   isActive: boolean
   expiresAt: string | null
+  aiDrafts: boolean
   createdAt: string
   customerCount: number
 }
@@ -520,6 +521,21 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
     setPending(null)
   }
 
+  async function toggleAiDrafts(id: string, current: boolean) {
+    setPending(id)
+    setError(null)
+    const res = await masterSetStoreAiDrafts(id, !current)
+
+    if (!res.ok) {
+      setError(`Failed to update AI drafts for ${id.slice(0, 8)}: ${res.error}`)
+    } else {
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, aiDrafts: !current } : r)),
+      )
+    }
+    setPending(null)
+  }
+
   async function setExpiry(id: string, dateInput: string) {
     const expiresAt = dubaiDateInputToExpiry(dateInput)
     setPending(id)
@@ -572,7 +588,9 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
               Toggle <span className="font-semibold">is_active</span> to enable or disable any store.
               Set <span className="font-semibold">Contract End</span> to auto-lock a store when its
               subscription lapses (access lasts through that day, Dubai time). Inactive or expired
-              stores redirect all visitors to the Service Inactive page.
+              stores redirect all visitors to the Service Inactive page.{' '}
+              <span className="font-semibold">AI Draft</span> gives that store&apos;s guests a
+              Gemini-written draft instead of the offline template (billed per call; off by default).
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-start sm:pt-0.5 relative z-10">
@@ -638,6 +656,9 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
                 </th>
                 <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
                   Contract End
+                </th>
+                <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
+                  AI Draft
                 </th>
                 <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
                   Status
@@ -714,6 +735,34 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
                     <div className="flex items-center justify-center gap-3">
                       <span
                         className={`text-xs font-semibold w-14 text-center ${
+                          row.aiDrafts ? 'text-amber-600' : 'text-slate-400'
+                        }`}
+                      >
+                        {row.aiDrafts ? 'Gemini' : 'Template'}
+                      </span>
+                      <button
+                        onClick={() => toggleAiDrafts(row.id, row.aiDrafts)}
+                        disabled={pending === row.id}
+                        aria-label={row.aiDrafts ? 'Switch AI drafts off' : 'Switch AI drafts on'}
+                        title="Guests get a Gemini-written draft (billed per call). Off = offline template engine."
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
+                          border-2 border-transparent transition-colors duration-200
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          ${row.aiDrafts ? 'bg-amber-500' : 'bg-gray-300'}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
+                            bg-white shadow ring-0 transition duration-200 ease-in-out
+                            ${row.aiDrafts ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-center gap-3">
+                      <span
+                        className={`text-xs font-semibold w-14 text-center ${
                           !row.isActive
                             ? 'text-slate-400'
                             : isExpired(row.expiresAt)
@@ -745,7 +794,7 @@ export default function MasterDashboard({ rows: initial }: { rows: StoreRow[] })
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
                     No stores found.
                   </td>
                 </tr>

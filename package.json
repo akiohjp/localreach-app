@@ -13,7 +13,10 @@
     "test:replies": "npx tsx scripts/test-reply-generation.mjs",
     "test:rating-only": "npx tsx scripts/test-rating-only.mjs",
     "check:rating-goal": "npx tsx scripts/check-rating-goal.mjs",
-    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal"
+    "test:ai-review": "npx tsx scripts/test-ai-review-filters.mjs",
+    "ai:sample": "npx tsx scripts/test-gemini-review.mjs",
+    "ai:drafts": "npx tsx scripts/read-ai-drafts.mjs",
+    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal && npm run test:ai-review"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

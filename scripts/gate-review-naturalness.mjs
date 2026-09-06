@@ -53,6 +53,11 @@ const ALL_LOCALES = has("all-locales");
 // honest on a store narrowed to a handful of pills (the sales demo store) —
 // with sixteen pills this is 65,536 cases, not a check.
 const EXHAUSTIVE = has("exhaustive");
+// Judge pre-written reviews instead of generating them: a JSON array of
+// {store, locale, category, taps, text} (scripts/test-gemini-review.mjs --out
+// and scripts/read-ai-drafts.mjs --out write it). Same question, same two-run
+// rule; only the source of the reviews changes.
+const INPUT = arg("input", "");
 // 10 whole reviews per call. The unit of JUDGEMENT is still one review — each
 // is delimited and answered separately — but the unit of BILLING is the call,
 // and the free tier counts calls, not reviews. At 6 a 30-review run cost 10
@@ -71,7 +76,7 @@ function loadEnv() {
       if (m) process.env[m[1]] ??= m[2].replace(/^"|"$/g, "");
     }
   }
-  for (const k of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GEMINI_API_KEY"]) {
+  for (const k of INPUT ? ["GEMINI_API_KEY"] : ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GEMINI_API_KEY"]) {
     if (!process.env[k]) throw new Error(`missing env: ${k}`);
   }
 }
@@ -240,7 +245,7 @@ function tapsFor(forced, guest, i, keywordTypes) {
   return picked;
 }
 
-const rows = await fetchStores();
+const rows = INPUT ? [] : await fetchStores();
 const stores = rows
   .map((s) => {
     const name = s.store_name?.en ?? Object.values(s.store_name ?? {})[0] ?? "";
@@ -256,8 +261,29 @@ const stores = rows
   .filter((s) => s.name && ((s.row.keywords ?? []).length || (s.row.forced_keywords ?? []).length))
   .filter((s) => !ONLY || s.name.toLowerCase().includes(ONLY.toLowerCase()));
 
+if (INPUT) {
+  const items = JSON.parse(fs.readFileSync(INPUT, "utf8"));
+  const groups = new Map();
+  for (const it of items) {
+    if (!it?.text) continue;
+    const locale = it.locale ?? "en";
+    const key = `${it.store}\u0000${locale}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        row: { business_category: it.category ?? null, keywords: [], forced_keywords: [] },
+        name: String(it.store ?? "?"),
+        shipped: [locale],
+        pre: [],
+      });
+    }
+    const g = groups.get(key);
+    g.pre.push({ i: g.pre.length, taps: it.taps ?? [], text: it.text });
+  }
+  stores.push(...groups.values());
+}
+
 if (stores.length === 0) {
-  console.log(`no live store matched --store=${ONLY}`);
+  console.log(INPUT ? `no reviews in ${INPUT}` : `no live store matched --store=${ONLY}`);
   process.exitCode = 1;
 }
 
@@ -310,7 +336,9 @@ for (const st of stores) {
   for (const locale of locales) {
     const pills = [...new Set([...forced, ...guest])];
     let cases;
-    if (EXHAUSTIVE) {
+    if (st.pre) {
+      cases = [];
+    } else if (EXHAUSTIVE) {
       cases = [[]];
       for (const pill of pills) {
         const len = cases.length;
@@ -327,7 +355,7 @@ for (const st of stores) {
       cases = Array.from({ length: N }, (_, i) => [...new Set(tapsFor(forced, guest, i, s.keyword_types ?? null))]);
     }
 
-    const reviews = [];
+    const reviews = st.pre ? [...st.pre] : [];
     for (let i = 0; i < cases.length; i++) {
       const taps = cases[i];
       reviews.push({

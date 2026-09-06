@@ -2,9 +2,10 @@ import { cache } from 'react'
 import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/utils/supabase/server'
-import { getLocalizedText, isRtlLocale, type SupportedLocale } from '@/types/database'
+import { getLocalizedText, isRtlLocale, type Database, type SupportedLocale } from '@/types/database'
 import { localesForStore } from '@/lib/guest-locales'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
+import { isMissingColumnError } from '@/lib/supabase-errors'
 import ReviewFlow from './ReviewFlow'
 
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
@@ -13,16 +14,29 @@ const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar:
 // Reads the anon-safe VIEW (not the base table) so the public anon key can never
 // pull owner_id / notification_email of any store. See migration
 // 20260701120000_stores_public_review_view.sql.
-const getStore = cache(async (id: string) => {
+const STORE_COLUMNS =
+  'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label, contact_channel, contact_dial_code, keyword_types'
+
+type StoreRow = Omit<Database['public']['Views']['public_store_review']['Row'], 'ai_review_enabled'> & {
+  /** Absent only while the 2026-09-06 migration has not reached this database. */
+  ai_review_enabled?: boolean
+}
+
+const getStore = cache(async (id: string): Promise<StoreRow | null> => {
   const supabase = await createClient()
-  const { data } = await supabase
+  const withAi = await supabase
     .from('public_store_review')
-    .select(
-      'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label, contact_channel, contact_dial_code, keyword_types',
-    )
+    .select(`${STORE_COLUMNS}, ai_review_enabled`)
     .eq('id', id)
     .single()
-  return data ?? null
+  if (!isMissingColumnError(withAi.error, 'ai_review_enabled')) {
+    return (withAi.data as unknown as StoreRow | null) ?? null
+  }
+  // Deploy-order guard: code reached Vercel before migration
+  // 20260906120000_ai_review_drafts.sql reached the database. Serve the page
+  // without AI drafts instead of 404-ing every store's QR page.
+  const { data } = await supabase.from('public_store_review').select(STORE_COLUMNS).eq('id', id).single()
+  return (data as unknown as StoreRow | null) ?? null
 })
 
 // ----------------------------------------------------------------
@@ -136,6 +150,7 @@ export default async function StorePage({ params, searchParams }: Props) {
           entityCategoryLabel={(store.entity_category_label as Record<string, string> | null) ?? null}
           contactChannel={store.contact_channel ?? 'whatsapp'}
           contactDialCode={store.contact_dial_code ?? null}
+          aiDrafts={Boolean(store.ai_review_enabled)}
         />
 
         <p className="text-center text-[10px] text-slate-400 mt-5 tracking-widest uppercase">

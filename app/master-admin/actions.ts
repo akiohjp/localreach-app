@@ -8,6 +8,8 @@ export type NewStoreRow = {
   name: string
   isActive: boolean
   expiresAt: string | null
+  /** stores.ai_review_enabled — Gemini guest drafts (billed per call). */
+  aiDrafts: boolean
   createdAt: string
   customerCount: number
 }
@@ -181,6 +183,7 @@ export async function createStore(payload: {
         name: (store.store_name as { en?: string })?.en ?? payload.storeName.trim(),
         isActive: store.is_active,
         expiresAt: null,
+        aiDrafts: false,
         createdAt: store.created_at,
         customerCount: 0,
       },
@@ -239,6 +242,33 @@ export async function masterSetStoreExpiry(
     const { data, error } = await admin
       .from('stores')
       .update({ subscription_expires_at: expiresAt })
+      .eq('id', storeId)
+      .select('id')
+    if (error) return { ok: false, error: error.message }
+    if (!data || data.length === 0) return { ok: false, error: 'Store not found.' }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Switches Gemini guest drafts on or off for one store. Master-only on
+ * purpose: every call is billed to the platform key, and the fallback to the
+ * template engine means an owner would never notice the switch was on.
+ */
+export async function masterSetStoreAiDrafts(
+  storeId: string,
+  enabled: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const denied = await masterUnauthorized()
+  if (denied) return denied
+
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('stores')
+      .update({ ai_review_enabled: enabled })
       .eq('id', storeId)
       .select('id')
     if (error) return { ok: false, error: error.message }

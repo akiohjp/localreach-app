@@ -139,3 +139,14 @@ npx vercel --prod
 - LP のデッドボタン・価格整合（D-4）、コントラスト（D-5）
 - QR ローカル生成・楽観保存の 0 行検知（E）
 - `business_category` migration + admin UI
+
+---
+
+## 6. AI レビュー下書き（Gemini、2026-09-06 追加）
+
+詳細は [[AI-REVIEW-DRAFTS-JA]]。要点だけ:
+
+1. `20260906120000_ai_review_drafts.sql` を**コードより先に**適用（列 `stores.ai_review_enabled`・view・`ai_review_drafts`）。
+2. `GEMINI_API_KEY` が**課金有効**の鍵であること（`node scripts/test-gemini-tier.mjs` → PAID）。無料枠のままだと日次上限で黙ってテンプレートに落ちる。
+3. デプロイ後、マスター管理画面の **AI Draft** トグルで 1 店舗だけ ON → `npm run ai:drafts` で実際の下書きを読む。
+4. `npm run audit:all` に `test:ai-review`（フィルタ・プロンプトの単体チェック）が含まれる。
