@@ -84,6 +84,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color: string;
           /** Object path `{owner_uuid}/{filename}` in `store-logos` bucket; legacy HTTPS URLs normalized by migration. */
           logo_url: string | null;
@@ -128,6 +130,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -160,6 +164,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -428,6 +434,7 @@ export type Database = {
           keywords: string[];
           forced_keywords: string[];
           keyword_types: KeywordTypes;
+          guest_audience: 'local' | 'visitor' | null;
           google_review_url: string;
           brand_color: string;
           default_language: SupportedLocale;

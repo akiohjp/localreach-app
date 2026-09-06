@@ -95,6 +95,8 @@ type Props = {
   entityCategoryLabel?: Record<string, string> | null
   /** stores.keyword_types — what each keyword names. See classifyKeyword. */
   keywordTypes?: Record<string, string> | null
+  /** stores.guest_audience — "local" | "visitor"; null = category heuristic. */
+  guestAudience?: 'local' | 'visitor' | null
   /**
    * stores.ai_review_enabled — ask /api/generate-review for a Gemini-written
    * draft first. The template engine stays the fallback on any failure, so a
@@ -122,6 +124,7 @@ export default function ReviewFlow({
   entityCity,
   entityCategoryLabel,
   keywordTypes,
+  guestAudience,
   aiDrafts = false,
 }: Props) {
   const entity = {
@@ -217,6 +220,7 @@ export default function ReviewFlow({
       outletKey: `${storeId}|${businessCategory ?? ''}|${brandColor}`,
       locale: loc,
       category: businessCategory,
+      audience: guestAudience ?? null,
       rating: ratingValue,
       entity,
       keywordTypes,

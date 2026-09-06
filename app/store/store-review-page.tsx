@@ -23,7 +23,7 @@ import ReviewFlow from './[id]/ReviewFlow'
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: 'EN', ja: 'JA', ar: 'AR' }
 
 const STORE_COLUMNS =
-  'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label, contact_channel, contact_dial_code, keyword_types'
+  'id, store_name, greeting_text, keywords, forced_keywords, google_review_url, brand_color, default_language, is_active, logo_url, business_category, entity_area, entity_city, entity_category_label, contact_channel, contact_dial_code, keyword_types, guest_audience'
 
 export type PublicStore = Omit<
   Database['public']['Views']['public_store_review']['Row'],
@@ -153,6 +153,7 @@ export async function StoreReviewPage({ store, lang }: { store: PublicStore; lan
           logoUrl={logoSignedUrl}
           businessCategory={store.business_category}
           keywordTypes={(store.keyword_types as Record<string, string> | null) ?? null}
+          guestAudience={(store.guest_audience as 'local' | 'visitor' | null) ?? null}
           entityArea={store.entity_area ?? null}
           entityCity={store.entity_city ?? null}
           entityCategoryLabel={(store.entity_category_label as Record<string, string> | null) ?? null}
