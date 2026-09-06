@@ -98,7 +98,9 @@ export function lengthRule(locale: SupportedLocale, rating: number): string {
  * effusive, not a customer with a complaint: the first live 4-star drafts
  * carried "just okay overall" and "wasn't quite our favourite", which read as
  * a lukewarm review under a rating the guest meant as praise (owner
- * direction, 2026-09-06). Only the guest's own words may carry a reservation.
+ * direction, 2026-09-06). The prompt alone carries this: a filter for hedge
+ * words was added and then removed the same day, because four stars being a
+ * good rating is common sense the model does not need policing on.
  */
 function toneRule(rating: number): string {
   return rating >= 5
