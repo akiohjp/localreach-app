@@ -76,6 +76,11 @@ function stripLabel(t: string): string {
 export function cleanReviewDraft(raw: string): string {
   let t = raw.trim();
   t = t.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/, "").trim();
+  // Bold/italic markers around the tapped phrases (seen on the 2026-09-06
+  // sample run despite the "no markdown" line). Formatting only, so stripped
+  // rather than rejected; headings and fences still fail in checkReviewDraft.
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, "$1").replace(/__([^_\n]+)__/g, "$1");
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?]|$)/g, "$1$2");
   // A leading label the model sometimes adds despite the instruction, and the
   // quotes it sometimes wraps the whole thing in. Either can sit inside the
   // other, so the label is stripped on both sides of the quote strip.
@@ -146,14 +151,17 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
     return { ok: false, reason: "rating_mentioned" };
   }
 
-  // The verbatim guarantee: every phrase the guest left switched on appears
-  // exactly as the owner typed it (scripts/verify-keyword-verbatim.mjs holds
-  // the template engine to the same rule).
+  // The verbatim guarantee, case-free: every phrase the guest left switched on
+  // appears word for word, in order. Capitalisation may follow the sentence
+  // ("Fresh doughnuts" as a pill is "fresh doughnuts" mid-sentence; names and
+  // places keep their capitals on their own). An exact-case rule sent 8 of 10
+  // otherwise-fine drafts back on the 2026-09-06 sample run, and Google's
+  // matching is not case-sensitive either.
+  const lower = t.toLowerCase();
   for (const kw of ctx.keywords) {
-    if (kw && !t.includes(kw)) return { ok: false, reason: `keyword_missing:${kw}` };
+    if (kw && !lower.includes(kw.toLowerCase())) return { ok: false, reason: `keyword_missing:${kw}` };
   }
 
-  const lower = t.toLowerCase();
   const tapped = ctx.keywords.map((k) => k.toLowerCase());
   for (const phrase of AI_TELL_PHRASES) {
     if (tapped.some((k) => k.includes(phrase))) continue;

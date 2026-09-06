@@ -62,7 +62,7 @@ const KEYWORD_HINT: Record<string, string> = {
   service: "a service they used",
   category: "what kind of place it is",
   attribute: "a quality of the place",
-  geo: "a search phrase with a place name; keep it as one unit inside a sentence, for example 'for <phrase>' or 'if you want <phrase>'",
+  geo: "a search phrase with a place name; keep the words together as one unit, inside a sentence that would make sense on its own, for example 'if you need <phrase>, these are the ones I would call'",
 };
 
 // Mirrors lib/review-engine isGeoPhrase / ReviewFlow GEO_RE for phrases that
@@ -139,7 +139,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   ];
   if (keywords.length) {
     rules.push(
-      `- Every tapped phrase must appear exactly as written above, capitalisation included, inside a natural sentence. Do not list them, do not put quotation marks around them${keywords.length > 2 ? ", and spread them across the paragraph instead of bunching them into one sentence" : ""}.`,
+      `- Every tapped phrase must appear word for word, in that order, inside a natural sentence. Capitalise it the way the sentence needs (names and places keep their capitals). Do not list them, do not put quotation marks or bold around them${keywords.length > 2 ? ", and spread them across the paragraph instead of bunching them into one sentence" : ""}.`,
     );
   }
   if (note) {

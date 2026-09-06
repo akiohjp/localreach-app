@@ -28,6 +28,7 @@ t("clean: strips fences, quotes, labels; one paragraph; no long dashes", () => {
   assert.equal(cleanReviewDraft(raw), "Loved it, really. Will be back - soon.");
   assert.equal(cleanReviewDraft("Here is your review: Great spot."), "Great spot.");
   assert.equal(cleanReviewDraft("- bullet start"), "bullet start");
+  assert.equal(cleanReviewDraft("I wanted a new **Oud perfume** and got a *personal fragrance consultation*."), "I wanted a new Oud perfume and got a personal fragrance consultation.");
 });
 
 t("check: a plain draft with every tapped phrase verbatim passes", () => {
@@ -35,9 +36,10 @@ t("check: a plain draft with every tapped phrase verbatim passes", () => {
   assert.equal(v.ok, true);
 });
 
-t("check: a missing or re-cased phrase is rejected (verbatim guarantee)", () => {
-  const v = checkReviewDraft(EN_GOOD.replace("Friendly Staff", "friendly staff"), EN_CTX);
-  assert.deepEqual(v, { ok: false, reason: "keyword_missing:Friendly Staff" });
+t("check: a missing phrase is rejected; a re-cased one is not (word-for-word, case-free)", () => {
+  const v = checkReviewDraft(EN_GOOD.replace("Fresh doughnuts", "fresh donuts"), EN_CTX);
+  assert.deepEqual(v, { ok: false, reason: "keyword_missing:Fresh doughnuts" });
+  assert.equal(checkReviewDraft(EN_GOOD.replace("Friendly Staff", "friendly staff"), EN_CTX).ok, true);
 });
 
 t("check: AI tells are rejected unless the guest tapped them", () => {
@@ -57,7 +59,7 @@ t("check: quotes, emoji, hashtags, scores, contact details, markdown are rejecte
   assert.equal(checkReviewDraft(base + " #dubai", EN_CTX).reason, "hashtag");
   assert.equal(checkReviewDraft(base + " Solid 5 stars.", EN_CTX).reason, "rating_mentioned");
   assert.equal(checkReviewDraft(base + " Call +971 50 123 4567.", EN_CTX).reason, "contact_detail");
-  assert.equal(checkReviewDraft(base + " **Loved it**", EN_CTX).reason, "markdown");
+  assert.equal(checkReviewDraft("## Loved it " + base, EN_CTX).reason, "markdown");
   assert.equal(checkReviewDraft(base + " Wow! Wow! Wow!", EN_CTX).reason, "exclamations");
 });
 
