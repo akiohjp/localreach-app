@@ -11,6 +11,8 @@ const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, 
   await import("../lib/review-ai-filter.ts");
 const { buildReviewPrompt, OPENINGS } = await import("../lib/review-prompt.ts");
 const { reviewModelsFromEnv, DEFAULT_REVIEW_MODELS } = await import("../lib/review-ai.ts");
+const { bannedTermsFor, softBannedTermsFor, splitSoftTerms, findBannedTermIn, findTermOutsidePhrases } =
+  await import("../lib/banned-terms.ts");
 
 let passed = 0;
 function t(name, fn) {
@@ -140,6 +142,32 @@ t("prompt: a tapped phrase containing an AI-tell word is still allowed", () => {
   const p = buildReviewPrompt({ storeName: "X", locale: "en", rating: 5, keywords: ["Hidden Gem"] });
   assert.ok(!p.includes("none of these words: hidden gem"));
   assert.ok(p.includes("still used exactly as written"));
+});
+
+t("banned terms: origin words are hard, carpet is soft and licensed only by a tapped phrase", () => {
+  assert.ok(!bannedTermsFor("Cinar Rugs Dubai").includes("carpet"));
+  assert.ok(bannedTermsFor("Cinar Rugs Dubai").includes("persian"));
+  assert.deepEqual(softBannedTermsFor("Cinar Rugs Dubai"), ["carpet"]);
+  assert.deepEqual(splitSoftTerms("Cinar Rugs Dubai", ["premium carpets in Dubai"]), { allowed: ["carpet"], forbidden: [] });
+  assert.deepEqual(splitSoftTerms("Cinar Rugs Dubai", ["hand-knotted wool rugs"]), { allowed: [], forbidden: ["carpet"] });
+  assert.deepEqual(splitSoftTerms("Let It Dough!", ["carpet cake"]), { allowed: [], forbidden: [] });
+  const phrase = ["premium carpets in Dubai"];
+  assert.equal(findTermOutsidePhrases(["carpet"], "Looking for premium carpets in Dubai, this shop delivered.", phrase), null);
+  assert.equal(findTermOutsidePhrases(["carpet"], "Looking for premium carpets in Dubai, this carpet shop delivered.", phrase), "carpet");
+  assert.equal(findBannedTermIn(["persian"], "A Persian-style piece"), "persian");
+});
+
+t("prompt: a soft term is allowed only inside its phrase; hard terms stay forbidden", () => {
+  const p = buildReviewPrompt({
+    storeName: "Cinar Rugs Dubai",
+    locale: "en",
+    rating: 5,
+    keywords: ["premium carpets in Dubai"],
+    phraseOnlyTerms: ["carpet"],
+    bannedTerms: ["persian"],
+  });
+  assert.ok(p.includes('The word "carpet" may appear only inside "premium carpets in Dubai"'));
+  assert.ok(p.includes('never use "persian"'));
 });
 
 t("models: env override and default ladder", () => {

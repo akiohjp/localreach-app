@@ -42,6 +42,8 @@ const { buildReviewPrompt, OPENINGS } = await import("../lib/review-prompt.ts");
 const { generateWithLadder, reviewModelsFromEnv } = await import("../lib/review-ai.ts");
 const { cleanReviewDraft, checkReviewDraft } = await import("../lib/review-ai-filter.ts");
 const { NON_VISIT_VERTICALS, resolveAudience, resolveVertical } = await import("../lib/review-pools.ts");
+const { bannedTermsFor, splitSoftTerms, findBannedTermIn, stripBannedSentencesIn, findTermOutsidePhrases } =
+  await import("../lib/banned-terms.ts");
 
 const N = Number(arg("n", "3"));
 const LOCALES = arg("locales", "en").split(",").map((s) => s.trim()).filter(Boolean);
@@ -87,6 +89,17 @@ const CASES = [
     entity: { area: "Jumeirah", city: "Dubai", noun: { en: "dental clinic", ja: "歯科医院", ar: "عيادة أسنان" } },
     keywords: ["Gentle dentist", "No waiting time", "Teeth cleaning"],
     keywordTypes: { "Teeth cleaning": "service", "Gentle dentist": "attribute", "No waiting time": "attribute" },
+    rating: 5,
+    note: "",
+  },
+  {
+    // Soft-ban fixture: Cinar never says "carpet", but guests search with it.
+    // The phrase may carry the word; nothing else in the draft may.
+    store: "Cinar Rugs Dubai",
+    category: "rug store",
+    entity: { area: "", city: "Dubai", noun: { en: "rug store", ja: "絨毯店", ar: "متجر سجاد" } },
+    keywords: ["premium carpets in Dubai", "hand-knotted wool rugs", "one-of-a-kind pieces"],
+    keywordTypes: { "premium carpets in Dubai": "geo", "hand-knotted wool rugs": "item", "one-of-a-kind pieces": "attribute" },
     rating: 5,
     note: "",
   },
@@ -173,6 +186,8 @@ for (const c of cases) {
     console.log(`\n### ${c.store} / ${c.category} / ${locale} / rating ${c.rating} / note=${c.note ? "yes" : "no"}${LIVE ? ` / taps=${JSON.stringify(c.keywords)}` : ""}`);
     for (let i = 0; i < (c.perCase ?? N); i++) {
       const vertical = resolveVertical(c.category);
+      const soft = splitSoftTerms(c.store, c.keywords);
+      const forbidden = [...bannedTermsFor(c.store), ...soft.forbidden];
       const prompt = buildReviewPrompt({
         storeName: c.store,
         locale,
@@ -186,6 +201,8 @@ for (const c of cases) {
         nonVisit: NON_VISIT_VERTICALS.has(vertical),
         visitor: resolveAudience(c.category) === "visitor",
         variant: (LIVE ? cases.indexOf(c) : i) % OPENINGS.length,
+        bannedTerms: forbidden,
+        phraseOnlyTerms: soft.allowed,
       });
       if (has("show-prompt") && i === 0) console.log(`\n--- prompt ---\n${prompt}\n--- end prompt ---\n`);
       total++;
@@ -195,8 +212,15 @@ for (const c of cases) {
         results.push({ store: c.store, locale, category: c.category, taps: c.keywords, text: "", failed: r.reason });
         continue;
       }
-      const text = cleanReviewDraft(r.text);
-      const verdict = checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store });
+      let text = cleanReviewDraft(r.text);
+      if (findBannedTermIn(forbidden, text)) text = stripBannedSentencesIn(forbidden, text);
+      const banned = findBannedTermIn(forbidden, text);
+      const leaked = findTermOutsidePhrases(soft.allowed, text, c.keywords);
+      const verdict = banned
+        ? { ok: false, reason: `banned:${banned}` }
+        : leaked
+          ? { ok: false, reason: `banned_outside_phrase:${leaked}` }
+          : checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store });
       if (verdict.ok) okCount++;
       console.log(`  [${i + 1}] ${r.model} ${r.latencyMs} ms  ${verdict.ok ? "PASS" : `REJECT ${verdict.reason}`}`);
       console.log(`      ${text}`);

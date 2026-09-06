@@ -3,7 +3,13 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isValidUuid } from "@/lib/is-valid-uuid";
 import { isStoreCurrentlyActive } from "@/lib/subscription";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { bannedTermsFor, findBannedTerm, stripBannedSentences } from "@/lib/banned-terms";
+import {
+  bannedTermsFor,
+  findBannedTermIn,
+  findTermOutsidePhrases,
+  splitSoftTerms,
+  stripBannedSentencesIn,
+} from "@/lib/banned-terms";
 import { buildReviewPrompt, OPENINGS } from "@/lib/review-prompt";
 import { checkReviewDraft, cleanReviewDraft, sanitizeGuestNote } from "@/lib/review-ai-filter";
 import { generateWithLadder, reviewModelsFromEnv } from "@/lib/review-ai";
@@ -189,7 +195,11 @@ export async function POST(req: Request) {
   const storeName = getLocalizedText(store.store_name ?? {}, locale, store.default_language) || "this place";
   const vertical = resolveVertical(store.business_category);
   const categoryNoun = getLocalizedText(store.entity_category_label ?? {}, locale, store.default_language) || null;
-  const bannedTerms = bannedTermsFor(storeName);
+  // Hard terms are never allowed. A soft term ("carpet" for Cinar) is allowed
+  // only inside a tapped phrase that contains it, because that phrase is what
+  // guests search with; the model must not volunteer it anywhere else.
+  const soft = splitSoftTerms(storeName, keywords);
+  const forbidden = [...bannedTermsFor(storeName), ...soft.forbidden];
   const models = reviewModelsFromEnv();
   const started = Date.now();
 
@@ -218,7 +228,8 @@ export async function POST(req: Request) {
       // Random so two guests with the same taps do not get the same skeleton;
       // the attempt offset guarantees "try another wording" moves.
       variant: (Math.floor(Math.random() * OPENINGS.length) + attempt + gen) % OPENINGS.length,
-      bannedTerms,
+      bannedTerms: forbidden,
+      phraseOnlyTerms: soft.allowed,
     });
     const result = await generateWithLadder({
       apiKey,
@@ -233,7 +244,19 @@ export async function POST(req: Request) {
     }
     lastModel = result.model;
     let text = cleanReviewDraft(result.text);
-    if (findBannedTerm(storeName, text)) text = stripBannedSentences(storeName, text);
+    if (findBannedTermIn(forbidden, text)) text = stripBannedSentencesIn(forbidden, text);
+    const stillBanned = findBannedTermIn(forbidden, text);
+    if (stillBanned) {
+      lastReason = `banned:${stillBanned}`;
+      lastCandidate = text;
+      continue;
+    }
+    const leaked = findTermOutsidePhrases(soft.allowed, text, keywords);
+    if (leaked) {
+      lastReason = `banned_outside_phrase:${leaked}`;
+      lastCandidate = text;
+      continue;
+    }
     const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName });
     if (!verdict.ok) {
       lastReason = verdict.reason;

@@ -34,8 +34,13 @@ export type ReviewPromptInput = {
   visitor?: boolean;
   /** 0..OPENINGS.length-1 — rotates the structure, never the facts. */
   variant?: number;
-  /** Store-specific forbidden vocabulary (lib/banned-terms). */
+  /** Store-specific forbidden vocabulary (lib/banned-terms), never allowed. */
   bannedTerms?: readonly string[];
+  /**
+   * Soft terms licensed by a tapped phrase (lib/banned-terms splitSoftTerms):
+   * may appear only inside the phrase that contains them.
+   */
+  phraseOnlyTerms?: readonly string[];
 };
 
 export const LANGUAGE_RULE: Record<SupportedLocale, string> = {
@@ -183,6 +188,14 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   if (p.bannedTerms?.length) {
     rules.push(
       `- FORBIDDEN WORDS: never use ${p.bannedTerms.map((t) => `"${t}"`).join(", ")} in any form, even if a tapped phrase or the customer's own words contain them.`,
+    );
+  }
+  for (const term of p.phraseOnlyTerms ?? []) {
+    const re = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "i");
+    const hosts = keywords.filter((k) => re.test(k));
+    if (!hosts.length) continue;
+    rules.push(
+      `- The word "${term}" may appear only inside ${hosts.map((h) => `"${h}"`).join(" and ")}, exactly as written there. Do not use it anywhere else and do not describe the place with it.`,
     );
   }
   rules.push(
