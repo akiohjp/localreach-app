@@ -1,3 +1,4 @@
+import { guestReviewUrl } from '@/lib/store-links'
 import { notFound, redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
@@ -144,7 +145,9 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       console.error('[admin] NEXT_PUBLIC_APP_URL unset — derived', appUrl, 'from request host')
     }
   }
-  const storeUrl = `${appUrl}/store/${store.id}`
+  // Short link (qr.miraireach.ae/<slug>) when the host is configured and the
+  // store has a slug; the long /store/<uuid> form otherwise. lib/store-links.
+  const storeUrl = guestReviewUrl(store, appUrl)
 
   // ---- Results (review count / rating over time) ----
   // Freshness capture: if today's snapshot is missing, take it now so the

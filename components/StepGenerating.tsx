@@ -11,10 +11,13 @@ export default function StepGenerating({
   t,
   brandColor = "#0f172a",
   durationMs = 900,
+  subtitle,
 }: {
   t: UiStrings;
   brandColor?: string;
   durationMs?: number;
+  /** Overrides t.generating.subtitle (AI drafts say what is happening). */
+  subtitle?: string;
 }) {
   return (
     <div
@@ -39,7 +42,7 @@ export default function StepGenerating({
           {t.generating.title}
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed max-w-[15rem]">
-          {t.generating.subtitle}
+          {subtitle ?? t.generating.subtitle}
         </p>
       </div>
 

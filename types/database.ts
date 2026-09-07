@@ -84,6 +84,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color: string;
           /** Object path `{owner_uuid}/{filename}` in `store-logos` bucket; legacy HTTPS URLs normalized by migration. */
           logo_url: string | null;
@@ -103,6 +105,10 @@ export type Database = {
           contact_dial_code?: string;
           /** Review-reply generator defaults. NULL = built-in defaults. */
           reply_settings?: ReplySettings | null;
+          /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
+          ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
           /** Google Place ID for results reporting (rating/review-count snapshots). */
           google_place_id?: string | null;
 
@@ -124,6 +130,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -133,6 +141,10 @@ export type Database = {
           entity_city?: string | null;
           entity_category_label?: LocalizedText;
           reply_settings?: ReplySettings | null;
+          /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
+          ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
 
           created_at?: string;
           updated_at?: string;
@@ -152,6 +164,8 @@ export type Database = {
           forced_keywords?: string[];
           /** keyword -> what it names; decides which sentence frames it may enter. */
           keyword_types?: KeywordTypes;
+          /** Who writes the reviews: 'local' can come back, 'visitor' is in town once. Null = category heuristic. */
+          guest_audience?: 'local' | 'visitor' | null;
           brand_color?: string;
           logo_url?: string | null;
           business_category?: string | null;
@@ -161,6 +175,10 @@ export type Database = {
           entity_city?: string | null;
           entity_category_label?: LocalizedText;
           reply_settings?: ReplySettings | null;
+          /** Master-admin switch: guests get a Gemini-written draft (template engine stays the fallback). */
+          ai_review_enabled?: boolean;
+          /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
+          slug?: string;
 
           created_at?: string;
           updated_at?: string;
@@ -343,6 +361,63 @@ export type Database = {
           },
         ];
       };
+      /**
+       * Every AI draft attempt from /api/generate-review: the draft the guest
+       * received, or why the route fell back to the template engine.
+       * Service-role writes; owners read their own store's rows.
+       * Backed by migration 20260906120000_ai_review_drafts.sql.
+       */
+      ai_review_drafts: {
+        Row: {
+          id: number;
+          store_id: string;
+          outcome: "ai" | "fallback";
+          model: string | null;
+          locale: string;
+          rating: number;
+          keywords: string[];
+          guest_note: string | null;
+          draft: string | null;
+          reason: string | null;
+          latency_ms: number | null;
+          created_at: string;
+        };
+        Insert: {
+          store_id: string;
+          outcome: "ai" | "fallback";
+          model?: string | null;
+          locale: string;
+          rating: number;
+          keywords?: string[];
+          guest_note?: string | null;
+          draft?: string | null;
+          reason?: string | null;
+          latency_ms?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          store_id?: string;
+          outcome?: "ai" | "fallback";
+          model?: string | null;
+          locale?: string;
+          rating?: number;
+          keywords?: string[];
+          guest_note?: string | null;
+          draft?: string | null;
+          reason?: string | null;
+          latency_ms?: number | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_review_drafts_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       /**
@@ -359,6 +434,7 @@ export type Database = {
           keywords: string[];
           forced_keywords: string[];
           keyword_types: KeywordTypes;
+          guest_audience: 'local' | 'visitor' | null;
           google_review_url: string;
           brand_color: string;
           default_language: SupportedLocale;
@@ -374,6 +450,10 @@ export type Database = {
           contact_channel: ContactChannel;
           /** E.164 prefix pre-filled in the guest number field, e.g. "+971", "+81". */
           contact_dial_code: string;
+          /** Whether the QR page should ask /api/generate-review for a Gemini draft first. */
+          ai_review_enabled: boolean;
+          /** Short-link code; the /r/[slug] page looks stores up by it. */
+          slug: string;
         };
         Relationships: [];
       };

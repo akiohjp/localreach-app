@@ -103,6 +103,13 @@ export type GenerateReviewOptions = {
    * groceries." Anything absent from the map still falls back to the guess.
    */
   keywordTypes?: Record<string, string> | null;
+  /**
+   * `stores.guest_audience` — who writes this store's reviews: "local" (people
+   * who can come back) or "visitor" (in town once). Null / omitted falls back to
+   * the category heuristic (resolveAudience). Cinar Dubai sells the same rugs
+   * as Cinar Istanbul, but to residents; the category alone cannot tell.
+   */
+  audience?: "local" | "visitor" | null;
 };
 
 function toReviewLocale(locale?: SupportedLocale): ReviewLocale {
@@ -169,7 +176,7 @@ export function generateReview(
   const locale = toReviewLocale(options?.locale);
   const vertical = resolveVertical(options?.category);
   // Local regulars or one-time visitors: decides which voice pools the review draws from.
-  const audience = resolveAudience(options?.category);
+  const audience = options?.audience ?? resolveAudience(options?.category);
   // Fold locale + vertical into the entropy so switching language/industry rotates cleanly.
   const seed = computeReviewSeed(store, cleaned, nonce, `${outlet}\0${locale}\0${vertical}`);
   const forcedCount = Math.max(0, Math.min(options?.forcedCount ?? 0, cleaned.length));

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw } from "lucide-react";
+import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw, Loader2 } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
 import { copyToClipboard, isUsableReviewUrl } from "@/lib/copy-text";
 import type { UiStrings } from "@/lib/ui-strings";
@@ -29,10 +29,10 @@ type Props = {
   /** Languages the guest can switch the generated review between. */
   reviewLocaleOptions: ReviewLocaleOption[];
   /** Regenerate the review in `loc`; returns the new text. */
-  onReviewLocaleChange: (loc: SupportedLocale) => string;
+  onReviewLocaleChange: (loc: SupportedLocale) => string | Promise<string>;
   onRetry: () => void;
   /** Fresh nonce + new wording; same merged keywords. For client demos. */
-  onRegenerate?: () => string;
+  onRegenerate?: () => string | Promise<string>;
   /** Lift edited/regenerated text so reload-persistence keeps the latest wording. */
   onReviewTextChange?: (text: string) => void;
   /** Store's guest contact channel — drives the label + consent wording. */
@@ -68,13 +68,20 @@ export default function StepResult({
   const [copied, setCopied] = useState(false);
   /** Both clipboard APIs blocked — show the manual-copy hint instead of silence. */
   const [copyBlocked, setCopyBlocked] = useState(false);
+  /** A rewrite is in flight (AI drafts take a few seconds); buttons wait for it. */
+  const [rewriting, setRewriting] = useState(false);
 
-  function handleLanguageChange(loc: SupportedLocale) {
-    if (loc === reviewLocale) return;
+  async function handleLanguageChange(loc: SupportedLocale) {
+    if (loc === reviewLocale || rewriting) return;
     setCopied(false);
-    const next = onReviewLocaleChange(loc);
-    setText(next);
-    onReviewTextChange?.(next);
+    setRewriting(true);
+    try {
+      const next = await onReviewLocaleChange(loc);
+      setText(next);
+      onReviewTextChange?.(next);
+    } finally {
+      setRewriting(false);
+    }
   }
 
   // Guest contact capture state. The channel and dial code come from the store,
@@ -173,12 +180,17 @@ export default function StepResult({
     });
   }
 
-  function handleRegenerateWording() {
-    if (!onRegenerate) return;
+  async function handleRegenerateWording() {
+    if (!onRegenerate || rewriting) return;
     setCopied(false);
-    const next = onRegenerate();
-    setText(next);
-    onReviewTextChange?.(next);
+    setRewriting(true);
+    try {
+      const next = await onRegenerate();
+      setText(next);
+      onReviewTextChange?.(next);
+    } finally {
+      setRewriting(false);
+    }
   }
 
   async function handleWhatsAppSave() {
@@ -262,6 +274,7 @@ export default function StepResult({
                   key={opt.code}
                   type="button"
                   onClick={() => handleLanguageChange(opt.code)}
+                  disabled={rewriting}
                   aria-pressed={active}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all active:scale-[0.98] ${
                     active
@@ -466,11 +479,14 @@ export default function StepResult({
           <button
             type="button"
             onClick={handleRegenerateWording}
+            disabled={rewriting}
+            aria-busy={rewriting}
             className="w-full py-3 rounded-xl font-semibold text-sm border border-dashed border-slate-300 bg-slate-50/80
               text-slate-700 hover:bg-slate-100 hover:border-slate-400 active:scale-[0.98]
-              transition-all flex items-center justify-center gap-2"
+              transition-all flex items-center justify-center gap-2
+              disabled:opacity-60 disabled:cursor-wait disabled:hover:translate-y-0"
           >
-            <RefreshCw size={13} />
+            {rewriting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
             {t.result.tryAnotherWording}
           </button>
         )}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
-import { bannedTermsFor, findBannedTerm, stripBannedSentences } from "@/lib/banned-terms";
+import { bannedTermsFor, findBannedTermIn, splitSoftTerms, stripBannedSentencesIn } from "@/lib/banned-terms";
 import { buildPrompt, clip, LANGUAGE_NAME } from "@/lib/reply-prompt";
 import { paragraphize } from "@/lib/reply-format";
 import { checkRateLimit } from "@/lib/api-rate-limit";
@@ -147,10 +147,14 @@ export async function POST(req: Request) {
 
   const rating = Math.min(5, Math.max(1, Math.round(Number(body.rating) || 5)));
   const storeName = clip(body.storeName, 120) || "our shop";
+  const guestText = clip(body.reviewText, 4000);
+  // A soft term the guest used themselves may be echoed; otherwise it is as
+  // forbidden as the hard ones (lib/banned-terms, 2026-09-06).
+  const forbidden = [...bannedTermsFor(storeName), ...splitSoftTerms(storeName, [guestText]).forbidden];
   const prompt = buildPrompt({
     storeName,
     rating,
-    reviewText: clip(body.reviewText, 4000),
+    reviewText: guestText,
     language: LANGUAGE_NAME[clip(body.locale, 5)] ?? LANGUAGE_NAME.en,
     tone: clip(body.tone, 20),
     geoPhrase: clip(body.geoPhrase, 120),
@@ -159,7 +163,7 @@ export async function POST(req: Request) {
       ? body.geoKeywords.map((k) => clip(k, 80)).filter(Boolean).slice(0, 8)
       : [],
     signature: clip(body.signature, 120),
-    bannedTerms: bannedTermsFor(storeName),
+    bannedTerms: forbidden,
   });
 
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...MODELS] : MODELS;
@@ -173,9 +177,9 @@ export async function POST(req: Request) {
         // fall through — a 502 sends the client to the (also filtered)
         // template engine rather than shipping the word to the owner's phone.
         let reply = cleanReply(text);
-        if (findBannedTerm(storeName, reply)) {
-          reply = stripBannedSentences(storeName, reply);
-          if (!reply || findBannedTerm(storeName, reply)) continue;
+        if (findBannedTermIn(forbidden, reply)) {
+          reply = stripBannedSentencesIn(forbidden, reply);
+          if (!reply || findBannedTermIn(forbidden, reply)) continue;
         }
         return NextResponse.json({ reply, model });
       }

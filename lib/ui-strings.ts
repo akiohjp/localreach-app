@@ -30,11 +30,17 @@ export interface UiStrings {
     /** "{n} selected" */
     selectedCount: string;
     generate: string;
+    /** Optional one-line "in your own words" field (AI drafts only). */
+    noteLabel: string;
+    notePlaceholder: string;
+    noteHint: string;
   };
   generating: {
     stepLabel: string;
     title: string;
     subtitle: string;
+    /** Shown instead of `subtitle` while a Gemini draft is being written. */
+    subtitleAi: string;
   };
   result: {
     stepLabel: string;
@@ -158,11 +164,15 @@ const en: UiStrings = {
     noneSelected: "none selected",
     selectedCount: "{n} selected",
     generate: "Generate Review",
+    noteLabel: "In your own words (optional)",
+    notePlaceholder: "One thing you'd tell a friend about today",
+    noteHint: "We'll build the review around it.",
   },
   generating: {
     stepLabel: "Step 3 — Generating",
     title: "Crafting your review",
     subtitle: "Assembling a unique review from your keywords.",
+    subtitleAi: "Writing your review from what you chose.",
   },
   result: {
     stepLabel: "Step 4 — Your Review",
@@ -265,11 +275,15 @@ const ja: UiStrings = {
     noneSelected: "未選択",
     selectedCount: "{n}件選択",
     generate: "レビューを作成",
+    noteLabel: "ひとこと（任意）",
+    notePlaceholder: "友だちに話すなら、今日のどんなところ？",
+    noteHint: "この一言を軸にレビューを作ります。",
   },
   generating: {
     stepLabel: "ステップ 3 — 作成中",
     title: "レビューを作成しています",
     subtitle: "キーワードから独自のレビューを組み立てています。",
+    subtitleAi: "選んだ内容からレビューを書いています。",
   },
   result: {
     stepLabel: "ステップ 4 — レビュー",
@@ -373,11 +387,15 @@ const ar: UiStrings = {
     noneSelected: "لم يتم التحديد",
     selectedCount: "{n} محدد",
     generate: "إنشاء المراجعة",
+    noteLabel: "بكلماتك أنت (اختياري)",
+    notePlaceholder: "شيء واحد تخبر به صديقًا عن اليوم",
+    noteHint: "سنبني المراجعة حوله.",
   },
   generating: {
     stepLabel: "الخطوة 3 — الإنشاء",
     title: "جارٍ إعداد مراجعتك",
     subtitle: "نُجمّع مراجعة فريدة من كلماتك المفتاحية.",
+    subtitleAi: "نكتب مراجعتك مما اخترته.",
   },
   result: {
     stepLabel: "الخطوة 4 — مراجعتك",
