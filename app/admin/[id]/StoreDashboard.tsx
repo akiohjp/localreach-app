@@ -15,7 +15,7 @@ import ReplyGenerator from '@/components/ReplyGenerator'
 import InstallAppButton from '@/components/InstallAppButton'
 import NotificationToggle from '@/components/NotificationToggle'
 import { waTemplate, buildWaLink, normalizeWaNumber, type WaLocale } from '@/lib/whatsapp'
-import { keywordPresetsFor } from '@/lib/keyword-presets'
+import { keywordPresetsFor, bestInCityPhrase } from '@/lib/keyword-presets'
 import { resolveVertical } from '@/lib/review-pools'
 import { classifyKeyword, type KeywordType } from '@/lib/review-engine'
 import { ownerLocaleOptions } from '@/lib/guest-locales'
@@ -554,6 +554,7 @@ function ForcedKeywordManager({
   types,
   onTypeChange,
   onTypesFrozen,
+  suggestion,
 }: {
   storeId: string
   initial: string[]
@@ -562,11 +563,28 @@ function ForcedKeywordManager({
   onTypeChange: (kw: string, t: KeywordType) => void
   /** Lift the frozen map after a save so the sibling manager sees it too. */
   onTypesFrozen: (t: KeywordTypes) => void
+  /**
+   * "best <product> in <city>", built by the parent from the store's own
+   * category keyword and entity city (lib/keyword-presets bestInCityPhrase).
+   * Offered as one click while the list has no "best …" phrase yet.
+   */
+  suggestion?: string | null
 }) {
   const [items, setItems] = useState<string[]>(initial)
   const [input, setInput] = useState('')
   const [state, setState] = useState<SaveState>('idle')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const hasBestPhrase = items.some((k) => /^best\b/i.test(k.trim()))
+  const showSuggestion = Boolean(suggestion) && !hasBestPhrase && !items.includes(suggestion as string)
+
+  function addSuggestion() {
+    if (!suggestion || items.includes(suggestion)) return
+    setItems((prev) => [...prev, suggestion])
+    // A buyer-search phrase is a search phrase, never a dish or a service.
+    onTypeChange(suggestion, 'geo')
+    setState('idle')
+  }
 
   function add() {
     const trimmed = input.trim()
@@ -680,6 +698,18 @@ function ForcedKeywordManager({
           >
             <Plus size={11} />
             Add &ldquo;{input.trim()}&rdquo;
+          </button>
+        )}
+        {showSuggestion && (
+          <button
+            onClick={addSuggestion}
+            title="The search a buyer types. Offered pre-selected and rotated like your other core phrases."
+            className="flex items-center gap-1 rounded-lg border border-amber-300
+              bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800
+              hover:border-amber-500 transition-all"
+          >
+            <Sparkles size={11} />
+            Add &ldquo;{suggestion}&rdquo;
           </button>
         )}
         <div className="flex flex-1 items-center justify-between">
@@ -2200,6 +2230,15 @@ export default function StoreDashboard({
                 types={keywordTypes}
                 onTypeChange={setKeywordType}
                 onTypesFrozen={setKeywordTypes}
+                suggestion={bestInCityPhrase(
+                  // What they sell, in the owner's own words: the first guest
+                  // keyword typed as "a whole range", else the entity label.
+                  (store.keywords ?? []).find((k) => keywordTypes[k] === 'category') ??
+                    (store.entity_category_label as LocalizedText | null)?.en ??
+                    null,
+                  store.entity_city ?? null,
+                  store.default_language,
+                )}
               />
             </SectionCard>
 

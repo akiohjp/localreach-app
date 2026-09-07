@@ -128,3 +128,30 @@ export function keywordPresetsFor(vertical: Vertical, locale: SupportedLocale): 
   const list = set[locale] ?? set.en ?? PRESETS.generic.en ?? [];
   return [...list];
 }
+
+/**
+ * The one search phrase every store should carry: "best <what they sell> in
+ * <city>". Owner direction 2026-09-07 ("best Turkish rugs" for Cinar, then the
+ * same mechanism for every store and industry): it is the query a buyer types,
+ * it names the product the way the owner names it, and as a core phrase it is
+ * offered pre-ticked and rotates with the others, so it reaches a share of
+ * reviews without sitting in every one.
+ *
+ * English only: the engine's geo frames ("This is the place I recommend for
+ * {kw}") exist for EN, and a Latin phrase would be dropped from a JA/AR draft.
+ * The noun is what the owner wrote (a proper noun keeps its capital, "Turkish
+ * rugs"); a leading "best" or "the" is not doubled.
+ */
+export function bestInCityPhrase(
+  productNoun: string | null | undefined,
+  city: string | null | undefined,
+  locale: SupportedLocale = "en",
+): string | null {
+  if (locale !== "en") return null;
+  const noun = (productNoun ?? "").trim().replace(/^(the|best)\s+/i, "");
+  const where = (city ?? "").trim();
+  if (!noun || !where) return null;
+  // Both halves must be readable in an English review.
+  if (!/^[\x20-\x7EÀ-ɏ]+$/.test(noun) || !/^[\x20-\x7EÀ-ɏ]+$/.test(where)) return null;
+  return `best ${noun} in ${where}`;
+}
