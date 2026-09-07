@@ -52,7 +52,8 @@ const BUDGET_MS = 7500;
 const ATTEMPT_MS = 5500;
 /** Silence before the next model is started alongside (lib/review-ai hedging). */
 const HEDGE_AFTER_MS = 1800;
-const MAX_GENERATIONS = 2;
+/** A rejected draft (opening repeat, thin, banned word) is regenerated with the next move; three tries fit the budget. */
+const MAX_GENERATIONS = 3;
 const DAILY_CAP = Math.max(50, Number(process.env.AI_REVIEW_DAILY_CAP) || 2000);
 
 function json(body: Record<string, unknown>, status: number, headers?: Record<string, string>) {

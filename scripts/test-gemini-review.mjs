@@ -219,6 +219,7 @@ for (const c of cases) {
         variant: seq % OPENINGS.length,
         closingVariant: (seq * 5 + 3) % CLOSINGS.length,
         recentOpenings: recent.map((d) => d.split(/\s+/).slice(0, 8).join(" ")),
+        // (recent is newest first, as the route passes it)
         bannedTerms: forbidden,
         phraseOnlyTerms: soft.allowed,
       });
@@ -239,7 +240,7 @@ for (const c of cases) {
         : leaked
           ? { ok: false, reason: `banned_outside_phrase:${leaked}` }
           : checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store, recent });
-      if (verdict.ok) recentByStore.set(c.store, [...recent, text].slice(-20));
+      if (verdict.ok) recentByStore.set(c.store, [text, ...recent].slice(0, 20));
       if (verdict.ok) okCount++;
       console.log(`  [${i + 1}] ${r.model} ${r.latencyMs} ms  ${verdict.ok ? "PASS" : `REJECT ${verdict.reason}`}`);
       console.log(`      ${text}`);

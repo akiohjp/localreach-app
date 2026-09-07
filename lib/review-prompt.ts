@@ -153,6 +153,9 @@ export const STOCK_CLOSERS: readonly string[] = [
   "you won't regret it",
   "10/10",
   "five stars",
+  "these are the ones I would call",
+  "this is the place to go",
+  "worth a visit",
 ];
 
 /**
@@ -183,7 +186,7 @@ const KEYWORD_HINT: Record<string, string> = {
   service: "a service they used",
   category: "what kind of place it is",
   attribute: "a quality of the place",
-  geo: "a search phrase with a place name; keep the words together as one unit, inside a sentence that would make sense on its own, for example 'if you need <phrase>, these are the ones I would call'",
+  geo: "a search phrase with a place name; keep the words together as one unit inside a sentence that makes sense on its own, anywhere in the review, never as a closing line",
 };
 
 // Mirrors lib/review-engine isGeoPhrase / ReviewFlow GEO_RE for phrases that
@@ -322,12 +325,17 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   rules.push(
     `- ${variant}`,
     `- ${closing}`,
-    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with "I". The first sentence must be one nobody else would write about this place.`,
+    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, with "I", or with a word ending in -ing ("Walking", "Stopping", "Sitting"). The first sentence must be one nobody else would write about this place.`,
     `- Never end with a stock closer such as ${STOCK_CLOSERS.map((s) => `"${s}"`).join(", ")}.`,
   );
   if (recentOpenings.length) {
+    // The newest eight sit side by side on Google: not even their first two
+    // words may come back. Named explicitly, because the model follows a
+    // word list far better than "do not begin like these".
+    const firstWords = [...new Set(recentOpenings.slice(0, 8).map((s) => s.split(/\s+/).slice(0, 2).join(" ")).filter(Boolean))];
     rules.push(
-      `- Other recent reviews of this place began like this; do not begin like any of them, and do not reuse their first few words: ${recentOpenings.map((s) => `"${s}"`).join(" / ")}`,
+      `- Other recent reviews of this place began like this; do not begin like any of them: ${recentOpenings.map((s) => `"${s}"`).join(" / ")}`,
+      `- In particular the first two words of your review must not be any of: ${firstWords.map((s) => `"${s}"`).join(", ")}. Choose a first word none of them use.`,
     );
   }
   rules.push(

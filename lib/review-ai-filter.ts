@@ -129,7 +129,14 @@ export type DraftContext = {
   rating: number;
   keywords: string[];
   storeName: string;
-  /** This store's recent shipped drafts; a new one must not open like, or read like, any of them. */
+  /**
+   * This store's recent shipped drafts, NEWEST FIRST. A new draft must not
+   * open like any of the first 20 (same first five words) nor read like one
+   * (shared 4-grams), and must not share its first three words with the
+   * newest eight: those are the ones a reader sees side by side on Google.
+   * (A two-word rule was tried on 2026-09-07 and rejected 4 in 10 first
+   * attempts: the model's stock of openers is narrower than its prose.)
+   */
   recent?: readonly string[];
 };
 
@@ -173,7 +180,22 @@ export const SIMILARITY_MAX = 0.3;
  * The verdict on one cleaned draft. Reasons are short machine-readable tags so
  * ai_review_drafts.reason can be grouped when reading why the route fell back.
  */
+class RejectDraft extends Error {
+  constructor(public readonly reason: string) {
+    super(reason);
+  }
+}
+
 export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
+  try {
+    return checkReviewDraftInner(text, ctx);
+  } catch (e) {
+    if (e instanceof RejectDraft) return { ok: false, reason: e.reason };
+    throw e;
+  }
+}
+
+function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   const t = text.trim();
   if (!t) return { ok: false, reason: "empty" };
 
@@ -214,16 +236,13 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   // Against this store's recent drafts: the opening must be new, and the body
   // must not be a rephrasing (owner's rule 2026-09-07: fifty reviews of one
   // place must not look like one person wrote them).
-  for (const prev of ctx.recent ?? []) {
-    if (!prev) continue;
-    // Same first five words, or even the same first two ("Stopping by",
-    // "Deciding on"): side by side, the first words are what a reader sees.
-    if (openingKey(t) === openingKey(prev) || openingKey(t, 2) === openingKey(prev, 2)) {
-      return { ok: false, reason: "opening_repeat" };
-    }
+  const recent = (ctx.recent ?? []).filter(Boolean).slice(0, 20);
+  recent.forEach((prev, i) => {
+    if (openingKey(t) === openingKey(prev)) throw new RejectDraft("opening_repeat");
+    if (i < 8 && openingKey(t, 3) === openingKey(prev, 3)) throw new RejectDraft("opening_repeat");
     const overlap = ngramOverlap(t, prev);
-    if (overlap > SIMILARITY_MAX) return { ok: false, reason: `too_similar:${Math.round(overlap * 100)}` };
-  }
+    if (overlap > SIMILARITY_MAX) throw new RejectDraft(`too_similar:${Math.round(overlap * 100)}`);
+  });
 
   // Length last, so a draft with a content defect reports that defect.
   const rails = LENGTH_RAILS[ctx.locale];
