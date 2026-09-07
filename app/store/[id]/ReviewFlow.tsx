@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { resolveVertical } from '@/lib/review-pools'
 import { createReviewNonce, generateReview } from '@/lib/assembler'
 import StepRating from '@/components/StepRating'
 import StepKeywords from '@/components/StepKeywords'
@@ -10,7 +11,7 @@ import StepFeedback from '@/components/StepFeedback'
 import StepFeedbackSent from '@/components/StepFeedbackSent'
 import type { Step } from '@/lib/config'
 import type { ContactChannel, SupportedLocale } from '@/types/database'
-import { getUiStrings } from '@/lib/ui-strings'
+import { getUiStrings, feedbackTopicsFor } from '@/lib/ui-strings'
 import { useFlowPersistence } from '@/lib/use-flow-persistence'
 
 /**
@@ -491,6 +492,7 @@ export default function ReviewFlow({
               rating={rating}
               storeName={storeName}
               dialCode={contactDialCode ?? undefined}
+              topics={feedbackTopicsFor(locale, resolveVertical(businessCategory))}
               onSubmit={(written) => {
                 setFeedbackText(written)
                 setFeedbackSent(true)

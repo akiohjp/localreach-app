@@ -20,9 +20,12 @@ type Props = {
   onSkip: () => void;
   /** Optional contact prefix, e.g. "+971" — same source as the 5-star screen. */
   dialCode?: string;
+  /** Quick tags with the vertical's own "quality" label (feedbackTopicsFor); falls back to the locale default. */
+  topics?: UiStrings["feedback"]["topics"];
 };
 
-export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, onSkip, dialCode }: Props) {
+export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, onSkip, dialCode, topics: topicOptions }: Props) {
+  const topicList = topicOptions ?? t.feedback.topics;
   const [helpBefore, helpAfter = ""] = t.feedback.help.split("{store}");
   const [text, setText] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
@@ -114,7 +117,7 @@ export default function StepFeedback({ t, storeId, rating, storeName, onSubmit, 
           counted across guests, so the owner could see that something was wrong
           but never what. */}
       <div className="flex flex-wrap gap-1.5">
-        {t.feedback.topics.map((topic) => {
+        {topicList.map((topic) => {
           const on = topics.includes(topic.key);
           return (
             <button
