@@ -15,10 +15,11 @@
     "check:rating-goal": "npx tsx scripts/check-rating-goal.mjs",
     "test:ai-review": "npx tsx scripts/test-ai-review-filters.mjs",
     "test:links": "npx tsx scripts/test-store-links.mjs",
+    "test:ai-ladder": "npx tsx scripts/test-ai-ladder.mjs",
     "ai:sample": "npx tsx scripts/test-gemini-review.mjs",
     "ai:drafts": "npx tsx scripts/read-ai-drafts.mjs",
     "sales:list": "npx tsx scripts/sales-list.mjs",
-    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal && npm run test:ai-review && npm run test:links"
+    "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal && npm run test:ai-review && npm run test:ai-ladder && npm run test:links"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

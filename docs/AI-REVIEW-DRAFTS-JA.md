@@ -24,7 +24,7 @@
 | IP ごと | 10 回/分、60 回/時（店の Wi-Fi は全員同じ IP なので広め） |
 | 店ごと | 150 回/時 |
 | 全体 | 1 日 `AI_REVIEW_DAILY_CAP`（既定 2,000）。超えたら全店テンプレート |
-| 時間 | ルート全体 7.5 秒、1 試行 4.5 秒。クライアントは 9 秒で諦める。実測 `gemini-flash-lite-latest` で 0.6〜0.9 秒（2026-09-06） |
+| 時間 | ルート全体 7.5 秒、1 モデル 5.5 秒。**1.8 秒応答が無ければ次のモデルを並走**させ、先に返った文を使う（2026-09-07。lite の遅い尾で 5 割落ちた時間帯があったため）。クライアントは 9 秒で諦める。実測 `gemini-flash-lite-latest` で 1.1〜1.6 秒 |
 | 長さ | 英語: 星 5 は 55〜90 語・星 4 は 45〜75 語を指示、上限 130 語で却下。日本語: 110〜200 文字／90〜160 文字、上限 280 文字。長さはフレーズの掘り下げで出させ、新しい事実は禁止（2026-09-06 に約 3 割引き上げ） |
 
 上限はすべて既存の `bump_rate_limit`（`api_rate_limits` テーブル）で数える。
@@ -32,7 +32,7 @@
 ## 前提（本番）
 
 1. **Gemini の鍵は課金有効のプロジェクトのもの**であること。無料枠だと 1 日数十〜数百回で 429 になり、以降は黙ってテンプレートに落ちる。確認: `.env.local` に鍵を置いて `node scripts/test-gemini-tier.mjs`（PAID と出ること）。
-2. Vercel の環境変数 `GEMINI_API_KEY`（返信機能と共通）。任意: `GEMINI_REVIEW_MODELS`（カンマ区切りで梯子を上書き）、`AI_REVIEW_DAILY_CAP`。
+2. Vercel の環境変数 `GEMINI_API_KEY`（返信機能と共通）。任意: `GEMINI_REVIEW_MODELS`（カンマ区切りで梯子を上書き）、`AI_REVIEW_DAILY_CAP`。梯子の既定は `gemini-flash-lite-latest` → `gemini-flash-latest`（thinking を切る指定は lite が 400 を返し、flash は受け付ける。lib/review-ai.ts がモデルごとに覚える）。
 3. マイグレーション `20260906120000_ai_review_drafts.sql` 適用済み（列・view・`ai_review_drafts` テーブル）。**コードより先に**適用する。QR ページが view から `ai_review_enabled` を読むため。
 
 ## 出す前の確認手順

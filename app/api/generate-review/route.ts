@@ -48,7 +48,10 @@ type Body = {
 
 /** Total wall-clock budget for the model ladder; the client aborts at 9 s. */
 const BUDGET_MS = 7500;
-const ATTEMPT_MS = 4500;
+/** Per model. The lite model answers in ~1.3 s; past this it is the slow tail. */
+const ATTEMPT_MS = 5500;
+/** Silence before the next model is started alongside (lib/review-ai hedging). */
+const HEDGE_AFTER_MS = 1800;
 const MAX_GENERATIONS = 2;
 const DAILY_CAP = Math.max(50, Number(process.env.AI_REVIEW_DAILY_CAP) || 2000);
 
@@ -239,6 +242,7 @@ export async function POST(req: Request) {
       prompt,
       budgetMs: remaining,
       attemptMs: ATTEMPT_MS,
+      hedgeAfterMs: HEDGE_AFTER_MS,
     });
     if (!result.ok) {
       lastReason = result.reason;
