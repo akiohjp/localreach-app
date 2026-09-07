@@ -23,21 +23,22 @@ export default async function MasterAdminPage() {
     subscription_expires_at: string | null
     created_at: string
     customers: unknown
-    /** Absent only while the 2026-09-06 migrations have not reached this database. */
+    /** Absent only while the 2026-09-06 / 09-08 migrations have not reached this database. */
     ai_review_enabled?: boolean
     slug?: string | null
+    paid?: boolean
   }
   // Deploy-order guard: the 2026-09-06 columns (ai_review_enabled, slug)
   // arrive with their migrations; until then the toggle reads off and the
   // short link is simply not shown.
   let stores: MasterStoreRow[] | null = null
-  for (const cols of [`${BASE}, ai_review_enabled, slug`, `${BASE}, ai_review_enabled`, BASE]) {
+  for (const cols of [`${BASE}, ai_review_enabled, slug, paid`, `${BASE}, ai_review_enabled, slug`, `${BASE}, ai_review_enabled`, BASE]) {
     const res = await admin.from('stores').select(cols).order('created_at', { ascending: false })
     if (!res.error) {
       stores = res.data as unknown as MasterStoreRow[] | null
       break
     }
-    if (!isMissingColumnError(res.error, 'slug') && !isMissingColumnError(res.error, 'ai_review_enabled')) break
+    if (!isMissingColumnError(res.error, 'paid') && !isMissingColumnError(res.error, 'slug') && !isMissingColumnError(res.error, 'ai_review_enabled')) break
   }
 
   const rows = (stores ?? []).map((s) => {
@@ -51,6 +52,7 @@ export default async function MasterAdminPage() {
       expiresAt: s.subscription_expires_at,
       aiDrafts: Boolean(s.ai_review_enabled),
       slug: s.slug ?? null,
+      paid: Boolean(s.paid),
       createdAt: s.created_at,
       customerCount: Number(countArr?.[0]?.count ?? 0),
     }

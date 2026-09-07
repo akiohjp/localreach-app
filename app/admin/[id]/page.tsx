@@ -154,7 +154,10 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
   // owner never opens the dashboard to stale numbers and a brand-new store
   // has a baseline from day one. The daily cron covers stores nobody opens.
   let reviewStats = [] as { captured_on: string; rating: number | null; review_count: number }[]
-  if (store.google_place_id) {
+  // Results are measured for paying stores only (owner decision 2026-09-08);
+  // a demo shows the flow, not a chart. Undefined = column not migrated yet.
+  const statsTracked = (store as { paid?: boolean }).paid ?? true
+  if (store.google_place_id && statsTracked) {
     const today = new Date().toISOString().slice(0, 10)
     const latest = await admin
       .from('review_stats')
@@ -197,6 +200,7 @@ export default async function AdminStorePage({ params, searchParams }: Props) {
       feedbackCount={feedbackCount}
       feedbackUnread={feedbackUnread}
       reviewStats={reviewStats}
+      statsTracked={statsTracked}
       logoSignedUrl={logoSignedUrl}
       initialTab={initialTab}
     />

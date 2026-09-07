@@ -109,6 +109,8 @@ export type Database = {
           ai_review_enabled?: boolean;
           /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
           slug?: string;
+          /** Paying client (master-admin toggle). Gates the Google Places review_stats capture. */
+          paid?: boolean;
           /** Google Place ID for results reporting (rating/review-count snapshots). */
           google_place_id?: string | null;
 
@@ -145,6 +147,8 @@ export type Database = {
           ai_review_enabled?: boolean;
           /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
           slug?: string;
+          /** Paying client (master-admin toggle). Gates the Google Places review_stats capture. */
+          paid?: boolean;
 
           created_at?: string;
           updated_at?: string;
@@ -179,6 +183,8 @@ export type Database = {
           ai_review_enabled?: boolean;
           /** Six-character code for the short guest link (migration 20260906180000). DB-generated. */
           slug?: string;
+          /** Paying client (master-admin toggle). Gates the Google Places review_stats capture. */
+          paid?: boolean;
 
           created_at?: string;
           updated_at?: string;

@@ -12,6 +12,8 @@ export type NewStoreRow = {
   aiDrafts: boolean
   /** stores.slug — short guest link code (DB-generated; null until the page refreshes). */
   slug: string | null
+  /** stores.paid — paying client; gates the Google Places review_stats capture. */
+  paid: boolean
   createdAt: string
   customerCount: number
 }
@@ -187,6 +189,7 @@ export async function createStore(payload: {
         expiresAt: null,
         aiDrafts: false,
         slug: null,
+        paid: false,
         createdAt: store.created_at,
         customerCount: 0,
       },
@@ -272,6 +275,32 @@ export async function masterSetStoreAiDrafts(
     const { data, error } = await admin
       .from('stores')
       .update({ ai_review_enabled: enabled })
+      .eq('id', storeId)
+      .select('id')
+    if (error) return { ok: false, error: error.message }
+    if (!data || data.length === 0) return { ok: false, error: 'Store not found.' }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
+}
+
+/**
+ * Marks a store as a paying client. Gates the Google Places snapshot (daily
+ * cron + dashboard freshness capture): demos are shown, not measured.
+ */
+export async function masterSetStorePaid(
+  storeId: string,
+  paid: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const denied = await masterUnauthorized()
+  if (denied) return denied
+
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('stores')
+      .update({ paid })
       .eq('id', storeId)
       .select('id')
     if (error) return { ok: false, error: error.message }

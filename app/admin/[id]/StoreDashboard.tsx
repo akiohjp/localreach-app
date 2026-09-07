@@ -77,6 +77,8 @@ type Props = {
   initialTab?: TabId
   /** Daily Google rating/review-count snapshots (oldest first). Empty = no place id or no data yet. */
   reviewStats?: { captured_on: string; rating: number | null; review_count: number }[]
+  /** False for demo stores: no snapshots are taken, so no results panel. */
+  statsTracked?: boolean
 }
 
 type TabId = 'grow' | 'customers' | 'settings'
@@ -1928,6 +1930,7 @@ export default function StoreDashboard({
   logoSignedUrl,
   initialTab = 'grow',
   reviewStats = [],
+  statsTracked = true,
 }: Props) {
   const router = useRouter()
 
@@ -2100,7 +2103,7 @@ export default function StoreDashboard({
               </ol>
             </details>
 
-            {(store.google_place_id || reviewStats.length > 0) && (
+            {statsTracked && (store.google_place_id || reviewStats.length > 0) && (
               <SectionCard label="Your results" icon={<Star size={14} />}>
                 <ResultsPanel stats={reviewStats} />
               </SectionCard>

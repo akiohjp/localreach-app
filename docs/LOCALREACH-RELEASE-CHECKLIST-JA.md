@@ -156,3 +156,9 @@ npx vercel --prod
 ## 7. 短縮 QR リンク（qr.miraireach.ae、2026-09-06 追加）
 
 詳細は [[SHORT-QR-LINKS-JA]]。順番: `20260906180000_store_slugs.sql` を適用 → Cloudflare で CNAME `qr` → `cname.vercel-dns.com`（DNS only）→ Vercel の Domains に `qr.miraireach.ae` を追加 → 環境変数 `NEXT_PUBLIC_QR_HOST=qr.miraireach.ae` を入れて再デプロイ。`/store/<uuid>` は永久に有効。
+
+---
+
+## 8. 有料店舗フラグ `stores.paid`（2026-09-08 追加）
+
+Google Places のレビュー数・評価点の日次取得（`review_stats`、1 店 1 日 1 回の課金呼び出し）は **paid の店だけ**で動く（Akio 決定 2026-09-08。デモ店は見せるものであって測るものではない）。オーナー画面の「Your results」も paid の店だけに出る。マスター管理画面の **Paid** トグルで切り替え。`20260908100000_stores_paid.sql` を適用（Let It Dough と Cinar 3 店を paid でバックフィル）。適用前にコードが出た場合は従来どおり全店取得のまま（有料店の記録を止めないため）。

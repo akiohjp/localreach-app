@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, X, Eye, EyeOff, Loader2, Plus, BarChart2, Copy, Printer, Check, LogOut } from 'lucide-react'
-import { createStore, masterSetStoreActive, masterSetStoreExpiry, masterSetStoreAiDrafts, masterExportCustomersCsv } from './actions'
+import { createStore, masterSetStoreActive, masterSetStoreExpiry, masterSetStoreAiDrafts, masterSetStorePaid, masterExportCustomersCsv } from './actions'
 import { logoutMasterAction } from './login/actions'
 import type { NewStoreRow } from './actions'
 
@@ -14,6 +14,7 @@ type StoreRow = {
   expiresAt: string | null
   aiDrafts: boolean
   slug: string | null
+  paid: boolean
   createdAt: string
   customerCount: number
 }
@@ -533,6 +534,21 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
     setPending(null)
   }
 
+  async function togglePaid(id: string, current: boolean) {
+    setPending(id)
+    setError(null)
+    const res = await masterSetStorePaid(id, !current)
+
+    if (!res.ok) {
+      setError(`Failed to update paid flag for ${id.slice(0, 8)}: ${res.error}`)
+    } else {
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, paid: !current } : r)),
+      )
+    }
+    setPending(null)
+  }
+
   async function toggleAiDrafts(id: string, current: boolean) {
     setPending(id)
     setError(null)
@@ -602,7 +618,9 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
               subscription lapses (access lasts through that day, Dubai time). Inactive or expired
               stores redirect all visitors to the Service Inactive page.{' '}
               <span className="font-semibold">AI Draft</span> gives that store&apos;s guests a
-              Gemini-written draft instead of the offline template (billed per call; off by default).
+              Gemini-written draft instead of the offline template (billed per call; off by default).{' '}
+              <span className="font-semibold">Paid</span> marks a paying client: only paid stores get the daily
+              Google rating and review-count snapshot (a billed Places call); demos are shown, not measured.
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 self-stretch sm:self-start sm:pt-0.5 relative z-10">
@@ -668,6 +686,9 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
                 </th>
                 <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
                   Contract End
+                </th>
+                <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
+                  Paid
                 </th>
                 <th className="px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 text-center">
                   AI Draft
@@ -757,6 +778,30 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-center gap-3">
+                      <span className={`text-xs font-semibold w-14 text-center ${row.paid ? 'text-green-700' : 'text-slate-400'}`}>
+                        {row.paid ? 'Paid' : 'Demo'}
+                      </span>
+                      <button
+                        onClick={() => togglePaid(row.id, row.paid)}
+                        disabled={pending === row.id}
+                        aria-label={row.paid ? 'Mark as demo (stop measuring)' : 'Mark as paying client (start measuring)'}
+                        title="Paying client: daily Google rating / review-count snapshot runs (billed Places call). Demo: shown, not measured."
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
+                          border-2 border-transparent transition-colors duration-200
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          ${row.paid ? 'bg-green-600' : 'bg-gray-300'}`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
+                            bg-white shadow ring-0 transition duration-200 ease-in-out
+                            ${row.paid ? 'translate-x-5' : 'translate-x-0'}`}
+                        />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-center gap-3">
                       <span
                         className={`text-xs font-semibold w-14 text-center ${
                           row.aiDrafts ? 'text-amber-600' : 'text-slate-400'
@@ -818,7 +863,7 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
                     No stores found.
                   </td>
                 </tr>

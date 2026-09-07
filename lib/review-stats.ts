@@ -92,10 +92,23 @@ export async function captureAllStores(): Promise<{
   skippedNoPlaceId: number;
 }> {
   const admin = createAdminClient();
-  const { data: stores, error } = await admin
+  // Paying stores only (owner decision 2026-09-08): a demo is shown, not
+  // measured, and each snapshot is a billed Places call. Until migration
+  // 20260908100000 reaches the database the column does not exist; the
+  // previous behaviour (every active store) is kept rather than skipping the
+  // paying clients' snapshots.
+  let { data: stores, error } = await admin
     .from("stores")
     .select("id, google_place_id, is_active")
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .eq("paid", true);
+  if (error && /paid/i.test(`${error.message} ${error.details ?? ""}`)) {
+    console.warn("[review-stats] stores.paid missing; capturing every active store until the migration lands");
+    ({ data: stores, error } = await admin
+      .from("stores")
+      .select("id, google_place_id, is_active")
+      .eq("is_active", true));
+  }
   if (error) throw new Error(`stores query failed: ${error.message}`);
 
   const withPid = (stores ?? []).filter(

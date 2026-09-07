@@ -58,10 +58,9 @@ const NOTES = {
   "Sushidokoro Tsukasa": { kind: "demo", note: "熊本。日本語店（AI は英語のみ検証済み）" },
   "Sengawa Golf": { kind: "demo", note: "東京。日本語店（AI は英語のみ検証済み）" },
 };
-const KIND_LABEL = { client: "クライアント", demo: "デモ（見込み客）", own: "自社", test: "テスト" };
 
 const res = await fetch(
-  `${url}/rest/v1/stores?select=id,slug,store_name,business_category,entity_area,entity_city,default_language,is_active,subscription_expires_at,ai_review_enabled,google_place_id,google_review_url,keywords,forced_keywords,logo_url,created_at&order=created_at`,
+  `${url}/rest/v1/stores?select=*&order=created_at`,
   { headers: { apikey: key, Authorization: `Bearer ${key}` } },
 );
 if (!res.ok) {
@@ -75,7 +74,13 @@ const esc = (s) =>
 const now = Date.now();
 const DAY = 86400000;
 
-function kindOf(name) {
+function kindOf(name, s) {
+  // stores.paid (2026-09-08) is the source of truth once it exists; the notes
+  // table only fills in what the database cannot say.
+  if (typeof s?.paid === "boolean" && NOTES[name]?.kind !== "own" && NOTES[name]?.kind !== "test") {
+    if (s.paid) return "client";
+    if (NOTES[name]?.kind === "client") return "demo";
+  }
   if (NOTES[name]?.kind) return NOTES[name].kind;
   return /test|qa |demo cafe|dubai bar/i.test(name) ? "test" : "demo";
 }
@@ -103,7 +108,7 @@ function messageFor(s, name) {
 const groups = { client: [], demo: [], own: [], test: [] };
 for (const s of rows) {
   const name = s.store_name?.en ?? Object.values(s.store_name ?? {})[0] ?? "(unnamed)";
-  const kind = kindOf(name);
+  const kind = kindOf(name, s);
   const live = s.is_active && (!s.subscription_expires_at || Date.parse(s.subscription_expires_at) > now);
   const short = s.slug ? `https://${QR_HOST}/${s.slug}` : null;
   const long = `${APP}/store/${s.id}`;
