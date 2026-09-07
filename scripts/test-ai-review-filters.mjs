@@ -7,9 +7,9 @@
  */
 import assert from "node:assert/strict";
 
-const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, measureLength } =
+const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, measureLength, openingKey, ngramOverlap } =
   await import("../lib/review-ai-filter.ts");
-const { buildReviewPrompt, OPENINGS } = await import("../lib/review-prompt.ts");
+const { buildReviewPrompt, OPENINGS, CLOSINGS, STOCK_OPENERS } = await import("../lib/review-prompt.ts");
 const { reviewModelsFromEnv, DEFAULT_REVIEW_MODELS } = await import("../lib/review-ai.ts");
 const { bannedTermsFor, softBannedTermsFor, splitSoftTerms, findBannedTermIn, findTermOutsidePhrases } =
   await import("../lib/banned-terms.ts");
@@ -82,6 +82,39 @@ t("check: length rails per locale", () => {
 t("check: the store name at most once", () => {
   const text = "Let It Dough was easy to find and Let It Dough had Friendly Staff and Fresh doughnuts, so we stayed a while longer.";
   assert.equal(checkReviewDraft(text, EN_CTX).reason, "store_name_repeated");
+});
+
+t("diversity: a draft that opens or reads like a recent one is rejected", () => {
+  assert.equal(openingKey("If you are looking for great pizza in Dubai, this spot is worth it."), "if you are looking for");
+  const prev = "If you are looking for great pizza in Dubai, this spot is worth checking out. We enjoyed the artisan pizza quite a bit and the Garlic Knots were fresh. The friendly team made the visit easy and we stayed a while longer than planned.";
+  const sameOpening = "If you are looking for solid pizza in Dubai, come here. The Friendly Staff kept checking on us and the Fresh doughnuts were warm, and we took a box home that was just as good the next morning, which says a lot about the place.";
+  assert.equal(checkReviewDraft(sameOpening, { ...EN_CTX, recent: [prev] }).reason, "opening_repeat");
+  const rephrase = "Honestly if you are looking for great pizza in Dubai this spot is worth checking out, we enjoyed the artisan pizza quite a bit and the Garlic Knots were fresh, and the friendly team made the visit easy so we stayed a while longer than planned. Friendly Staff, Fresh doughnuts.";
+  assert.ok(ngramOverlap(rephrase, prev) > 0.3);
+  assert.ok(checkReviewDraft(rephrase, { ...EN_CTX, recent: [prev] }).reason.startsWith("too_similar:"));
+  assert.equal(checkReviewDraft(EN_GOOD, { ...EN_CTX, recent: [prev] }).ok, true);
+});
+
+t("prompt: many openings and closings, stock openers banned, recent openings named", () => {
+  assert.ok(OPENINGS.length >= 24);
+  assert.ok(CLOSINGS.length >= 12);
+  assert.equal(new Set(OPENINGS).size, OPENINGS.length);
+  const p = buildReviewPrompt({
+    storeName: "Pitfire Pizza",
+    locale: "en",
+    rating: 5,
+    keywords: ["pizza in Dubai"],
+    variant: 7,
+    closingVariant: 2,
+    recentOpenings: ["If you are looking for great pizza", "It turned out even better than"],
+  });
+  assert.ok(p.includes(OPENINGS[7]));
+  assert.ok(p.includes(CLOSINGS[2]));
+  assert.ok(p.includes('"If you are looking for"'));
+  assert.ok(STOCK_OPENERS.includes("I finally found"));
+  assert.ok(p.includes('do not begin like any of them, and do not reuse their first few words: "If you are looking for great pizza" / "It turned out even better than"'));
+  const p30 = buildReviewPrompt({ storeName: "X", locale: "en", rating: 5, keywords: ["a"], variant: 30 });
+  assert.ok(p30.includes(OPENINGS[30 % OPENINGS.length]));
 });
 
 t("note: bounded, single line, printable", () => {

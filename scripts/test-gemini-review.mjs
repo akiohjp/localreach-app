@@ -38,9 +38,9 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const { buildReviewPrompt, OPENINGS } = await import("../lib/review-prompt.ts");
+const { buildReviewPrompt, OPENINGS, CLOSINGS } = await import("../lib/review-prompt.ts");
 const { generateWithLadder, reviewModelsFromEnv } = await import("../lib/review-ai.ts");
-const { cleanReviewDraft, checkReviewDraft } = await import("../lib/review-ai-filter.ts");
+const { cleanReviewDraft, checkReviewDraft, openingKey } = await import("../lib/review-ai-filter.ts");
 const { NON_VISIT_VERTICALS, resolveAudience, resolveVertical } = await import("../lib/review-pools.ts");
 const { bannedTermsFor, splitSoftTerms, findBannedTermIn, stripBannedSentencesIn, findTermOutsidePhrases } =
   await import("../lib/banned-terms.ts");
@@ -191,6 +191,9 @@ if (LIVE) {
 const results = [];
 let okCount = 0;
 let total = 0;
+// Drafts already made for a store in this run, so each next one is steered
+// and checked against them exactly as the route does with the log.
+const recentByStore = new Map();
 for (const c of cases) {
   if (ONLY && !`${c.store} ${c.category}`.toLowerCase().includes(ONLY)) continue;
   for (const locale of LOCALES) {
@@ -199,6 +202,8 @@ for (const c of cases) {
       const vertical = resolveVertical(c.category);
       const soft = splitSoftTerms(c.store, c.keywords);
       const forbidden = [...bannedTermsFor(c.store), ...soft.forbidden];
+      const recent = recentByStore.get(c.store) ?? [];
+      const seq = recent.length;
       const prompt = buildReviewPrompt({
         storeName: c.store,
         locale,
@@ -211,7 +216,9 @@ for (const c of cases) {
         city: c.entity.city,
         nonVisit: NON_VISIT_VERTICALS.has(vertical),
         visitor: resolveAudience(c.category) === "visitor",
-        variant: (LIVE ? cases.indexOf(c) : i) % OPENINGS.length,
+        variant: seq % OPENINGS.length,
+        closingVariant: (seq * 5 + 3) % CLOSINGS.length,
+        recentOpenings: recent.map((d) => d.split(/\s+/).slice(0, 8).join(" ")),
         bannedTerms: forbidden,
         phraseOnlyTerms: soft.allowed,
       });
@@ -231,7 +238,8 @@ for (const c of cases) {
         ? { ok: false, reason: `banned:${banned}` }
         : leaked
           ? { ok: false, reason: `banned_outside_phrase:${leaked}` }
-          : checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store });
+          : checkReviewDraft(text, { locale, rating: c.rating, keywords: c.keywords, storeName: c.store, recent });
+      if (verdict.ok) recentByStore.set(c.store, [...recent, text].slice(-20));
       if (verdict.ok) okCount++;
       console.log(`  [${i + 1}] ${r.model} ${r.latencyMs} ms  ${verdict.ok ? "PASS" : `REJECT ${verdict.reason}`}`);
       console.log(`      ${text}`);
@@ -241,6 +249,10 @@ for (const c of cases) {
 }
 
 console.log(`\n${"=".repeat(70)}\ngenerated ${total}, passed filter ${okCount}, rejected/failed ${total - okCount}`);
+for (const [store, drafts] of recentByStore) {
+  const keys = new Set(drafts.map((d) => openingKey(d)));
+  console.log(`openings ${store}: ${keys.size} distinct of ${drafts.length}`);
+}
 if (OUT) {
   fs.writeFileSync(OUT, JSON.stringify(results.filter((r) => r.text), null, 2));
   console.log(`wrote ${OUT}. Judge it with: npx tsx scripts/gate-review-naturalness.mjs --input=${OUT}`);

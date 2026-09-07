@@ -18,6 +18,7 @@
     "test:ai-ladder": "npx tsx scripts/test-ai-ladder.mjs",
     "ai:sample": "npx tsx scripts/test-gemini-review.mjs",
     "ai:drafts": "npx tsx scripts/read-ai-drafts.mjs",
+    "ai:diversity": "npx tsx scripts/ai-drafts-diversity.mjs",
     "sales:list": "npx tsx scripts/sales-list.mjs",
     "audit:all": "npm run audit:reviews && npm run test:replies && npm run test:rating-only && npm run test:generation && npm run check:rating-goal && npm run test:ai-review && npm run test:ai-ladder && npm run test:links"
   },

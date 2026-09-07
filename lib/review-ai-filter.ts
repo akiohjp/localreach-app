@@ -129,7 +129,45 @@ export type DraftContext = {
   rating: number;
   keywords: string[];
   storeName: string;
+  /** This store's recent shipped drafts; a new one must not open like, or read like, any of them. */
+  recent?: readonly string[];
 };
+
+// RegExp() rather than a literal: \p{} is ES2018 syntax and tsconfig targets ES2017.
+const NON_WORD_RE = new RegExp("[^\\p{L}\\p{N}\\s]", "gu");
+
+/** Lower-cased word tokens (JA/AR: characters), punctuation dropped. */
+function tokens(text: string): string[] {
+  const t = text.toLowerCase().replace(NON_WORD_RE, " ");
+  const words = t.split(/\s+/).filter(Boolean);
+  // Character-based when the text has no spaces to speak of (Japanese).
+  if (words.length < 6 && t.replace(/\s/g, "").length > 20) return Array.from(t.replace(/\s/g, ""));
+  return words;
+}
+
+/** The first N tokens, joined: what a reader compares when reviews sit side by side. */
+export function openingKey(text: string, n = 5): string {
+  return tokens(text).slice(0, n).join(" ");
+}
+
+function ngrams(toks: string[], n: number): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i + n <= toks.length; i++) out.add(toks.slice(i, i + n).join(" "));
+  return out;
+}
+
+/** Share of the draft's 4-grams that also occur in `other` (0..1). */
+export function ngramOverlap(draft: string, other: string, n = 4): number {
+  const a = ngrams(tokens(draft), n);
+  if (a.size === 0) return 0;
+  const b = ngrams(tokens(other), n);
+  let hit = 0;
+  for (const g of a) if (b.has(g)) hit++;
+  return hit / a.size;
+}
+
+/** Above this share of shared 4-grams, two reviews read as the same review. */
+export const SIMILARITY_MAX = 0.3;
 
 /**
  * The verdict on one cleaned draft. Reasons are short machine-readable tags so
@@ -171,6 +209,16 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   const name = ctx.storeName.trim();
   if (name.length >= 3 && countOccurrences(lower, name.toLowerCase()) > 1) {
     return { ok: false, reason: "store_name_repeated" };
+  }
+
+  // Against this store's recent drafts: the opening must be new, and the body
+  // must not be a rephrasing (owner's rule 2026-09-07: fifty reviews of one
+  // place must not look like one person wrote them).
+  for (const prev of ctx.recent ?? []) {
+    if (!prev) continue;
+    if (openingKey(t) === openingKey(prev)) return { ok: false, reason: "opening_repeat" };
+    const overlap = ngramOverlap(t, prev);
+    if (overlap > SIMILARITY_MAX) return { ok: false, reason: `too_similar:${Math.round(overlap * 100)}` };
   }
 
   // Length last, so a draft with a content defect reports that defect.

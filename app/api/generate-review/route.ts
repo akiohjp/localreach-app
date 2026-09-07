@@ -10,7 +10,7 @@ import {
   splitSoftTerms,
   stripBannedSentencesIn,
 } from "@/lib/banned-terms";
-import { buildReviewPrompt, OPENINGS } from "@/lib/review-prompt";
+import { buildReviewPrompt, CLOSINGS, OPENINGS } from "@/lib/review-prompt";
 import { checkReviewDraft, cleanReviewDraft, sanitizeGuestNote } from "@/lib/review-ai-filter";
 import { generateWithLadder, reviewModelsFromEnv } from "@/lib/review-ai";
 import { NON_VISIT_VERTICALS, resolveAudience, resolveVertical } from "@/lib/review-pools";
@@ -208,6 +208,31 @@ export async function POST(req: Request) {
   const models = reviewModelsFromEnv();
   const started = Date.now();
 
+  // What this store's guests already received. The opening move rotates
+  // through every variant before repeating (total so far + attempt), the
+  // prompt names the recent openings to steer clear of, and the filter
+  // rejects a draft that still opens or reads like one of them.
+  const [recentRes, countRes] = await Promise.all([
+    admin
+      .from("ai_review_drafts")
+      .select("draft")
+      .eq("store_id", store.id)
+      .eq("outcome", "ai")
+      .order("created_at", { ascending: false })
+      .limit(20),
+    admin
+      .from("ai_review_drafts")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", store.id)
+      .eq("outcome", "ai"),
+  ]);
+  const recent = (recentRes.data ?? []).map((r) => r.draft ?? "").filter(Boolean);
+  const totalSoFar = countRes.count ?? recent.length;
+  const recentOpenings = recent.map((d) => d.split(/\s+/).slice(0, 8).join(" "));
+  // Per-store offset so two stores set up the same day do not march in step.
+  let storeSeed = 0;
+  for (let i = 0; i < store.id.length; i++) storeSeed = (storeSeed * 31 + store.id.charCodeAt(i)) >>> 0;
+
   let lastReason = "no_attempt";
   let lastCandidate: string | null = null;
   let lastModel: string | null = null;
@@ -230,9 +255,9 @@ export async function POST(req: Request) {
       city: store.entity_city,
       nonVisit: NON_VISIT_VERTICALS.has(vertical),
       visitor: resolveAudience(store.business_category) === "visitor",
-      // Random so two guests with the same taps do not get the same skeleton;
-      // the attempt offset guarantees "try another wording" moves.
-      variant: (Math.floor(Math.random() * OPENINGS.length) + attempt + gen) % OPENINGS.length,
+      variant: (storeSeed + totalSoFar + attempt + gen) % OPENINGS.length,
+      closingVariant: (storeSeed * 7 + totalSoFar * 5 + attempt + gen) % CLOSINGS.length,
+      recentOpenings,
       bannedTerms: forbidden,
       phraseOnlyTerms: soft.allowed,
     });
@@ -263,7 +288,7 @@ export async function POST(req: Request) {
       lastCandidate = text;
       continue;
     }
-    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName });
+    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName, recent });
     if (!verdict.ok) {
       lastReason = verdict.reason;
       lastCandidate = text;

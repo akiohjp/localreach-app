@@ -34,6 +34,14 @@ export type ReviewPromptInput = {
   visitor?: boolean;
   /** 0..OPENINGS.length-1 — rotates the structure, never the facts. */
   variant?: number;
+  /** 0..CLOSINGS.length-1 — rotates how the review ends. */
+  closingVariant?: number;
+  /**
+   * How this store's recent drafts began (first words of each). The model is
+   * told not to begin the same way: fifty reviews of one place must not share
+   * an opening, and left alone the model reaches for the same stock one.
+   */
+  recentOpenings?: readonly string[];
   /** Store-specific forbidden vocabulary (lib/banned-terms), never allowed. */
   bannedTerms?: readonly string[];
   /**
@@ -51,7 +59,11 @@ export const LANGUAGE_RULE: Record<SupportedLocale, string> = {
 
 /**
  * Structural variety without invented facts. Each opening changes where the
- * review starts, not what happened.
+ * review starts, not what happened. Twenty-four moves, rotated per store in
+ * order (route: total drafts so far + attempt), so the first twenty-four
+ * guests of a store all begin differently before any move comes round again.
+ * The owner's rule (2026-09-07): a repeated opening is the first thing a
+ * reader notices when reviews sit side by side, so openings get the most care.
  */
 export const OPENINGS: readonly string[] = [
   "Open with the one thing that stood out most.",
@@ -60,6 +72,63 @@ export const OPENINGS: readonly string[] = [
   "Open with who this place is good for, then what made it so.",
   "Open with the most concrete of the tapped phrases, worked into a full sentence.",
   "Open with how it compared to what you expected, without inventing what you expected in detail.",
+  "Open with the moment you decided you liked the place.",
+  "Open with a plain statement of what you had or did, with no adjective in the first sentence.",
+  "Open with the ending: what you thought on the way out, then go back to the details.",
+  "Open with a very short reaction of two or three words, then a full sentence.",
+  "Open by talking to the reader directly, as if answering a friend who asked about the place.",
+  "Open with the second most important thing and keep the best for the middle.",
+  "Open with a small practical detail from the tapped phrases, what it was or how it came, not a judgement.",
+  "Open with a plain sentence naming the type of place and what you were after.",
+  "Open with the tapped phrase a friend would ask about first, as a question you then answer.",
+  "Open with how you felt afterwards, then explain what caused it.",
+  "Open with a quiet understatement and let the details do the work.",
+  "Open in the middle of the visit, with the thing in front of you.",
+  "Open with a one-line summary a busy reader could stop after, then the details for those who read on.",
+  "Open with what surprised you, within what the tapped phrases and their own words say.",
+  "Open with a flat past-tense sentence about the visit that a real person would type, no hook, no flourish.",
+  "Open with the last tapped phrase in the list and work backwards through the others.",
+  "Open with the time of day or the occasion ONLY if their own words give it; otherwise open with what you had.",
+  "Open with a sentence about the place itself before anything you ordered or bought.",
+];
+
+/** How the review ends, rotated independently of the opening. */
+export const CLOSINGS: readonly string[] = [
+  "End on a specific detail, not a verdict.",
+  "End by saying who you would send here.",
+  "End with a plain sentence about coming back, in your own words, not 'will definitely be back'.",
+  "End on the tapped phrase you cared about most.",
+  "End mid-thought, the way a phone review often just stops.",
+  "End with a short one-line verdict.",
+  "End with what you would order or look at next time.",
+  "End on a practical tip drawn only from the tapped phrases or their own words.",
+  "End without a closing line at all: the last detail is the last sentence.",
+  "End with one sentence about the overall feel of the visit.",
+  "End with the reason you would mention this place to someone.",
+  "End with the plainest possible sentence, four to eight words.",
+];
+
+/**
+ * Stock openers the model reaches for when a search phrase is in play
+ * ("pizza in Dubai" pulls "If you are looking for pizza in Dubai, ..."). Banned
+ * outright; across one store's reviews they are the tell.
+ */
+export const STOCK_OPENERS: readonly string[] = [
+  "If you are looking for",
+  "If you're looking for",
+  "If you want",
+  "If anyone is looking",
+  "Looking for",
+  "I finally found",
+  "Finally found",
+  "Best ... in ...",
+  "Great place",
+  "Amazing",
+  "Wow",
+  "Highly recommend",
+  "This place",
+  "I recently",
+  "I had the pleasure",
 ];
 
 const KEYWORD_HINT: Record<string, string> = {
@@ -122,6 +191,8 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   const note = (p.note ?? "").trim();
   const rating = p.rating >= 5 ? 5 : 4;
   const variant = OPENINGS[Math.abs(Math.trunc(p.variant ?? 0)) % OPENINGS.length]!;
+  const closing = CLOSINGS[Math.abs(Math.trunc(p.closingVariant ?? (p.variant ?? 0) * 5 + 3)) % CLOSINGS.length]!;
+  const recentOpenings = (p.recentOpenings ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 20);
 
   const tappedLower = keywords.map((k) => k.toLowerCase());
   const area = (p.area ?? "").trim();
@@ -203,6 +274,15 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   }
   rules.push(
     `- ${variant}`,
+    `- ${closing}`,
+    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with "I". The first sentence must be one nobody else would write about this place.`,
+  );
+  if (recentOpenings.length) {
+    rules.push(
+      `- Other recent reviews of this place began like this; do not begin like any of them, and do not reuse their first few words: ${recentOpenings.map((s) => `"${s}"`).join(" / ")}`,
+    );
+  }
+  rules.push(
     `- Language: ${LANGUAGE_RULE[p.locale]}`,
     "- Output ONLY the review text, as one paragraph. No title, no name, no sign-off, no markdown, no explanation.",
   );
