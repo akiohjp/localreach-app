@@ -1,4 +1,5 @@
 import type { SupportedLocale } from "@/types/database";
+import type { Vertical } from "@/lib/review-pools";
 
 /**
  * UI copy for the guest review flow, per locale. The store name / greeting come
@@ -481,4 +482,30 @@ const UI_STRINGS: Record<SupportedLocale, UiStrings> = { en, ja, ar };
 /** Resolved UI copy for a locale (falls back to English). */
 export function getUiStrings(locale: SupportedLocale): UiStrings {
   return UI_STRINGS[locale] ?? en;
+}
+
+/**
+ * The low-rating quick tags are the same six countable reasons for every
+ * store (their KEYS are what the dashboard totals), but the first label is
+ * about food, and a perfume house or a clinic whose unhappy guest is offered
+ * "Food quality" reads as a template wearing the wrong business (RMK demo
+ * read, 2026-09-06). Only the "quality" label changes; keys never do.
+ */
+type FeedbackTopic = UiStrings["feedback"]["topics"][number];
+type QualityGroup = "food" | "retail" | "care" | "other";
+const QUALITY_LABEL: Record<SupportedLocale, Record<QualityGroup, string>> = {
+  en: { food: "Food quality", retail: "Product quality", care: "The result", other: "Quality" },
+  ja: { food: "料理の質", retail: "商品の質", care: "仕上がり", other: "品質" },
+  ar: { food: "جودة الطعام", retail: "جودة المنتج", care: "النتيجة", other: "الجودة" },
+};
+function qualityGroupFor(vertical: Vertical): QualityGroup {
+  if (vertical === "restaurant" || vertical === "cafe") return "food";
+  if (vertical === "retail") return "retail";
+  if (vertical === "beauty" || vertical === "aesthetic" || vertical === "dental" || vertical === "clinic" || vertical === "pet") return "care";
+  return "other";
+}
+export function feedbackTopicsFor(locale: SupportedLocale, vertical: Vertical): FeedbackTopic[] {
+  const t = getUiStrings(locale);
+  const label = QUALITY_LABEL[locale]?.[qualityGroupFor(vertical)] ?? QUALITY_LABEL.en[qualityGroupFor(vertical)];
+  return t.feedback.topics.map((topic) => (topic.key === "quality" ? { ...topic, label } : topic));
 }
