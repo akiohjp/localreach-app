@@ -216,7 +216,11 @@ export function checkReviewDraft(text: string, ctx: DraftContext): DraftCheck {
   // place must not look like one person wrote them).
   for (const prev of ctx.recent ?? []) {
     if (!prev) continue;
-    if (openingKey(t) === openingKey(prev)) return { ok: false, reason: "opening_repeat" };
+    // Same first five words, or even the same first two ("Stopping by",
+    // "Deciding on"): side by side, the first words are what a reader sees.
+    if (openingKey(t) === openingKey(prev) || openingKey(t, 2) === openingKey(prev, 2)) {
+      return { ok: false, reason: "opening_repeat" };
+    }
     const overlap = ngramOverlap(t, prev);
     if (overlap > SIMILARITY_MAX) return { ok: false, reason: `too_similar:${Math.round(overlap * 100)}` };
   }

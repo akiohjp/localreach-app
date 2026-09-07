@@ -90,6 +90,30 @@ export const OPENINGS: readonly string[] = [
   "Open with the last tapped phrase in the list and work backwards through the others.",
   "Open with the time of day or the occasion ONLY if their own words give it; otherwise open with what you had.",
   "Open with a sentence about the place itself before anything you ordered or bought.",
+  "Open with the name of the thing you had as the first words of a full sentence, no colon.",
+  "Open with the staff or service phrase first, if one was tapped; otherwise open with the type of place.",
+  "Open with the area or the type of place in the first sentence, then move to what you had.",
+  "Open with their own words, lightly tidied, if they typed any; otherwise open with the plainest tapped phrase.",
+  "Open with a sentence in the present tense, as if you were still there, then switch to the past.",
+  "Open with what you will get next time, then what you got this time.",
+  "Open with a question a friend might ask you about the place, then answer it in the next sentence.",
+  "Open with three words and a full stop, then a full sentence.",
+  "Open with one long sentence that carries two of the tapped phrases, then short ones.",
+  "Open with a sentence that contains no adjective at all.",
+  "Open in a dry, matter-of-fact tone, reporting rather than praising, and let the warmth come later.",
+  "Open with the first bite, sip or look, kept to what the tapped phrases say it was like.",
+  "Open by stating plainly how many of the tapped things you tried, then go through them.",
+  "Open by telling the reader what to order or ask for, using only tapped phrases.",
+  "Open with a contrast between two tapped phrases, one set against the other.",
+  "Open with the plainest, most ordinary true sentence about the visit, then build from there.",
+  "Open with a first sentence of five words or fewer.",
+  "Open with what you thought to yourself at the time, not what you said to anyone.",
+  "Open with the reason you would come back, before anything else.",
+  "Open with the thing you almost skipped but are glad you did not, drawn only from the tapped phrases.",
+  "Open with the value feeling ONLY if a tapped phrase is about value; otherwise open with the quality alone.",
+  "Open with a sentence that names no food, product or service, only the place and the feeling.",
+  "Open in the second person, saying what the reader will find, then switch to what you found.",
+  "Open by comparing this to the last time you had the same kind of thing elsewhere, naming no other place and inventing nothing about it.",
 ];
 
 /** How the review ends, rotated independently of the opening. */
@@ -106,6 +130,29 @@ export const CLOSINGS: readonly string[] = [
   "End with one sentence about the overall feel of the visit.",
   "End with the reason you would mention this place to someone.",
   "End with the plainest possible sentence, four to eight words.",
+  "End with the tapped phrase you have not used yet, in its own short sentence.",
+  "End with a present-tense sentence about how you feel now.",
+  "End on the staff or service phrase, if one was tapped; otherwise on the place.",
+  "End with a plain word of thanks to the place, one sentence, no exclamation mark.",
+  "End with a light question you are still asking yourself.",
+  "End on the area or the type of place, as a plain statement.",
+  "End with what you would tell someone who asks whether it is worth it, in one sentence.",
+  "End with a sentence that repeats nothing from the first sentence.",
+  "End on how you left, kept to what the tapped phrases or their own words support.",
+  "End with the plainest sentence in the whole review.",
+  "End with a sentence of five words or fewer.",
+  "End by naming the one thing you would change nothing about.",
+];
+
+/** Stock closers, banned for the same reason as the stock openers. */
+export const STOCK_CLOSERS: readonly string[] = [
+  "will definitely be back",
+  "highly recommend",
+  "can't wait to come back",
+  "worth every penny",
+  "you won't regret it",
+  "10/10",
+  "five stars",
 ];
 
 /**
@@ -276,6 +323,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     `- ${variant}`,
     `- ${closing}`,
     `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with "I". The first sentence must be one nobody else would write about this place.`,
+    `- Never end with a stock closer such as ${STOCK_CLOSERS.map((s) => `"${s}"`).join(", ")}.`,
   );
   if (recentOpenings.length) {
     rules.push(
