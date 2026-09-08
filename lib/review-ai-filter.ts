@@ -177,6 +177,20 @@ export function ngramOverlap(draft: string, other: string, n = 4): number {
 export const SIMILARITY_MAX = 0.3;
 
 /**
+ * A rejection the route may overrule when it has nothing better to ship: the
+ * draft is clean and truthful and only misses a preference (length target,
+ * distinct opening, distance from recent drafts). Every other reason is
+ * content that must not reach the guest.
+ *
+ * Seen 2026-09-08 on the first call to a fresh instance during a slow minute
+ * at Google: a 38-word draft fell to the length floor, the retry ran out of
+ * budget, and the guest got the template although a usable AI draft existed.
+ */
+export function isSoftRejection(reason: string): boolean {
+  return /^(too_short|too_long|opening_repeat|too_similar)(:|$)/.test(reason);
+}
+
+/**
  * The verdict on one cleaned draft. Reasons are short machine-readable tags so
  * ai_review_drafts.reason can be grouped when reading why the route fell back.
  */

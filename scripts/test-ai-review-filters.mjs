@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 
-const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, measureLength, openingKey, ngramOverlap } =
+const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, measureLength, openingKey, ngramOverlap, isSoftRejection } =
   await import("../lib/review-ai-filter.ts");
 const { buildReviewPrompt, OPENINGS, CLOSINGS, STOCK_OPENERS } = await import("../lib/review-prompt.ts");
 const { reviewModelsFromEnv, DEFAULT_REVIEW_MODELS } = await import("../lib/review-ai.ts");
@@ -220,6 +220,12 @@ t("models: env override and default ladder", () => {
   assert.deepEqual(reviewModelsFromEnv({}), [...DEFAULT_REVIEW_MODELS]);
   assert.deepEqual(reviewModelsFromEnv({ GEMINI_MODEL: "gemini-x" }), ["gemini-x", ...DEFAULT_REVIEW_MODELS]);
   assert.deepEqual(reviewModelsFromEnv({ GEMINI_REVIEW_MODELS: "a, b ,,c" }), ["a", "b", "c"]);
+});
+
+t("soft rejections: only length, opening and similarity may be overruled by the route", () => {
+  for (const r of ["too_short:38", "too_long:141", "opening_repeat", "too_similar:34"]) assert.equal(isSoftRejection(r), true, r);
+  for (const r of ["keyword_missing:fresh doughnuts", "ai_tell:hidden gem", "contact_detail", "rating_mentioned", "banned:persian", "empty", "gemini-flash-lite-latest:timeout"])
+    assert.equal(isSoftRejection(r), false, r);
 });
 
 console.log(`\nai-review filters: ${passed} checks passed`);

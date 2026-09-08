@@ -11,7 +11,7 @@ import {
   stripBannedSentencesIn,
 } from "@/lib/banned-terms";
 import { buildReviewPrompt, CLOSINGS, OPENINGS } from "@/lib/review-prompt";
-import { checkReviewDraft, cleanReviewDraft, sanitizeGuestNote } from "@/lib/review-ai-filter";
+import { checkReviewDraft, cleanReviewDraft, isSoftRejection, sanitizeGuestNote } from "@/lib/review-ai-filter";
 import { generateWithLadder, reviewModelsFromEnv } from "@/lib/review-ai";
 import { NON_VISIT_VERTICALS, resolveAudience, resolveVertical } from "@/lib/review-pools";
 import { getLocalizedText, type SupportedLocale } from "@/types/database";
@@ -28,8 +28,11 @@ import { qrHost } from "@/lib/store-links";
  * store, the phrases the guest left switched on (validated against the store's
  * own pill list — nothing the guest was never shown can reach the draft), the
  * guest's optional own words, and the entity layer. Every draft passes
- * lib/review-ai-filter before it is returned; a rejected draft is retried once
- * and then the route gives up (502) rather than ship it.
+ * lib/review-ai-filter before it is returned; a rejected draft is regenerated
+ * (up to MAX_GENERATIONS inside the time budget). When every try fails, a
+ * candidate that missed only a preference (length, opening, similarity) still
+ * ships; a content rejection never does, and the route answers 502 so the
+ * client falls back to the template.
  *
  * Cost controls, all before the model is called: origin check, per-IP burst
  * and hourly windows, per-store hourly window, a global daily ceiling.
@@ -237,6 +240,8 @@ export async function POST(req: Request) {
   let lastReason = "no_attempt";
   let lastCandidate: string | null = null;
   let lastModel: string | null = null;
+  /** First draft that missed only a preference; ships if nothing better comes. */
+  let softCandidate: { text: string; model: string; reason: string } | null = null;
 
   for (let gen = 0; gen < MAX_GENERATIONS; gen++) {
     const remaining = BUDGET_MS - (Date.now() - started);
@@ -293,6 +298,7 @@ export async function POST(req: Request) {
     if (!verdict.ok) {
       lastReason = verdict.reason;
       lastCandidate = text;
+      if (!softCandidate && isSoftRejection(verdict.reason)) softCandidate = { text, model: result.model, reason: verdict.reason };
       continue;
     }
     logDraft({
@@ -308,6 +314,25 @@ export async function POST(req: Request) {
       latency_ms: Date.now() - started,
     });
     return json({ review: verdict.text, model: result.model, source: "ai" }, 200);
+  }
+
+  // Every retry failed or ran out of budget. A clean draft that only missed a
+  // preference (length, opening, similarity) still beats the template; it is
+  // logged as an AI outcome with the overruled reason so the rate stays visible.
+  if (softCandidate) {
+    logDraft({
+      store_id: store.id,
+      outcome: "ai",
+      model: softCandidate.model,
+      locale,
+      rating,
+      keywords,
+      guest_note: note || null,
+      draft: softCandidate.text,
+      reason: `soft:${softCandidate.reason}`,
+      latency_ms: Date.now() - started,
+    });
+    return json({ review: softCandidate.text, model: softCandidate.model, source: "ai" }, 200);
   }
 
   logDraft({
