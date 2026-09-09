@@ -70,10 +70,13 @@ export default function StepResult({
   const [copyBlocked, setCopyBlocked] = useState(false);
   /** A rewrite is in flight (AI drafts take a few seconds); buttons wait for it. */
   const [rewriting, setRewriting] = useState(false);
+  /** The language button the guest just tapped — it carries the spinner. */
+  const [pendingLocale, setPendingLocale] = useState<SupportedLocale | null>(null);
 
   async function handleLanguageChange(loc: SupportedLocale) {
     if (loc === reviewLocale || rewriting) return;
     setCopied(false);
+    setPendingLocale(loc);
     setRewriting(true);
     try {
       const next = await onReviewLocaleChange(loc);
@@ -81,6 +84,7 @@ export default function StepResult({
       onReviewTextChange?.(next);
     } finally {
       setRewriting(false);
+      setPendingLocale(null);
     }
   }
 
@@ -269,6 +273,7 @@ export default function StepResult({
           <div className="flex gap-1.5 flex-wrap">
             {reviewLocaleOptions.map((opt) => {
               const active = opt.code === reviewLocale;
+              const pending = opt.code === pendingLocale;
               return (
                 <button
                   key={opt.code}
@@ -276,12 +281,14 @@ export default function StepResult({
                   onClick={() => handleLanguageChange(opt.code)}
                   disabled={rewriting}
                   aria-pressed={active}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all active:scale-[0.98] ${
+                  aria-busy={pending}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all active:scale-[0.98] disabled:cursor-wait ${
                     active
                       ? "bg-slate-900 text-white border-slate-900"
                       : "bg-white text-slate-600 border-gray-300 hover:border-slate-400"
-                  }`}
+                  } ${rewriting && !pending ? "opacity-50" : ""}`}
                 >
+                  {pending && <Loader2 size={12} className="animate-spin" aria-hidden="true" />}
                   {opt.label}
                 </button>
               );
@@ -290,7 +297,10 @@ export default function StepResult({
         </div>
       )}
 
-      {/* Textarea */}
+      {/* Textarea. While a rewrite or language switch is in flight the draft
+          dims and a "Rewriting…" badge sits over it: the old text stays legible
+          (no blank flash), but nobody edits words that are about to be replaced,
+          and the wait for the model never looks like a page that stopped. */}
       <div className="relative">
         <textarea
           data-review-text
@@ -299,15 +309,28 @@ export default function StepResult({
             setText(e.target.value);
             onReviewTextChange?.(e.target.value);
           }}
+          readOnly={rewriting}
+          aria-busy={rewriting}
           rows={6}
           aria-label={t.result.reviewAria}
-          className="w-full p-4 text-base text-slate-800 leading-relaxed bg-gray-50
+          className={`w-full p-4 text-base text-slate-800 leading-relaxed bg-gray-50
             border border-gray-300 rounded-xl resize-none
-            focus:outline-none focus:border-slate-500 transition-colors"
+            focus:outline-none focus:border-slate-500 transition-[opacity,border-color] duration-300 ${
+              rewriting ? "opacity-40" : "opacity-100"
+            }`}
         />
         <span className="absolute bottom-3 right-3 text-[10px] text-slate-400 select-none">
           {text.length}
         </span>
+        {rewriting && (
+          <div className="absolute inset-0 flex items-center justify-center" role="status" aria-live="polite">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 border border-gray-200 shadow-sm
+              px-3.5 py-1.5 text-xs font-semibold text-slate-700">
+              <Loader2 size={13} className="animate-spin text-slate-500" aria-hidden="true" />
+              {t.result.rewriting}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* WhatsApp — full UI on every page; preview simulates Save without DB */}

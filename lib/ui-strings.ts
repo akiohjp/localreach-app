@@ -42,6 +42,8 @@ export interface UiStrings {
     subtitle: string;
     /** Shown instead of `subtitle` while a Gemini draft is being written. */
     subtitleAi: string;
+    /** Replaces the subtitle once an AI draft runs past its expected time. */
+    stillWriting: string;
   };
   result: {
     stepLabel: string;
@@ -84,6 +86,8 @@ export interface UiStrings {
     tryAnotherWording: string;
     /** Label for the guest's review-language selector (English / العربية / 日本語). */
     reviewLanguage: string;
+    /** Badge over the draft while a rewrite or language switch is in flight. */
+    rewriting: string;
     copyReview: string;
     translate: string;
     postOnGoogle: string;
@@ -174,6 +178,7 @@ const en: UiStrings = {
     title: "Crafting your review",
     subtitle: "Assembling a unique review from your keywords.",
     subtitleAi: "Writing your review from what you chose.",
+    stillWriting: "Still writing, just a few more seconds.",
   },
   result: {
     stepLabel: "Step 4 — Your Review",
@@ -207,6 +212,7 @@ const en: UiStrings = {
     copiedToast: "Copied to clipboard",
     tryAnotherWording: "Try another wording",
     reviewLanguage: "Review language",
+    rewriting: "Rewriting…",
     copyReview: "Copy Review",
     translate: "Translate via Google",
     postOnGoogle: "Post on Google",
@@ -285,6 +291,7 @@ const ja: UiStrings = {
     title: "レビューを作成しています",
     subtitle: "キーワードから独自のレビューを組み立てています。",
     subtitleAi: "選んだ内容からレビューを書いています。",
+    stillWriting: "まだ書いています。あと数秒お待ちください。",
   },
   result: {
     stepLabel: "ステップ 4 — レビュー",
@@ -319,6 +326,7 @@ const ja: UiStrings = {
     copiedToast: "クリップボードにコピーしました",
     tryAnotherWording: "別の文面を試す",
     reviewLanguage: "レビューの言語",
+    rewriting: "書き直しています…",
     copyReview: "レビューをコピー",
     translate: "Googleで翻訳",
     postOnGoogle: "Googleに投稿",
@@ -397,6 +405,7 @@ const ar: UiStrings = {
     title: "جارٍ إعداد مراجعتك",
     subtitle: "نُجمّع مراجعة فريدة من كلماتك المفتاحية.",
     subtitleAi: "نكتب مراجعتك مما اخترته.",
+    stillWriting: "ما زلنا نكتب، بضع ثوانٍ أخرى.",
   },
   result: {
     stepLabel: "الخطوة 4 — مراجعتك",
@@ -429,6 +438,7 @@ const ar: UiStrings = {
     copiedToast: "تم النسخ إلى الحافظة",
     tryAnotherWording: "جرّب صياغة أخرى",
     reviewLanguage: "لغة المراجعة",
+    rewriting: "جارٍ إعادة الكتابة…",
     copyReview: "نسخ المراجعة",
     translate: "ترجم عبر Google",
     postOnGoogle: "انشر على Google",

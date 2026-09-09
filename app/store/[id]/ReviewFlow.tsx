@@ -464,6 +464,7 @@ export default function ReviewFlow({
               brandColor={brandColor}
               durationMs={aiDrafts ? AI_GENERATE_DELAY_MS : GENERATE_DELAY_MS}
               subtitle={aiDrafts ? t.generating.subtitleAi : undefined}
+              openEnded={aiDrafts}
             />
           )}
 

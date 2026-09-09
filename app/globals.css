@@ -59,6 +59,27 @@
   to   { width: 100%; }
 }
 
+/* Open-ended wait (AI drafts): the bar reaches 88% in the expected time, then
+   keeps creeping and a highlight sweeps along it, so a slow model never looks
+   like a frozen page. */
+@keyframes progress-fill-open {
+  from { width: 4%; }
+  to   { width: 88%; }
+}
+@keyframes progress-creep {
+  from { width: 88%; }
+  to   { width: 97%; }
+}
+@keyframes progress-shimmer {
+  from { transform: translateX(-100%); opacity: 1; }
+  to   { transform: translateX(100%); opacity: 1; }
+}
+[dir="rtl"] .progress-shimmer { animation-direction: reverse; }
+@keyframes dot-pulse {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40%           { opacity: 1;    transform: translateY(-2px); }
+}
+
 /* ------------------------------------------------------------------ *
  * Base
  * ------------------------------------------------------------------ */
