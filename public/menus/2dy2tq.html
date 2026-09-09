@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Menu — let it dough!</title>
+<meta name="description" content="Menu and prices for let it dough! — daily-fresh doughnuts, coffee, matcha and tea at WAFI Mall, Dubai.">
+<meta name="theme-color" content="#E85F4A">
+<meta name="robots" content="noindex">
+<meta property="og:title" content="Menu — let it dough!">
+<meta property="og:description" content="Daily-fresh doughnuts, coffee, matcha and tea. WAFI Mall, Dubai.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="/menus/letitdough/logo.png">
+<style>
+:root{
+  --cream:#F5EDDD; --paper:#FEFAEE; --coral:#E85F4A; --coral-d:#C9452F;
+  --cocoa:#3A2419; --muted:#6B5348; --line:rgba(58,36,25,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--cream); color:var(--cocoa);
+  font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 16px 40px}
+
+/* hero */
+.hero{
+  position:relative;text-align:center;margin-top:16px;overflow:hidden;
+  background:var(--paper);border:1.5px solid var(--line);border-radius:18px;padding:26px 16px 0;
+}
+.hero img.logo{width:min(74%,300px);height:auto;display:block;margin:0 auto}
+.hero .tag{
+  font-size:10px;letter-spacing:.17em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin-top:12px;
+}
+.hero .loc{font-family:'Fraunces',Georgia,serif;font-size:15px;color:var(--muted);margin-top:4px}
+.hero .donuts{width:min(84%,330px);height:auto;display:block;margin:4px auto -6px}
+
+/* quick links */
+.links{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:6px 0 2px}
+.links a{
+  display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;
+  background:var(--paper);border:1.5px solid var(--line);border-radius:14px;
+  padding:12px 6px 11px;color:var(--cocoa);font-weight:600;font-size:13px;
+  text-align:center;transition:transform .12s ease;
+}
+.links a:active{transform:scale(.96)}
+.links a svg{width:22px;height:22px;flex:0 0 auto;color:var(--coral)}
+.links a .l2{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:1px}
+
+/* review call to action, after the menu */
+.review{
+  display:flex;align-items:center;gap:12px;text-decoration:none;margin-top:16px;
+  background:var(--coral);border-radius:16px;padding:16px 18px;color:#fff;
+  font-family:'Fraunces',Georgia,serif;font-size:18px;font-weight:700;line-height:1.15;
+  transition:transform .12s ease;
+}
+.review:active{transform:scale(.98)}
+.review svg{width:26px;height:26px;flex:0 0 auto;color:#fff}
+.review .l2{
+  display:block;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;
+  color:rgba(255,255,255,.88);margin-top:3px;
+}
+
+/* sticky section nav */
+.nav{
+  position:sticky;top:0;z-index:5;display:flex;gap:8px;
+  padding:11px 0;margin:14px 0 2px;overflow-x:auto;
+  background:var(--cream);box-shadow:0 10px 12px -6px var(--cream);
+  scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav a{
+  flex:0 0 auto;text-decoration:none;font-size:13px;font-weight:600;
+  color:var(--cocoa);background:var(--paper);border:1.5px solid var(--line);
+  border-radius:999px;padding:7px 14px;
+}
+
+/* sections */
+section{
+  background:var(--paper);border:1.5px solid var(--line);border-radius:16px;
+  padding:16px 15px 8px;margin-top:14px;scroll-margin-top:58px;
+}
+section h2{
+  font-family:'Fraunces',Georgia,serif;font-size:23px;font-weight:700;
+  color:var(--coral);line-height:1.1;
+}
+section .note{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+.list{list-style:none;margin-top:10px}
+.row{
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  padding:11px 0;border-top:1px solid var(--line);
+}
+.list .row:first-child{border-top:none}
+.nm{
+  font-family:'Fraunces',Georgia,serif;font-size:16.5px;font-weight:600;
+  line-height:1.2;flex:1 1 auto;
+}
+.nm .sub{display:block;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:2px}
+.one{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:var(--coral);flex:0 0 auto}
+
+/* price chips */
+.row:not(.simple){flex-direction:column;align-items:stretch;gap:7px}
+.px{display:flex;flex-wrap:wrap;gap:6px}
+.grp{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.grp i{
+  font-style:normal;font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);
+  border:1.4px solid var(--line);border-radius:6px;padding:3px 6px;
+}
+.grp.cold i{color:#3E7CA6;border-color:rgba(62,124,166,.35)}
+.grp b{
+  display:inline-flex;align-items:baseline;gap:5px;
+  font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:var(--coral);
+  background:rgba(232,95,74,.07);border-radius:7px;padding:3px 8px;
+}
+.grp b span{
+  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+}
+.grp.cold b{color:#2F6F97;background:rgba(62,124,166,.09)}
+.grp.cold b span{color:#5B7C90}
+
+/* footer */
+footer{
+  text-align:center;margin-top:16px;
+  background:var(--paper);border:1.5px solid var(--line);border-radius:18px;padding:18px 16px 16px;
+}
+footer .cups{width:124px;height:auto;display:block;margin:0 auto 6px}
+footer p{font-size:12.5px;color:var(--muted);line-height:1.6}
+footer a{color:var(--coral);text-decoration:none;font-weight:600}
+footer .made{margin-top:10px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase}
+
+@media (min-width:520px){
+  .row:not(.simple){flex-direction:row;align-items:center}
+  .px{justify-content:flex-end}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <img class="logo" src="/menus/letitdough/logo.png" alt="let it dough!">
+    <p class="tag">Daily-fresh doughnuts &middot; coffee &middot; matcha</p>
+    <p class="loc">WAFI Mall, Dubai</p>
+    <img class="donuts" src="/menus/letitdough/donuts.jpg" alt="">
+  </header>
+
+  <nav class="links">
+    <a href="https://www.instagram.com/letitdough_ae/" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg><span>Instagram<span class="l2">@letitdough_ae</span></span></a>
+    <a href="https://www.google.com/maps?cid=6417923502665691068" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Find us<span class="l2">Google Maps</span></span></a>
+    <a href="https://www.letitdough.co/shop" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16l-1.2 12H5.2L4 8z"/><path d="M8.5 8V6.2a3.5 3.5 0 0 1 7 0V8"/></svg><span>Order<span class="l2">letitdough.co</span></span></a>
+  </nav>
+
+  <nav class="nav"><a href="#doughnuts">Doughnuts</a><a href="#coffee">Coffee</a><a href="#matcha">Matcha</a><a href="#tea">Tea</a></nav>
+
+  <section id="doughnuts"><h2>Daily-Fresh Doughnuts</h2><p class="note">Fried fresh every morning. Ask the counter for today's flavours.</p><ul class="list"><li class="row simple"><span class="nm">Classic Doughnut</span><span class="one">19</span></li><li class="row simple"><span class="nm">Mini Doughnut</span><span class="one">12</span></li><li class="row simple"><span class="nm">Box of 6 Classic</span><span class="one">110</span></li><li class="row simple"><span class="nm">Box of 9 Classic</span><span class="one">165</span></li><li class="row simple"><span class="nm">Box of 16 Minis</span><span class="one">180</span></li><li class="row simple"><span class="nm">Cookies</span><span class="one">15</span></li></ul></section><section id="coffee"><h2>Coffee & Drinks</h2><ul class="list"><li class="row"><span class="nm">V60 Iced Pure Drop</span><span class="px"><span class="grp cold"><i>Iced</i><b><span>Reg</span>30</b></span></span></li><li class="row"><span class="nm">Americano</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>16</b><b><span>Med</span>19</b><b><span>Lrg</span>23</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>16</b><b><span>Lrg</span>24</b></span></span></li><li class="row"><span class="nm">Latte</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>20</b><b><span>Med</span>23</b><b><span>Lrg</span>26</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>20</b><b><span>Lrg</span>27</b></span></span></li><li class="row"><span class="nm">Salted Caramel Latte</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>24</b><b><span>Med</span>27</b><b><span>Lrg</span>30</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>24</b><b><span>Lrg</span>31</b></span></span></li><li class="row"><span class="nm">Spanish Latte</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>22</b><b><span>Med</span>25</b><b><span>Lrg</span>29</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>22</b><b><span>Lrg</span>30</b></span></span></li><li class="row"><span class="nm">Flat White</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>20</b><b><span>Med</span>23</b><b><span>Lrg</span>26</b></span></span></li><li class="row"><span class="nm">Cappuccino</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>20</b><b><span>Med</span>23</b><b><span>Lrg</span>26</b></span></span></li><li class="row"><span class="nm">Mochaccino</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>22</b><b><span>Med</span>25</b><b><span>Lrg</span>28</b></span></span></li><li class="row"><span class="nm">Mexican Latte</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>22</b><b><span>Med</span>25</b><b><span>Lrg</span>28</b></span></span></li><li class="row"><span class="nm">Hot Chocolate</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>22</b><b><span>Med</span>25</b><b><span>Lrg</span>28</b></span></span></li><li class="row"><span class="nm">Espresso<span class="sub">single / double</span></span><span class="px"><span class="grp plain"><b><span>Single</span>14</b><b><span>Double</span>18</b></span></span></li><li class="row"><span class="nm">Cortado</span><span class="px"><span class="grp plain"><b><span>Regular</span>20</b></span></span></li></ul></section><section id="matcha"><h2>Matcha</h2><ul class="list"><li class="row"><span class="nm">Matcha Karak</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>20</b><b><span>Med</span>23</b><b><span>Lrg</span>26</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>20</b><b><span>Lrg</span>27</b></span></span></li><li class="row"><span class="nm">Matcha Latte</span><span class="px"><span class="grp hot"><i>Hot</i><b><span>Reg</span>20</b><b><span>Med</span>23</b><b><span>Lrg</span>26</b></span><span class="grp cold"><i>Iced</i><b><span>Reg</span>20</b><b><span>Lrg</span>27</b></span></span></li></ul></section><section id="tea"><h2>Tea</h2><ul class="list"><li class="row"><span class="nm">Karak</span><span class="px"><span class="grp plain"><b><span>Regular</span>5</b><b><span>Large</span>8</b></span></span></li><li class="row"><span class="nm">Houji Tea</span><span class="px"><span class="grp plain"><b><span>Regular</span>12</b><b><span>Large</span>19</b></span></span></li><li class="row"><span class="nm">Genmai Tea</span><span class="px"><span class="grp plain"><b><span>Regular</span>12</b><b><span>Large</span>19</b></span></span></li><li class="row"><span class="nm">Green Sencha Tea</span><span class="px"><span class="grp plain"><b><span>Regular</span>12</b><b><span>Large</span>19</b></span></span></li><li class="row"><span class="nm">English Breakfast Tea</span><span class="px"><span class="grp plain"><b><span>Regular</span>10</b><b><span>Large</span>17</b></span></span></li></ul></section>
+
+  <a class="review" href="https://g.page/r/Ca5bbsLfRfKCEBE/review" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.6 5.6 6 .8-4.4 4.2 1.1 6.1L12 17l-5.3 2.9 1.1-6.1L3.4 9.6l6-.8L12 3.2z"/></svg><span>Leave us a review<span class="l2">Twenty seconds on Google &mdash; it helps us a lot. Thank you!</span></span></a>
+
+  <footer>
+    <img class="cups" src="/menus/letitdough/cups.jpg" alt="">
+    <p>All prices in AED. Sizes: Reg &middot; Med &middot; Lrg.</p>
+    <p><a href="https://www.instagram.com/letitdough_ae/" target="_blank" rel="noopener">@letitdough_ae</a>
+       &nbsp;&middot;&nbsp;
+       <a href="https://www.letitdough.co" target="_blank" rel="noopener">letitdough.co</a>
+       &nbsp;&middot;&nbsp;WAFI Mall, Dubai</p>
+    <p class="made">Made in UAE</p>
+  </footer>
+
+</div>
+</body>
+</html>

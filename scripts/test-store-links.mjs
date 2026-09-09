@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 
-const { SLUG_RE, SLUG_PATH_RE, qrHost, isQrHost, guestReviewUrl } = await import("../lib/store-links.ts");
+const { SLUG_RE, SLUG_PATH_RE, MENU_PATH_RE, MENU_SLUGS, qrHost, isQrHost, guestReviewUrl } = await import("../lib/store-links.ts");
 
 let passed = 0;
 function t(name, fn) {
@@ -27,6 +27,17 @@ t("slug: six characters from the unambiguous alphabet only", () => {
   assert.equal(SLUG_PATH_RE.exec("/x7kp2m/")?.[1], "x7kp2m");
   assert.equal(SLUG_PATH_RE.exec("/store/x7kp2m"), null);
   assert.equal(SLUG_PATH_RE.exec("/admin"), null);
+});
+
+t("menu path: only /<slug>/menu, and only for a store that has one", () => {
+  assert.equal(MENU_PATH_RE.exec("/2dy2tq/menu")?.[1], "2dy2tq");
+  assert.equal(MENU_PATH_RE.exec("/2dy2tq/menu/")?.[1], "2dy2tq");
+  assert.equal(MENU_PATH_RE.exec("/2dy2tq"), null);
+  assert.equal(MENU_PATH_RE.exec("/2dy2tq/menu/extra"), null);
+  assert.equal(MENU_PATH_RE.exec("/menus/2dy2tq.html"), null);
+  assert.equal(SLUG_PATH_RE.exec("/2dy2tq/menu"), null);
+  assert.ok(MENU_SLUGS.has("2dy2tq"));
+  assert.ok(!MENU_SLUGS.has("x7kp2m"));
 });
 
 t("qrHost: normalised from the env, null when unset", () => {

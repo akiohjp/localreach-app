@@ -1,15 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isQrHost, SLUG_PATH_RE } from "@/lib/store-links";
+import { isQrHost, MENU_PATH_RE, MENU_SLUGS, SLUG_PATH_RE } from "@/lib/store-links";
 
 /**
  * Refreshes Supabase Auth cookies on every matched request so Server Components
  * (e.g. /admin, /admin/login) see the same session as the browser client.
  *
  * Also the front door of the short QR host: on https://<NEXT_PUBLIC_QR_HOST>,
- * "/x7kp2m" IS the store page (rewritten, not redirected, so the address bar
- * keeps the short link), and "/" goes to the product site. Everything else on
- * that host falls through to the app as usual.
+ * "/x7kp2m" IS the store page and "/x7kp2m/menu" is that store's guest menu
+ * (both rewritten, not redirected, so the address bar keeps the short link),
+ * and "/" goes to the product site. Everything else on that host falls through
+ * to the app as usual.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,6 +20,12 @@ export async function middleware(request: NextRequest) {
     if (short) {
       const url = request.nextUrl.clone();
       url.pathname = `/r/${short[1]}`;
+      return NextResponse.rewrite(url);
+    }
+    const menu = MENU_PATH_RE.exec(pathname);
+    if (menu && MENU_SLUGS.has(menu[1])) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/menus/${menu[1]}.html`;
       return NextResponse.rewrite(url);
     }
     if (pathname === "/") {

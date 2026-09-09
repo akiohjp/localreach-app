@@ -20,6 +20,18 @@ export const SLUG_RE = /^[23456789abcdefghjkmnpqrstuvwxyz]{6}$/;
 /** Path pattern the QR host rewrites to the store page ("/x7kp2m"). */
 export const SLUG_PATH_RE = /^\/([23456789abcdefghjkmnpqrstuvwxyz]{6})\/?$/;
 
+/** Path pattern for a store's guest menu on the QR host ("/x7kp2m/menu"). */
+export const MENU_PATH_RE = /^\/([23456789abcdefghjkmnpqrstuvwxyz]{6})\/menu\/?$/;
+
+/**
+ * Stores that have a guest menu at public/menus/<slug>.html. Listed rather than
+ * probed because the rewrite happens in Edge middleware, which has no
+ * filesystem; a slug missing here just falls through and 404s.
+ */
+export const MENU_SLUGS = new Set<string>([
+  "2dy2tq", // Let It Dough!, WAFI Mall
+]);
+
 /** The short host, normalised (no scheme, no path, lower case), or null when unset. */
 export function qrHost(env: Record<string, string | undefined> = process.env): string | null {
   const raw = (env.NEXT_PUBLIC_QR_HOST ?? "").trim().toLowerCase();
