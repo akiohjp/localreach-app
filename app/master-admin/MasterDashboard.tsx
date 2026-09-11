@@ -670,9 +670,17 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
           </div>
         )}
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        {/* Table
+            Seven columns do not fit a tablet, and the switches that matter
+            (Paid / AI Draft / Status) are the rightmost three: clipping them
+            off with overflow-hidden made them look deleted. Scroll instead,
+            and say so where the scrollbar is invisible. */}
+        <div className="space-y-2">
+          <p className="px-1 text-[11px] text-slate-400 lg:hidden">
+            Scroll the table sideways for the Paid, AI Draft and Status switches.
+          </p>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[1040px] text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-slate-50">
                 <th className="text-left px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500">
@@ -870,6 +878,7 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
               )}
             </tbody>
           </table>
+        </div>
         </div>
 
         <p className="text-center text-[10px] text-slate-300 tracking-widest uppercase">
