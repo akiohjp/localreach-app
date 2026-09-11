@@ -329,7 +329,17 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   rules.push(
     `- ${variant}`,
     `- ${closing}`,
-    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, with "I", or with a word ending in -ing ("Walking", "Stopping", "Sitting"). The first sentence must be one nobody else would write about this place.`,
+    // Banning "I" as a first word bought variety and cost naturalness. With
+    // "I" closed off, the model fronts a noun and has it act on the writer:
+    // "Plates arrived warm", "Morning light hit the window next to my seat",
+    // "Craving breakfast near X brought me here", "Tables filled up around
+    // us", "Walking back to my car made me glad". Eight of eight live drafts
+    // on the tashas demo opened that way (owner read, 2026-09-11: 倒置法 —
+    // every review begins inverted). Real Google reviews open with a person:
+    // "I", "We", "Came here for", "Had the". The recent-openings rule below
+    // already stops a page of identical first words, so the person is allowed
+    // back and the inverted shape is what gets named and banned instead.
+    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with a thing, a time of day, the weather or a feeling as the subject doing something to you ("Plates arrived warm", "Morning light hit the window", "Tables filled up around us", "Craving breakfast brought me here", "Walking back to my car made me glad"). That inverted opening is the clearest sign a machine wrote it. Beginning with "I" or "We" is normal and often the most natural thing to do; vary the words that follow instead.`,
     `- Never end with a stock closer such as ${STOCK_CLOSERS.map((s) => `"${s}"`).join(", ")}.`,
   );
   if (recentOpenings.length) {
