@@ -13,10 +13,9 @@ import {
   BarChart2,
   Search
 } from 'lucide-react';
+import { supportWaLink } from '@/lib/whatsapp';
 
-const WA_DEMO_LINK =
-  'https://wa.me/971557810053?text=' +
-  encodeURIComponent("Hi! I'd like to book a free LocalReach demo.");
+const WA_DEMO_LINK = supportWaLink("Hi! I'd like to book a free LocalReach demo.");
 
 const LocalReachLP = () => {
   return (

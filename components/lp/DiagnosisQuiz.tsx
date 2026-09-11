@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, ChevronRight, BarChart3, Users, MessageSquare } from 'lucide-react';
+import { supportWaLink } from '@/lib/whatsapp';
 
 const QUESTIONS = [
   {
@@ -118,10 +119,7 @@ export default function DiagnosisQuiz() {
           </div>
 
           <a
-            href={
-              'https://wa.me/971557810053?text=' +
-              encodeURIComponent("Hi! I finished the LocalReach self-assessment and I'd like a free consultation.")
-            }
+            href={supportWaLink("Hi! I finished the LocalReach self-assessment and I'd like a free consultation.")}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full bg-[#D4AF37] text-black px-8 py-5 rounded-full text-lg font-bold hover:bg-[#B8962E] transition-all transform hover:scale-105 flex items-center justify-center gap-3"

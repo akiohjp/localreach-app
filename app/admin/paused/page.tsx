@@ -9,6 +9,7 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
+import { supportWaLink } from '@/lib/whatsapp'
 
 export default function AdminPausedPage() {
   const router = useRouter()
@@ -36,7 +37,7 @@ export default function AdminPausedPage() {
         </p>
         <div className="pt-2 flex flex-col gap-2">
           <a
-            href="https://wa.me/971549967498"
+            href={supportWaLink('Hi! My LocalReach subscription is paused and I would like to reactivate it.')}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
