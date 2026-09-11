@@ -141,7 +141,11 @@ export const CLOSINGS: readonly string[] = [
   "End on how you left, kept to what the tapped phrases or their own words support.",
   "End with the plainest sentence in the whole review.",
   "End with a sentence of five words or fewer.",
-  "End by naming the one thing you would change nothing about.",
+  // "the one thing you would change nothing about" is not a sentence a small
+  // model can land: live drafts came back as "Everything about <store> is the
+  // one thing you would change nothing about." (tashas demo, 2026-09-11).
+  // Same closing move, phrased so it can only come out grammatical.
+  "End by naming the one thing you would not change.",
 ];
 
 /** Stock closers, banned for the same reason as the stock openers. */
