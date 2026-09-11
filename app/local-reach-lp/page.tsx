@@ -13,7 +13,7 @@ import {
   BarChart2,
   Search
 } from 'lucide-react';
-import { supportWaLink } from '@/lib/whatsapp';
+import { supportMailto, supportWaLink } from '@/lib/contact';
 
 const WA_DEMO_LINK = supportWaLink("Hi! I'd like to book a free LocalReach demo.");
 
@@ -393,7 +393,7 @@ const LocalReachLP = () => {
           <div className="flex gap-8 text-sm font-bold text-gray-500 uppercase tracking-widest">
             <a href="https://miraireach.marketing/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Privacy</a>
             <a href="https://miraireach.marketing/terms" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Terms</a>
-            <a href="mailto:info.ae@miraireach.marketing" className="hover:text-white transition-colors">Contact</a>
+            <a href={supportMailto()} className="hover:text-white transition-colors">Contact</a>
           </div>
           <div className="text-sm font-bold text-gray-500">
             © {new Date().getFullYear()} AI Company Core. Powered by AIO.

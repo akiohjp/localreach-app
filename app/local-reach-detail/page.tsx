@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { supportMailto } from '@/lib/contact'
 
 export const metadata: Metadata = {
   // Absolute so the root "%s — LocalReach" template doesn't append a 2nd "LocalReach".
@@ -737,7 +738,7 @@ export default function LocalReachDetailPage() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
-                href="mailto:info@gam-solutions.com?subject=LocalReach%20Demo%20Request"
+                href={supportMailto('LocalReach Demo Request')}
                 className="inline-flex items-center justify-center gap-3 rounded-2xl px-10 py-5
                   text-base font-black text-white shadow-2xl hover:opacity-90 active:scale-[0.97] transition-all"
                 style={{ backgroundColor: GOLD }}

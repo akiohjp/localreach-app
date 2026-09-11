@@ -9,7 +9,7 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { supportWaLink } from '@/lib/whatsapp'
+import { supportWaLink } from '@/lib/contact'
 
 export default function AdminPausedPage() {
   const router = useRouter()

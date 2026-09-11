@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ArrowRight, CheckCircle2, ChevronRight, BarChart3, Users, MessageSquare } from 'lucide-react';
-import { supportWaLink } from '@/lib/whatsapp';
+import { supportWaLink } from '@/lib/contact';
 
 const QUESTIONS = [
   {

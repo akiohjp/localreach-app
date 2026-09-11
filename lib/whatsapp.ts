@@ -10,21 +10,6 @@
 export type WaLocale = 'en' | 'ja' | 'ar'
 
 /**
- * OUR WhatsApp — mirAIreach, who runs LocalReach. Not a store's: everything
- * else in this file builds links from the number the owner or the customer
- * gave us. Every screen that says "contact us" reads it from here, because
- * the paused-subscription screen was found carrying a client's own number
- * (Let it dough's) instead of ours (owner read, 2026-09-11).
- */
-export const SUPPORT_WA_NUMBER = '971557810053'
-
-/** Click-to-chat link to us, optionally pre-filled with a first message. */
-export function supportWaLink(text?: string): string {
-  const base = `https://wa.me/${SUPPORT_WA_NUMBER}`
-  return text ? `${base}?text=${encodeURIComponent(text)}` : base
-}
-
-/**
  * Default review-request message per locale. `{store}` is the shop name and
  * `{link}` is the customer-facing review page (the LocalReach funnel, NOT the
  * raw Google link — we want them to go through the multilingual funnel).

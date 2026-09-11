@@ -15,10 +15,12 @@ import { createAdminClient } from '@/utils/supabase/admin'
  * to the guest: their feedback is already saved by the time we get here.
  */
 
+import { supportMailto } from './contact'
+
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
 const PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? ''
 /** mailto the push service can contact if this app misbehaves; required by the spec. */
-const CONTACT = process.env.VAPID_CONTACT ?? 'mailto:info@miraireach.marketing'
+const CONTACT = process.env.VAPID_CONTACT ?? supportMailto()
 
 export function pushConfigured(): boolean {
   return PUBLIC_KEY.length > 0 && PRIVATE_KEY.length > 0
