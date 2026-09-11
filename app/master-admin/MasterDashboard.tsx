@@ -561,7 +561,7 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
     closeModal()
     setInfoMsg(
       reusedAuthUser
-        ? 'このメールのログインアカウントは既にありました。新しい店舗のみ追加し、ログインパスワードを入力した値に更新しました。'
+        ? 'That email already had a login. The new store was added to it and the password was set to what you typed.'
         : null,
     )
     // Prepend new store then refresh server data (for accurate customer counts etc.)

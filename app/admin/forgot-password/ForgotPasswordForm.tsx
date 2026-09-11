@@ -5,24 +5,6 @@ import Link from "next/link";
 import { Loader2, Mail } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
-/** Supabase may return errors that look like silent failures unless the operator configures SMTP. */
-function authMailHintJa(message: string): string | null {
-  const m = message.toLowerCase();
-  if (
-    m.includes("not authorized") ||
-    m.includes("email sending is disabled") ||
-    m.includes("smtp")
-  ) {
-    return (
-      "Supabase 側でカスタム SMTP（例: Resend）が未設定のとき、既定の送信ではユーザー宛メールが送れないことがあります。Supabase Dashboard → Authentication → SMTP を設定してください（リポジトリの docs/SUPABASE-AUTH-EMAIL-JA.md）。"
-    );
-  }
-  if (m.includes("rate") || m.includes("quota") || m.includes("too many")) {
-    return "送信レートまたは上限に達している可能性があります。しばらく待つか、Supabase でカスタム SMTP を設定してください（docs/SUPABASE-AUTH-EMAIL-JA.md）。";
-  }
-  return null;
-}
-
 function callbackUrl(): string {
   if (typeof window === "undefined") return "";
   /** Hint for PKCE flow; implicit hash uses `type=recovery` from Supabase. */
@@ -34,7 +16,6 @@ export default function ForgotPasswordForm() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const errorHint = error ? authMailHintJa(error) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,19 +48,8 @@ export default function ForgotPasswordForm() {
             If an account exists for <span className="font-semibold">{email}</span>,
             we sent a reset link. Open it to set a new password.
           </p>
-          <p className="text-[11px] text-slate-500 leading-relaxed text-left px-2">
-            長時間、アカウント宛にも届きませんか？ アプリ側ではなく
-            <strong className="text-slate-700"> Supabase のカスタム SMTP が未設定</strong>
-            だと、ダッシュボードからの復旧メールも含め送信ができないことがあります（
-            <a
-              href="https://supabase.com/docs/guides/auth/auth-smtp"
-              target="_blank"
-              rel="noreferrer"
-              className="font-semibold text-slate-800 underline underline-offset-2"
-            >
-              SMTP 設定
-            </a>
-            ）。
+          <p className="text-xs text-slate-500">
+            Nothing after a few minutes? Check your spam folder, then contact us.
           </p>
         </div>
         <Link
@@ -115,25 +85,7 @@ export default function ForgotPasswordForm() {
         />
       </div>
 
-      {error && (
-        <div className="space-y-2">
-          <p className="text-xs text-red-600">{error}</p>
-          {errorHint && (
-            <p className="text-xs text-slate-600 leading-relaxed border border-amber-200 bg-amber-50 rounded-lg px-3 py-2">
-              {errorHint}
-              <br />
-              <a
-                href="https://supabase.com/docs/guides/auth/auth-smtp"
-                target="_blank"
-                rel="noreferrer"
-                className="text-slate-900 font-semibold underline underline-offset-2 mt-1 inline-block"
-              >
-                Supabase: カスタム SMTP の手順（公式）
-              </a>
-            </p>
-          )}
-        </div>
-      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
 
       <button
         type="submit"

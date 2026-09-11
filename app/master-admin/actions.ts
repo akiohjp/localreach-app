@@ -63,8 +63,8 @@ function formatSupabaseActionError(context: string, raw: string): string {
   if (lower.includes('fetch failed') || lower.includes('network') || lower.includes('econnrefused')) {
     return (
       `${context}: ${raw} — ` +
-      'Supabase にサーバーから届いていません。Vercel の Environment Variables で ' +
-      'Preview（および Development）にも `NEXT_PUBLIC_SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` を設定し、再デプロイしてください。'
+      'the server could not reach Supabase. Check that NEXT_PUBLIC_SUPABASE_URL and ' +
+      'SUPABASE_SERVICE_ROLE_KEY are set for this environment, then redeploy.'
     )
   }
   return `${context}: ${raw}`
@@ -117,7 +117,7 @@ export async function createStore(payload: {
 
   const nameTrim = payload.storeName.trim()
   if (!nameTrim) {
-    return { ok: false, error: '店舗名を入力してください。' }
+    return { ok: false, error: 'Enter a store name.' }
   }
 
   const emailTrim = payload.email.trim()
@@ -139,7 +139,7 @@ export async function createStore(payload: {
         return {
           ok: false,
           error:
-            'Auth: メールアドレスは既に登録済みですが、既存ユーザーを検索できませんでした。',
+            'Auth: that email is already registered, but the existing user could not be found.',
         }
       }
       ownerId = existingId
@@ -150,7 +150,7 @@ export async function createStore(payload: {
       if (pwErr) {
         return {
           ok: false,
-          error: formatSupabaseActionError('Auth', pwErr.message ?? 'パスワード更新に失敗しました。'),
+          error: formatSupabaseActionError('Auth', pwErr.message ?? 'the password could not be updated.'),
         }
       }
     } else if (authError || !authData?.user) {

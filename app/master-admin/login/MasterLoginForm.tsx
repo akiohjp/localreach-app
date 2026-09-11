@@ -75,7 +75,7 @@ export default function MasterLoginForm() {
             Signing in…
           </>
         ) : (
-          "Sign in to Master"
+          "Sign in"
         )}
       </button>
     </form>

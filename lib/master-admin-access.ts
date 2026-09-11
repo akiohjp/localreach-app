@@ -1,16 +1,17 @@
 import type { User } from "@supabase/supabase-js";
 
 /**
- * Roles（混同しないこと）:
+ * Two sign-ins, never to be confused:
  *
- * - **マスターアドミン（親）**: 環境変数のメール＋パスワードで `/master-admin/login`。店舗アカウント発行のみ。
- *   Supabase の「super_admin」ロールとは別物。**ここだけバックエンド（Vercel 環境変数）で全決め**してください。
+ * - **Master (us)**: `/master-admin/login`, email + password from env only.
+ *   It creates store accounts; it is not a Supabase user and has nothing to do
+ *   with Supabase's own "super_admin" role.
  *
- * - **店舗アドミン（クライアント）**: マスターが発行した Supabase アカウントで `/admin/login`。
- *   自分の店の名前・ロゴ・キーワードなどを編集する。
+ * - **Store owner (the client)**: `/admin/login`, the Supabase account we
+ *   issued them. They edit their own store — name, logo, keywords.
  *
- * - **JWT `super_admin` / DB `is_super_admin()`**: 旧来の一覧用 RLS に残っていることがありますが、
- *   ダッシュボード `/admin/[id]` への入館は **owner_id のみ**です。
+ * A leftover JWT `super_admin` / `is_super_admin()` may still appear in older
+ * list policies, but entry to `/admin/[id]` is decided by owner_id alone.
  */
 export function resolveAdminHomeHref(_user: User): "/admin" {
   return "/admin";

@@ -71,7 +71,7 @@ function RecoverSession() {
       window.location.replace(
         "/admin/login?error=" +
           encodeURIComponent(
-            "Invalid or expired reset link. Try Forgot password again, and add this URL to Supabase Redirect URLs.",
+            "That link has expired. Request a new one from Forgot password.",
           ),
       );
     }
