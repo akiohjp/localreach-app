@@ -37,6 +37,56 @@ function isExpired(expiresAt: string | null): boolean {
   return !!expiresAt && Date.parse(expiresAt) <= Date.now()
 }
 
+/**
+ * One of the three per-store switches. Built once per store and rendered by
+ * both views below, so the wide table and the narrow card list can never
+ * disagree about what a switch says or does.
+ */
+type SwitchSpec = {
+  key: 'paid' | 'ai' | 'status'
+  /** Column header in the table; row label on a card. */
+  header: string
+  /** The word next to the switch: Paid / Demo, Gemini / Template, Active / ... */
+  state: string
+  stateClass: string
+  on: boolean
+  onClass: string
+  ariaLabel: string
+  title?: string
+  onToggle: () => void
+}
+
+function StoreSwitch({ spec, disabled }: { spec: SwitchSpec; disabled: boolean }) {
+  return (
+    <button
+      onClick={spec.onToggle}
+      disabled={disabled}
+      aria-label={spec.ariaLabel}
+      title={spec.title}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
+        border-2 border-transparent transition-colors duration-200
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
+        disabled:opacity-50 disabled:cursor-not-allowed
+        ${spec.on ? spec.onClass : 'bg-gray-300'}`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
+          bg-white shadow ring-0 transition duration-200 ease-in-out
+          ${spec.on ? 'translate-x-5' : 'translate-x-0'}`}
+      />
+    </button>
+  )
+}
+
+/** The date a store was created, as both views print it. */
+function createdLabel(createdAt: string): string {
+  return new Date(createdAt).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 // ─────────────────────────────────────────────
 // GBP Report Generator
 // ─────────────────────────────────────────────
@@ -580,6 +630,48 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
     setPending(null)
   }
 
+  /** The three switches for one store, in the order both views draw them. */
+  function switchesFor(row: StoreRow): SwitchSpec[] {
+    return [
+      {
+        key: 'paid',
+        header: 'Paid',
+        state: row.paid ? 'Paid' : 'Demo',
+        stateClass: row.paid ? 'text-green-700' : 'text-slate-400',
+        on: row.paid,
+        onClass: 'bg-green-600',
+        ariaLabel: row.paid ? 'Mark as demo (stop measuring)' : 'Mark as paying client (start measuring)',
+        title: 'Paying client: daily Google rating / review-count snapshot runs (billed Places call). Demo: shown, not measured.',
+        onToggle: () => togglePaid(row.id, row.paid),
+      },
+      {
+        key: 'ai',
+        header: 'AI Draft',
+        state: row.aiDrafts ? 'Gemini' : 'Template',
+        stateClass: row.aiDrafts ? 'text-amber-600' : 'text-slate-400',
+        on: row.aiDrafts,
+        onClass: 'bg-amber-500',
+        ariaLabel: row.aiDrafts ? 'Switch AI drafts off' : 'Switch AI drafts on',
+        title: 'Guests get a Gemini-written draft (billed per call). Off = offline template engine.',
+        onToggle: () => toggleAiDrafts(row.id, row.aiDrafts),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        state: !row.isActive ? 'Inactive' : isExpired(row.expiresAt) ? 'Expired' : 'Active',
+        stateClass: !row.isActive
+          ? 'text-slate-400'
+          : isExpired(row.expiresAt)
+            ? 'text-red-600'
+            : 'text-green-600',
+        on: row.isActive,
+        onClass: 'bg-green-500',
+        ariaLabel: row.isActive ? 'Deactivate store' : 'Activate store',
+        onToggle: () => toggleActive(row.id, row.isActive),
+      },
+    ]
+  }
+
   async function handleExportCSV(storeId: string, storeName: string) {
     setCsvPending(storeId)
     const res = await masterExportCustomersCsv(storeId)
@@ -603,7 +695,7 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
 
         {/* Header — stack on narrow viewports so long copy never overlaps action buttons */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -617,8 +709,8 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
               Set <span className="font-semibold">Contract End</span> to auto-lock a store when its
               subscription lapses (access lasts through that day, Dubai time). Inactive or expired
               stores redirect all visitors to the Service Inactive page.{' '}
-              <span className="font-semibold">AI Draft</span> gives that store&apos;s guests a
-              Gemini-written draft instead of the offline template (billed per call; off by default).{' '}
+              <span className="font-semibold">AI Draft</span>{' '}
+              gives that store&apos;s guests a Gemini-written draft instead of the offline template (billed per call; off by default).{' '}
               <span className="font-semibold">Paid</span> marks a paying client: only paid stores get the daily
               Google rating and review-count snapshot (a billed Places call); demos are shown, not measured.
             </p>
@@ -670,17 +762,117 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
           </div>
         )}
 
-        {/* Table
-            Seven columns do not fit a tablet, and the switches that matter
-            (Paid / AI Draft / Status) are the rightmost three: clipping them
-            off with overflow-hidden made them look deleted. Scroll instead,
-            and say so where the scrollbar is invisible. */}
-        <div className="space-y-2">
-          <p className="px-1 text-[11px] text-slate-400 lg:hidden">
-            Scroll the table sideways for the Paid, AI Draft and Status switches.
-          </p>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
-          <table className="w-full min-w-[1040px] text-sm">
+        {/* Stores, in the shape the viewport can hold.
+            Seven columns need more width than a tablet has, and sideways
+            scrolling was not an answer: the three switches that matter sit at
+            the right edge, so they were the part that went missing. Below xl
+            each store is a card with the same fields stacked and nothing cut
+            off; the table is kept only for widths where it fits whole. Both
+            views draw switchesFor(row), so they cannot drift apart. */}
+        <div className="space-y-3 xl:hidden">
+          {rows.map((row) => (
+            <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 break-words">{row.name}</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-slate-400">
+                    {row.id.slice(0, 8)}&hellip;
+                  </p>
+                  {qrHost && row.slug && (
+                    <button
+                      type="button"
+                      onClick={() => copyShortLink(row.id, `https://${qrHost}/${row.slug}`)}
+                      title="Copy the short guest link"
+                      className="mt-1 inline-flex items-center gap-1 break-all font-mono text-[11px]
+                        text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {copiedLink === row.id ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+                      {qrHost}/{row.slug}
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleExportCSV(row.id, row.name)}
+                  disabled={csvPending === row.id}
+                  title="Export customers as CSV"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200
+                    bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-500
+                    hover:border-slate-400 hover:text-slate-800 transition-all
+                    disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download size={11} />
+                  CSV
+                </button>
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 border-t border-gray-100 pt-3">
+                <div>
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Created</dt>
+                  <dd className="text-xs text-slate-600 tabular-nums">{createdLabel(row.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Contacts</dt>
+                  <dd className={`text-xs font-bold tabular-nums ${row.customerCount > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {row.customerCount}
+                    {row.customerCount > 0 && <span className="font-normal text-slate-400"> leads</span>}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Contract end
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={expiryToDubaiDateInput(row.expiresAt)}
+                    onChange={(e) => setExpiry(row.id, e.target.value)}
+                    disabled={pending === row.id}
+                    aria-label={`Contract end date for ${row.name}`}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5
+                      text-xs text-slate-700 outline-none focus:border-slate-400
+                      disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {row.expiresAt ? (
+                    <button
+                      onClick={() => setExpiry(row.id, '')}
+                      disabled={pending === row.id}
+                      className="shrink-0 text-[10px] font-semibold text-slate-400 hover:text-slate-700
+                        transition-colors disabled:opacity-40"
+                    >
+                      Clear
+                    </button>
+                  ) : (
+                    <span className="shrink-0 text-[10px] text-slate-300">No expiry</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2.5 border-t border-gray-100 pt-3">
+                {switchesFor(row).map((spec) => (
+                  <div key={spec.key} className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {spec.header}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs font-semibold ${spec.stateClass}`}>{spec.state}</span>
+                      <StoreSwitch spec={spec} disabled={pending === row.id} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {rows.length === 0 && (
+            <p className="rounded-2xl border border-gray-200 bg-white px-5 py-12 text-center text-sm text-slate-400">
+              No stores found.
+            </p>
+          )}
+        </div>
+
+        <div className="hidden xl:block bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-slate-50">
                 <th className="text-left px-5 py-3 text-[11px] font-bold tracking-wider uppercase text-slate-500">
@@ -784,89 +976,16 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <span className={`text-xs font-semibold w-14 text-center ${row.paid ? 'text-green-700' : 'text-slate-400'}`}>
-                        {row.paid ? 'Paid' : 'Demo'}
-                      </span>
-                      <button
-                        onClick={() => togglePaid(row.id, row.paid)}
-                        disabled={pending === row.id}
-                        aria-label={row.paid ? 'Mark as demo (stop measuring)' : 'Mark as paying client (start measuring)'}
-                        title="Paying client: daily Google rating / review-count snapshot runs (billed Places call). Demo: shown, not measured."
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
-                          border-2 border-transparent transition-colors duration-200
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${row.paid ? 'bg-green-600' : 'bg-gray-300'}`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
-                            bg-white shadow ring-0 transition duration-200 ease-in-out
-                            ${row.paid ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <span
-                        className={`text-xs font-semibold w-14 text-center ${
-                          row.aiDrafts ? 'text-amber-600' : 'text-slate-400'
-                        }`}
-                      >
-                        {row.aiDrafts ? 'Gemini' : 'Template'}
-                      </span>
-                      <button
-                        onClick={() => toggleAiDrafts(row.id, row.aiDrafts)}
-                        disabled={pending === row.id}
-                        aria-label={row.aiDrafts ? 'Switch AI drafts off' : 'Switch AI drafts on'}
-                        title="Guests get a Gemini-written draft (billed per call). Off = offline template engine."
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
-                          border-2 border-transparent transition-colors duration-200
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${row.aiDrafts ? 'bg-amber-500' : 'bg-gray-300'}`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
-                            bg-white shadow ring-0 transition duration-200 ease-in-out
-                            ${row.aiDrafts ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-center gap-3">
-                      <span
-                        className={`text-xs font-semibold w-14 text-center ${
-                          !row.isActive
-                            ? 'text-slate-400'
-                            : isExpired(row.expiresAt)
-                              ? 'text-red-600'
-                              : 'text-green-600'
-                        }`}
-                      >
-                        {!row.isActive ? 'Inactive' : isExpired(row.expiresAt) ? 'Expired' : 'Active'}
-                      </span>
-                      <button
-                        onClick={() => toggleActive(row.id, row.isActive)}
-                        disabled={pending === row.id}
-                        aria-label={row.isActive ? 'Deactivate store' : 'Activate store'}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full
-                          border-2 border-transparent transition-colors duration-200
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${row.isActive ? 'bg-green-500' : 'bg-gray-300'}`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full
-                            bg-white shadow ring-0 transition duration-200 ease-in-out
-                            ${row.isActive ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
-                      </button>
-                    </div>
-                  </td>
+                  {switchesFor(row).map((spec) => (
+                    <td key={spec.key} className="px-5 py-4">
+                      <div className="flex items-center justify-center gap-3">
+                        <span className={`text-xs font-semibold w-14 text-center ${spec.stateClass}`}>
+                          {spec.state}
+                        </span>
+                        <StoreSwitch spec={spec} disabled={pending === row.id} />
+                      </div>
+                    </td>
+                  ))}
                 </tr>
               ))}
               {rows.length === 0 && (
@@ -878,7 +997,6 @@ export default function MasterDashboard({ rows: initial, qrHost }: { rows: Store
               )}
             </tbody>
           </table>
-        </div>
         </div>
 
         <p className="text-center text-[10px] text-slate-300 tracking-widest uppercase">
