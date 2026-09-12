@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 
-const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, measureLength, openingKey, ngramOverlap, isSoftRejection } =
+const { cleanReviewDraft, checkReviewDraft, sanitizeGuestNote, AI_TELL_PHRASES, PROMPT_LEAK_PHRASES, measureLength, openingKey, ngramOverlap, isSoftRejection } =
   await import("../lib/review-ai-filter.ts");
 const { buildReviewPrompt, OPENINGS, CLOSINGS, STOCK_OPENERS } = await import("../lib/review-prompt.ts");
 const { reviewModelsFromEnv, DEFAULT_REVIEW_MODELS } = await import("../lib/review-ai.ts");
@@ -52,6 +52,27 @@ t("check: AI tells are rejected unless the guest tapped them", () => {
   const okText = "Honestly a Hidden Gem for a weekday breakfast, and the coffee was fine too, nothing fancy about the place. We sat by the window for a good hour and nobody rushed us, which is rare around here, and the pastries kept coming out warm from the back. The second round arrived without us having to ask, and the bill was smaller than I expected for two of us.";
   assert.equal(checkReviewDraft(okText, tapped).ok, true);
   assert.ok(AI_TELL_PHRASES.includes("nestled"));
+});
+
+t("check: a draft that writes the instruction down instead of following it is rejected", () => {
+  // All four are real drafts that reached guests before 2026-09-12.
+  const leaked = [
+    "I thought the quality was better than most places I have visited lately. They clearly specialize in Fresh doughnuts that have a really unique texture. The Friendly Staff made the whole stop feel very welcoming and easy from the moment I walked in and found a seat by the window. I picked up a box to try and the flavour was just right. I would not change how they prepare them because it is the one thing I would not change.",
+    "Sunlight came through the windows while I looked over the menu and decided what to order in the end. Later on I ate at the counter, and the Fresh doughnuts had a good balance of sweetness that carried through. Everything tasted like it was made that morning rather than the day before. The Friendly Staff checked on me twice without hovering over the table. The food is the one thing I would change nothing about.",
+  ];
+  for (const text of leaked) {
+    const v = checkReviewDraft(text, EN_CTX);
+    assert.equal(v.ok, false);
+    assert.ok(v.reason.startsWith("prompt_leak:"), `expected prompt_leak, got ${v.reason}`);
+  }
+
+  // The same closing move, landed properly, is not a leak: this one ships.
+  const fine = "I stopped in for a coffee and stayed longer than I meant to, which is usually a good sign. The Friendly Staff checked on the table twice without hovering, and the Fresh doughnuts came out warm enough that I ate one before I had even sat down properly. It was quiet enough to read for a while without anyone rushing me along. I would not change the calm atmosphere.";
+  assert.equal(checkReviewDraft(fine, EN_CTX).ok, true);
+
+  // A leak is a content defect, never overruled at the end of the budget.
+  assert.equal(isSoftRejection("prompt_leak:the tapped"), false);
+  assert.ok(PROMPT_LEAK_PHRASES.includes("tapped phrase"));
 });
 
 t("check: quotes, emoji, hashtags, scores, contact details, markdown are rejected", () => {
@@ -101,7 +122,9 @@ t("diversity: a draft that opens or reads like a recent one is rejected", () => 
 
 t("prompt: many openings and closings, stock openers banned, recent openings named", () => {
   assert.ok(OPENINGS.length >= 48);
-  assert.ok(CLOSINGS.length >= 24);
+  // 23 since 2026-09-12: the "one thing you would not change" move was written
+  // down rather than acted on and is gone. 48 x 23 still leaves 1,104 shapes.
+  assert.ok(CLOSINGS.length >= 23);
   assert.equal(new Set(OPENINGS).size, OPENINGS.length);
   assert.equal(new Set(CLOSINGS).size, CLOSINGS.length);
   // Every move rearranges given material; none may ask for a fact the guest did not give.

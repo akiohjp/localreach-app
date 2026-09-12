@@ -47,6 +47,39 @@ export const AI_TELL_PHRASES: readonly string[] = [
 ];
 
 /**
+ * Phrases that only exist because the model wrote the instruction down instead
+ * of following it. The opening and closing moves in lib/review-prompt tell the
+ * model HOW to write; a small model sometimes answers by quoting the brief.
+ *
+ * Found live on 2026-09-12: "The food is the one thing I would change nothing
+ * about." and "I would not change how they prepare the doughnuts because it is
+ * the one thing I would not change." — three unusable drafts out of the six
+ * that reached one closing move. That move is gone, but the same failure can
+ * come from any of the other seventy, so it is caught here by shape.
+ *
+ * Every entry has to be something no real guest would type about a shop. A
+ * phrase a guest might plausibly write (say "in my own words") does not belong
+ * here: a false positive costs a regeneration and, at the end of the budget,
+ * hands over a draft that was fine.
+ */
+export const PROMPT_LEAK_PHRASES: readonly string[] = [
+  "tapped phrase",
+  "the one thing i would change nothing about",
+  "one thing i would not change",
+  "one thing you would not change",
+  "closing line",
+  "mid-thought",
+  "five words or fewer",
+  "four to eight words",
+  "the first sentence",
+  "this sentence",
+  "the tapped",
+  "full stop",
+  "in the review",
+  "this review says",
+];
+
+/**
  * Length rails per locale. Words for EN/AR, characters (no spaces) for JA.
  * The floor depends on the rating (a 5 is expected to say more than a 4):
  * a draft under it is regenerated, because "thin" was the owner's reading of
@@ -240,6 +273,10 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   for (const phrase of AI_TELL_PHRASES) {
     if (tapped.some((k) => k.includes(phrase))) continue;
     if (lower.includes(phrase)) return { ok: false, reason: `ai_tell:${phrase}` };
+  }
+
+  for (const phrase of PROMPT_LEAK_PHRASES) {
+    if (lower.includes(phrase)) return { ok: false, reason: `prompt_leak:${phrase}` };
   }
 
   const name = ctx.storeName.trim();

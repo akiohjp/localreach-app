@@ -141,11 +141,14 @@ export const CLOSINGS: readonly string[] = [
   "End on how you left, kept to what the tapped phrases or their own words support.",
   "End with the plainest sentence in the whole review.",
   "End with a sentence of five words or fewer.",
-  // "the one thing you would change nothing about" is not a sentence a small
-  // model can land: live drafts came back as "Everything about <store> is the
-  // one thing you would change nothing about." (tashas demo, 2026-09-11).
-  // Same closing move, phrased so it can only come out grammatical.
-  "End by naming the one thing you would not change.",
+  // Removed 2026-09-12: "name the one thing you would change nothing about"
+  // and its rewrite "the one thing you would not change" were both written
+  // back into the review instead of acted on — "The food is the one thing I
+  // would change nothing about.", "I would not change how they prepare the
+  // doughnuts because it is the one thing I would not change." Three of the
+  // six live drafts that reached this move were unusable. A move a small
+  // model cannot land is worth less than the variety it buys, and the leak
+  // check below now catches the shape wherever it comes from.
 ];
 
 /** Stock closers, banned for the same reason as the stock openers. */
