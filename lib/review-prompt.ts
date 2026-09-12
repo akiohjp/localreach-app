@@ -305,10 +305,30 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   }
   rules.push(
     "- Do not invent specifics: no dishes, products, prices, names, dates, waiting times, occasions or companions beyond what is given above. If all you know is a phrase, stay at the level of that phrase. Several tapped dishes or items simply means they had them; never invent a partner or friend to explain who had what.",
-    `- Mention "${store}" at most once, or not at all. Do not start the review with the business name.`,
   );
+  // What local search and AI answers match on is the name, what the place is
+  // and where it is. Both lines used to be permissions — "at most once, or not
+  // at all", "only if it fits naturally, you may" — and the model took the way
+  // out: across 136 live English drafts the name appeared in 24%, the category
+  // noun in 34%, the area in 53% (measured 2026-09-12, owner read).
+  //
+  // Asked for outright now, but not every time. A store whose every review
+  // names the business and the district reads like a campaign rather than a
+  // row of customers, which loses more than the coverage gains — so it
+  // rotates with the opening, two drafts in three for the name and three in
+  // four for the place line.
+  const v = Math.abs(Math.trunc(p.variant ?? 0));
+  if (v % 3 === 2) {
+    rules.push(`- Do not name "${store}" at all in this one.`);
+  } else {
+    rules.push(`- Name "${store}" exactly once, inside a sentence in the body of the review. Never in the first sentence, never as a heading or a sign-off.`);
+  }
   if (place) {
-    rules.push(`- Once, and only if it fits naturally, you may say what and where it is: "${place}". Never as a tagline or a closing line.`);
+    if ((v + 1) % 4 === 0) {
+      rules.push(`- You may say what and where it is once: "${place}". Never as a tagline or a closing line.`);
+    } else {
+      rules.push(`- Say once, plainly, what and where it is: "${place}". Work it into a sentence that says something about the visit — never as a tagline, a heading or a closing line.`);
+    }
   }
   if (p.nonVisit) {
     rules.push("- This is a service business: the customer hired them or worked with them rather than dropping in. Do not write that they visited or popped in.");
