@@ -53,9 +53,9 @@ export const AI_TELL_PHRASES: readonly string[] = [
  * a 38-word draft on 2026-09-06.
  */
 export const LENGTH_RAILS: Record<SupportedLocale, { min4: number; min5: number; max: number; unit: "words" | "chars" }> = {
-  en: { min4: 35, min5: 45, max: 130, unit: "words" },
-  ar: { min4: 30, min5: 40, max: 120, unit: "words" },
-  ja: { min4: 75, min5: 100, max: 300, unit: "chars" },
+  en: { min4: 55, min5: 68, max: 170, unit: "words" },
+  ar: { min4: 48, min5: 58, max: 160, unit: "words" },
+  ja: { min4: 120, min5: 150, max: 430, unit: "chars" },
 };
 
 /** The guest's optional free-text line: bounded, printable, one line. */

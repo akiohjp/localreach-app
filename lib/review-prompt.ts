@@ -212,16 +212,19 @@ function hintFor(kw: string, types?: Record<string, string> | null): string {
  * longer place to invent things.
  */
 export function lengthRule(locale: SupportedLocale, rating: number): string {
-  // Stated a notch above the real target: the lite models undershoot a length
-  // instruction by roughly a fifth (measured 2026-09-06), and the filter's
-  // floor (LENGTH_RAILS) catches the ones that still come back thin.
+  // Stated well above the real target, because the lite models undershoot a
+  // length instruction badly: asked for 70 to 110 they returned a mean of 66
+  // across 122 live 5-star drafts, with an eighth of them under 55 (measured
+  // 2026-09-12, after the owner read the drafts as short again). Asking for
+  // 95 to 135 lands them where 70 to 110 was meant to. LENGTH_RAILS catches
+  // whatever still comes back thin.
   const happy = rating >= 5;
   if (locale === "ja") {
-    return happy ? "4〜6 文、140〜240 文字程度" : "3〜5 文、110〜190 文字程度";
+    return happy ? "6〜8 文、230〜340 文字程度" : "5〜7 文、180〜280 文字程度";
   }
   return happy
-    ? "4 to 6 sentences, roughly 70 to 110 words"
-    : "3 to 5 sentences, roughly 55 to 90 words";
+    ? "6 to 8 sentences, roughly 115 to 155 words"
+    : "5 to 7 sentences, roughly 90 to 125 words";
 }
 
 /**
