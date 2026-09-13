@@ -1,9 +1,12 @@
 "use client";
 import { useState } from "react";
 import {
-  Star, Utensils, Coffee, Wine, Building2,
-  ShoppingBag, Scissors, Dumbbell, Car, BookOpen, Plus, MapPin,
+  Star, Utensils, Coffee, Wine, Building2, Beef, Fish, Soup, Pizza,
+  Croissant, IceCreamCone, Stethoscope, House, Briefcase, Footprints, Package,
+  Sofa, Sparkles, ShoppingBag, ShoppingCart, Shirt, Scissors, Dumbbell,
+  Car, BookOpen, MapPin,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { UiStrings } from "@/lib/ui-strings";
 
 type Props = {
@@ -22,29 +25,63 @@ type Props = {
   branchLabel?: string | null;
 };
 
-function getCategoryIcon(category: string | null | undefined) {
+/**
+ * 業種アイコン。客が QR を読んで最初に見る絵なので、業種と合っていないと
+ * そこで信用が落ちる。
+ *
+ * 部分一致で当ててはいけない。"steakhouse" は "tea" を内側に含むので、
+ * includes("tea") がステーキハウスをコーヒーカップにしていた
+ * （Rowley's、オーナー指摘 2026-09-14）。だから語の境界で当てる。
+ *
+ * 文体プールの resolveVertical（lib/review-pools.ts）とは粒度が違う。
+ * あちらはレビューの声を決めるので "restaurant" で足りるが、絵は寿司と
+ * ラーメンとステーキを分けるだけの細かさがいる。業種を足すときは両方を見ること。
+ *
+ * 並び順は「具体的なものから一般的なものへ」。最初に当たった行が勝つ。
+ */
+type IconRule = readonly [RegExp, LucideIcon];
+const CATEGORY_ICONS: readonly IconRule[] = [
+  // 飲食 — 料理が分かるものから先に
+  [/\b(steak|steakhouse|grill|grillhouse|barbecue|bbq|butcher|churrascaria)\b/, Beef],
+  [/\b(sushi|sashimi|omakase|seafood)\b/, Fish],
+  [/\b(ramen|udon|soba|noodle|noodles|pho|izakaya)\b/, Soup],
+  [/\b(pizza|pizzeria)\b/, Pizza],
+  [/\b(bakery|boulangerie|patisserie|pastry|doughnut|doughnuts|donut|donuts|bread)\b/, Croissant],
+  [/\b(dessert|desserts|gelato|creamery|ice ?cream)\b/, IceCreamCone],
+  // 食品を「売る」店は、食べさせる店より先に。"food store" の "food" が
+  // restaurant 行に当たって Prime Gourmet がフォークになっていた（2026-09-14）。
+  [/\b(grocery|groceries|supermarket|hypermarket|greengrocer|delicatessen|food (store|shop|market))\b/, ShoppingCart],
+  [/\b(cafe|caf\u00e9|coffee|espresso|roastery|tea|teahouse|matcha)\b/, Coffee],
+  [/\b(bar|pub|wine|winery|brewery|lounge|nightclub|cocktail|cocktails)\b/, Wine],
+  [/\b(restaurant|dining|diner|bistro|brasserie|eatery|kitchen|canteen|food)\b/, Utensils],
+  // 医療と体
+  [/\b(clinic|medical|hospital|doctor|dental|dentist|pharmacy|physio|chiro)\b/, Stethoscope],
+  [/\b(salon|barber|hair|nail|nails|lash|brow|spa|beauty|aesthetic)\b/, Scissors],
+  [/\b(gym|fitness|yoga|pilates|crossfit|golf|sport|sports)\b/, Dumbbell],
+  // 専門職と不動産
+  [/\b(real ?estate|realty|realtor|property|properties|broker|brokers|brokerage|leasing)\b/, House],
+  [/\b(agency|agencies|marketing|advertising|branding|creative|media|studio|consulting|consultancy)\b/, Briefcase],
+  [/\b(school|academy|tutor|tutoring|nursery|kindergarten|education|learning|course|courses)\b/, BookOpen],
+  [/\b(hotel|inn|motel|resort|hostel|accommodation|lodging)\b/, Building2],
+  [/\b(auto|automotive|car|cars|mechanic|garage|tyre|tire|detailing)\b/, Car],
+  // 小売 — 何を売る店かが分かる語を先に、"shop" のような一般語は最後
+  [/\b(perfume|perfumes|fragrance|fragrances|cosmetics|jewellery|jewelry)\b/, Sparkles],
+  [/\b(rug|rugs|carpet|carpets|furniture|interior|homeware)\b/, Sofa],
+  [/\b(pet|pets|vet|veterinary|aquarium|koi|pond)\b/, Fish],
+  [/\b(clothing|apparel|fashion|menswear|womenswear|tailor)\b/, Shirt],
+  [/\b(running|outdoor|sportswear|sneaker|sneakers|footwear)\b/, Footprints],
+  [/\b(wholesale|wholesaler|trading|distributor|distribution|supplier|logistics)\b/, Package],
+  [/\b(shop|store|retail|boutique|showroom)\b/, ShoppingBag],
+];
+
+export function resolveCategoryIcon(category: string | null | undefined): LucideIcon {
   const c = (category ?? "").toLowerCase();
-  if (c.includes("restaurant") || c.includes("food") || c.includes("dining") || c.includes("sushi") || c.includes("ramen"))
-    return <Utensils size={24} strokeWidth={1.5} />;
-  if (c.includes("cafe") || c.includes("coffee") || c.includes("tea") || c.includes("bakery"))
-    return <Coffee size={24} strokeWidth={1.5} />;
-  if (c.includes("bar") || c.includes("pub") || c.includes("wine") || c.includes("lounge") || c.includes("nightclub"))
-    return <Wine size={24} strokeWidth={1.5} />;
-  if (c.includes("hotel") || c.includes("inn") || c.includes("motel") || c.includes("accommodation") || c.includes("hostel"))
-    return <Building2 size={24} strokeWidth={1.5} />;
-  if (c.includes("shop") || c.includes("store") || c.includes("retail") || c.includes("boutique") || c.includes("market"))
-    return <ShoppingBag size={24} strokeWidth={1.5} />;
-  if (c.includes("salon") || c.includes("beauty") || c.includes("spa") || c.includes("nail") || c.includes("hair") || c.includes("barber"))
-    return <Scissors size={24} strokeWidth={1.5} />;
-  if (c.includes("gym") || c.includes("fitness") || c.includes("sport") || c.includes("yoga") || c.includes("pilates"))
-    return <Dumbbell size={24} strokeWidth={1.5} />;
-  if (c.includes("medical") || c.includes("clinic") || c.includes("dental") || c.includes("hospital") || c.includes("doctor") || c.includes("pharmacy"))
-    return <Plus size={24} strokeWidth={1.5} />;
-  if (c.includes("auto") || c.includes("car") || c.includes("mechanic") || c.includes("garage"))
-    return <Car size={24} strokeWidth={1.5} />;
-  if (c.includes("school") || c.includes("education") || c.includes("learning") || c.includes("academy") || c.includes("tutor"))
-    return <BookOpen size={24} strokeWidth={1.5} />;
-  return <Star size={24} strokeWidth={1.5} />;
+  return CATEGORY_ICONS.find(([re]) => re.test(c))?.[1] ?? Star;
+}
+
+function getCategoryIcon(category: string | null | undefined) {
+  const Icon = resolveCategoryIcon(category);
+  return <Icon size={24} strokeWidth={1.5} />;
 }
 
 export default function StepRating({ t, storeName, greetingText, onSelect, logoUrl, businessCategory, branchLabel }: Props) {
