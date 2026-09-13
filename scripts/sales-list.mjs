@@ -65,7 +65,7 @@ const NOTES = {
   "Trifid Media": { kind: "demo", friend: true, free: true, owner: "Mahdi", note: "Al Quoz。AED 1,000 前払い済みのため LocalReach は無償。文面は serve の trifid-media-message.html（2026-09-13）" },
   "Marina Estates": { kind: "test", note: "不動産向けの汎用デモ（架空店）。実在の listing には投稿されない" },
   "Demo — Marina Table": { kind: "test", note: "飲食向けの汎用デモ（架空店）。実在の listing には投稿されない" },
-  "Prime Gourmet Dubai Creek Harbour": { kind: "demo", friend: true, owner: "Maria（GM）", shortName: "Prime Gourmet", note: "UAE 15 店舗。Creek Harbour は新店で星 5.0 / レビュー 1 件。1 店決まれば横展開できる（2026-09-14）" },
+  "Prime Gourmet Dubai Creek Harbour": { kind: "demo", friend: true, owner: "Maria（GM）", shortName: "Prime Gourmet", message: "Hi Maria, how have you been?\n\nThis is my own business, and I have already set it up for the new Creek Harbour store, so I am just sending it over.\n\nA customer opens it on their phone, taps a rating and a few things they liked (the Japanese A5 Wagyu, the Black Angus, the dry aged beef), and about thirty seconds later a full review is written in their own words. They post it themselves on Google. Nothing is offered in exchange, so it stays inside Google's rules.\n\nCreek Harbour has one review on it right now, so it seemed like the right store to try this on. Have a go on your phone:\n{link}\n\nNothing to sign and no rush. Just tell me if it is any good.", note: "UAE 15 店舗。Creek Harbour は新店で星 5.0 / レビュー 1 件。1 店決まれば横展開できる（2026-09-14）" },
   "Summit Trading": { kind: "demo", friend: true, lang: "ja", owner: "松崎", tapsJa: ["冷凍まぐろ", "鮮魚", "寿司米"], note: "日本食材の卸。Akio の元取引先で、松崎さんが窓口。Dubai Investment Park 2、星 4.2 / 9 件（2026-09-14）" },
   "Noren": { kind: "demo", owner: "Pawel Kazanowski（共同創業者・エグゼクティブシェフ）", friend: true, note: "Pullman Dubai JLT, Cluster T。2026-08 開店、星 4.8 / 26 件。オーナー知り合い（2026-09-14）" },
 };
@@ -134,6 +134,10 @@ function tapExamples(s) {
 }
 
 function messageFor(s, name) {
+  const short0 = `https://${QR_HOST}/${s.slug}`;
+  // A店ごとの書き下ろしが最優先。共通テンプレートが営業文に寄りすぎる相手に使う
+  // （Akio 2026-09-14: 知り合いには挨拶から入り、売り込みを最初に出さない）。
+  if (NOTES[name]?.message) return NOTES[name].message.replace(/\{link\}/g, short0);
   const owner = NOTES[name]?.owner;
   const first = owner ? owner.split(/[\s（(]/)[0] : null;
   const friend = !!NOTES[name]?.friend;
@@ -152,7 +156,7 @@ function messageFor(s, name) {
     return [
       open,
       "",
-      `ずっと作っていたレビューの仕組みが動く形になったので、${jaName}の中身を入れて用意しました。`,
+      `これは私が自分でやっている事業です。ずっと作っていたレビューの仕組みが動く形になったので、${jaName}の中身を入れて用意しました。`,
       "",
       `${who}がスマホで開いて、星とよかったところをいくつかタップすると${ex}、30 秒ほどで本人の言葉のレビューが出来上がります。文章はその場で直せて、投稿するのは${who}本人です。見返りは何も渡さないので、Google のルールの中に収まっています。`,
       "",
@@ -171,9 +175,11 @@ function messageFor(s, name) {
 
   const ex = taps.length ? ` (${taps.join(", ")})` : "";
   const hello = `Hi ${first ?? "{name}"}, Akio here.`;
+  // 「誰の事業なのか」を先に言う。作っているものの話だけだと、相手は趣味なのか
+  // 勤め先の商品なのか判断がつかない（Akio 2026-09-14: 「誰のビジネス?」ってなる）。
   const lead = friend
-    ? `The review thing I have been building is working now, and I have put ${label} into it.`
-    : `I built something for ${label}, and it is easier to show it than to describe it.`;
+    ? `This is my own business. The review system I have been building is working now, and I have put ${label} into it.`
+    : `This is my own business, and it is easier to show it than to describe it. ${label} is already in it.`;
   return [
     hello,
     "",
@@ -187,7 +193,7 @@ function messageFor(s, name) {
       ? "You already paid me up front, so this one is on me. No charge for it, for as long as you use it."
       : NOTES[name]?.noPrice
       ? null
-      : `If you want it running at ${label}, it is AED 298 a month, three months up front, and that is the whole cost. Or 498 a month if you also want a reply drafted for every review that comes in. The American tools that do this start at about four times that.`,
+      : `If you want it running at ${label}, it is AED 298 a month, three months up front, and that is the whole cost. Or 498 a month if you also want a reply drafted for every review that comes in.`,
     "",
     "Two minutes on your phone, then tell me straight what you think:",
     short,
