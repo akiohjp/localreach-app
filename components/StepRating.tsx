@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   Star, Utensils, Coffee, Wine, Building2, Beef, Fish, Soup, Pizza,
   Croissant, IceCreamCone, Stethoscope, House, Briefcase, Footprints, Package,
+  SprayCan, KeyRound, Waves, Truck,
   Sofa, Sparkles, ShoppingBag, ShoppingCart, Shirt, Scissors, Dumbbell,
   Car, BookOpen, MapPin,
 } from "lucide-react";
@@ -26,12 +27,17 @@ type Props = {
 };
 
 /**
- * 業種アイコン。客が QR を読んで最初に見る絵なので、業種と合っていないと
- * そこで信用が落ちる。
+ * 業種アイコン。1 行が [パターン, 主となる絵, 横に添える絵?]。
+ *
+ * 添える側がある理由: ステーキの絵だけでは、食べに行く店なのか精肉店なのか
+ * 読み取れない。ナイフとフォークが横にあって初めて「食事をする店」だと分かる
+ * （オーナー、2026-09-14）。だから絵だけで業種が伝わらない行にだけ二つ目を置く。
+ * 単体で明らかな行（カフェ、バー、ジム、クリニック）には添えない。添えるほど
+ * 情報が増えるわけではなく、意味が散るだけなので。
  *
  * 部分一致で当ててはいけない。"steakhouse" は "tea" を内側に含むので、
  * includes("tea") がステーキハウスをコーヒーカップにしていた
- * （Rowley's、オーナー指摘 2026-09-14）。だから語の境界で当てる。
+ * （Rowley's、2026-09-14）。だから語の境界で当てる。
  *
  * 文体プールの resolveVertical（lib/review-pools.ts）とは粒度が違う。
  * あちらはレビューの声を決めるので "restaurant" で足りるが、絵は寿司と
@@ -39,13 +45,13 @@ type Props = {
  *
  * 並び順は「具体的なものから一般的なものへ」。最初に当たった行が勝つ。
  */
-type IconRule = readonly [RegExp, LucideIcon];
+type IconRule = readonly [RegExp, LucideIcon, LucideIcon?];
 const CATEGORY_ICONS: readonly IconRule[] = [
-  // 飲食 — 料理が分かるものから先に
-  [/\b(steak|steakhouse|grill|grillhouse|barbecue|bbq|butcher|churrascaria)\b/, Beef],
-  [/\b(sushi|sashimi|omakase|seafood)\b/, Fish],
-  [/\b(ramen|udon|soba|noodle|noodles|pho|izakaya)\b/, Soup],
-  [/\b(pizza|pizzeria)\b/, Pizza],
+  // 飲食 — 食べに行く店には食器を添える
+  [/\b(steak|steakhouse|grill|grillhouse|barbecue|bbq|butcher|churrascaria)\b/, Beef, Utensils],
+  [/\b(sushi|sashimi|omakase|seafood)\b/, Fish, Utensils],
+  [/\b(ramen|udon|soba|noodle|noodles|pho|izakaya)\b/, Soup, Utensils],
+  [/\b(pizza|pizzeria)\b/, Pizza, Utensils],
   [/\b(bakery|boulangerie|patisserie|pastry|doughnut|doughnuts|donut|donuts|bread)\b/, Croissant],
   [/\b(dessert|desserts|gelato|creamery|ice ?cream)\b/, IceCreamCone],
   // 食品を「売る」店は、食べさせる店より先に。"food store" の "food" が
@@ -54,34 +60,43 @@ const CATEGORY_ICONS: readonly IconRule[] = [
   [/\b(cafe|caf\u00e9|coffee|espresso|roastery|tea|teahouse|matcha)\b/, Coffee],
   [/\b(bar|pub|wine|winery|brewery|lounge|nightclub|cocktail|cocktails)\b/, Wine],
   [/\b(restaurant|dining|diner|bistro|brasserie|eatery|kitchen|canteen|food)\b/, Utensils],
-  // 医療と体
+  // 医療と体 — 一つで伝わるので添えない
   [/\b(clinic|medical|hospital|doctor|dental|dentist|pharmacy|physio|chiro)\b/, Stethoscope],
   [/\b(salon|barber|hair|nail|nails|lash|brow|spa|beauty|aesthetic)\b/, Scissors],
   [/\b(gym|fitness|yoga|pilates|crossfit|golf|sport|sports)\b/, Dumbbell],
-  // 専門職と不動産
-  [/\b(real ?estate|realty|realtor|property|properties|broker|brokers|brokerage|leasing)\b/, House],
+  // 専門職と不動産 — 家だけでは自宅にも見えるので鍵を添える
+  [/\b(real ?estate|realty|realtor|property|properties|broker|brokers|brokerage|leasing)\b/, House, KeyRound],
   [/\b(agency|agencies|marketing|advertising|branding|creative|media|studio|consulting|consultancy)\b/, Briefcase],
   [/\b(school|academy|tutor|tutoring|nursery|kindergarten|education|learning|course|courses)\b/, BookOpen],
   [/\b(hotel|inn|motel|resort|hostel|accommodation|lodging)\b/, Building2],
   [/\b(auto|automotive|car|cars|mechanic|garage|tyre|tire|detailing)\b/, Car],
-  // 小売 — 何を売る店かが分かる語を先に、"shop" のような一般語は最後
-  [/\b(perfume|perfumes|fragrance|fragrances|cosmetics|jewellery|jewelry)\b/, Sparkles],
-  [/\b(rug|rugs|carpet|carpets|furniture|interior|homeware)\b/, Sofa],
-  [/\b(pet|pets|vet|veterinary|aquarium|koi|pond)\b/, Fish],
+  // 小売 — 何を売るかの絵に、買う場所だと分かる袋を添える
+  [/\b(perfume|perfumes|fragrance|fragrances|cosmetics|jewellery|jewelry)\b/, SprayCan, Sparkles],
+  [/\b(rug|rugs|carpet|carpets|furniture|interior|homeware)\b/, Sofa, ShoppingBag],
+  [/\b(pet|pets|vet|veterinary|aquarium|koi|pond)\b/, Fish, Waves],
   [/\b(clothing|apparel|fashion|menswear|womenswear|tailor)\b/, Shirt],
-  [/\b(running|outdoor|sportswear|sneaker|sneakers|footwear)\b/, Footprints],
-  [/\b(wholesale|wholesaler|trading|distributor|distribution|supplier|logistics)\b/, Package],
+  [/\b(running|outdoor|sportswear|sneaker|sneakers|footwear)\b/, Footprints, ShoppingBag],
+  [/\b(wholesale|wholesaler|trading|distributor|distribution|supplier|logistics)\b/, Package, Truck],
   [/\b(shop|store|retail|boutique|showroom)\b/, ShoppingBag],
 ];
 
-export function resolveCategoryIcon(category: string | null | undefined): LucideIcon {
+export function resolveCategoryIcons(category: string | null | undefined): {
+  primary: LucideIcon;
+  secondary?: LucideIcon;
+} {
   const c = (category ?? "").toLowerCase();
-  return CATEGORY_ICONS.find(([re]) => re.test(c))?.[1] ?? Star;
+  const hit = CATEGORY_ICONS.find(([re]) => re.test(c));
+  return hit ? { primary: hit[1], secondary: hit[2] } : { primary: Star };
 }
 
 function getCategoryIcon(category: string | null | undefined) {
-  const Icon = resolveCategoryIcon(category);
-  return <Icon size={24} strokeWidth={1.5} />;
+  const { primary: Primary, secondary: Secondary } = resolveCategoryIcons(category);
+  return (
+    <span className="flex items-center gap-2">
+      <Primary size={24} strokeWidth={1.5} />
+      {Secondary ? <Secondary size={18} strokeWidth={1.5} className="opacity-60" /> : null}
+    </span>
+  );
 }
 
 export default function StepRating({ t, storeName, greetingText, onSelect, logoUrl, businessCategory, branchLabel }: Props) {
