@@ -334,6 +334,15 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   if (GERUND_SUBJECT.test(opening)) {
     return { ok: false, reason: "opens_without_a_person" };
   }
+  // A time or a thing doing something to the reviewer: "Today brought me to
+  // Bentoya Kitchen", "Lunch today led me to a great spot", "My search for a
+  // clinic led me here". Same inverted opening, no gerund. The verb list is the
+  // give-away; "My visit turned out easier than I thought" is left alone.
+  const THING_SUBJECT =
+    /^(today|tonight|yesterday|this (morning|afternoon|evening|week|weekend)|last (night|week|weekend|month)|a (quick|late|long|busy|slow) \w+|(lunch|dinner|breakfast|brunch|coffee|work|hunger|curiosity|a craving|cravings)\b[^,.!?]*?|(my|our|the) \w+( \w+)?)\s+[^,.!?]*?\b(brought|led|took|drew|pulled|sent|landed|steered|pushed|dragged|walked|carried|guided|pointed) (me|us)\b/i;
+  if (THING_SUBJECT.test(opening)) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
   const FIRST_PERSON = /\b(i|we|my|our|me|us|mine|ours)\b/i;
   const LEADING_ADVERB =
     /^(finally|honestly|genuinely|definitely|really|just|eventually|recently|yesterday|today|tonight|lately|thankfully|luckily)\b[,\s]+/i;
