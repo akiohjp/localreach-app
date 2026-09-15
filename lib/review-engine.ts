@@ -283,7 +283,7 @@ const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
  * (owner read, RMK demo, 2026-09-06); after a copula they read as intended.
  */
 const STORY_PREDICATE =
-  /^(made|based|sourced|produced|crafted|designed|handmade|hand-made|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|halal|locally|freshly|newly|proudly|fully)\b/i;
+  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|halal|locally|freshly|newly|proudly|fully)\b/i;
 
 /**
  * "Item" pills that name a quality or a service rather than a thing you buy
@@ -942,7 +942,6 @@ const ATTRIBUTE_TAILS: Record<ReviewLocale | "enNegative" | "enPredicate" | "enO
   ],
   enPredicate: [
     "It's also {kw}.",
-    "The place is also {kw}.",
     "I'd add that it's {kw}.",
     "It is {kw} as well.",
     "It's {kw} too, which matters to us.",
@@ -1814,7 +1813,11 @@ function capitalizeSentenceStartsEn(text: string, protect: readonly string[]): s
     const idx = m.index + m[1]!.length;
     // Same-length replacement, so the regex cursor stays valid.
     const cand = out.slice(0, idx) + out[idx]!.toUpperCase() + out.slice(idx + 1);
-    if (!protect.some((k) => k && out.includes(k) && !cand.includes(k))) {
+    // A protected phrase whose only change is a capital first letter is still
+    // the phrase: "the filtration systems again" at a sentence start stayed
+    // lowercase on Koi Water Barn (gate, 2026-09-15) because this refused it.
+    const stillThere = (k: string) => cand.includes(k) || cand.includes(k[0]!.toUpperCase() + k.slice(1));
+    if (!protect.some((k) => k && out.includes(k) && !stillThere(k))) {
       out = cand;
     }
   }
@@ -2182,6 +2185,42 @@ function takesQuantityFrame(phrase: string): boolean {
   if (/[^s]s$/.test(head)) return true; // plural
   return CATEGORY_MASS_HEADS.has(head);
 }
+
+/**
+ * An OCCASION ("date nights", "group dinners", "celebrations", "breakfast
+ * meetings") is not a class of goods. In the category frames it reads as
+ * ad copy: "I couldn't criticize their celebrations.", "They carry a good
+ * range of group dinners." (gate over Rowley's, Maru Udon, Noren, 2026-09-15,
+ * after the occasion phrases had already been made plural). A guest says what
+ * the place is GOOD FOR. Detected on the head noun; EN only.
+ */
+const OCCASION_HEAD =
+  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?)$/i;
+
+function isOccasion(phrase: string): boolean {
+  const head = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
+  return OCCASION_HEAD.test(head);
+}
+
+// Whole sentences, subject and verb, or the judge reads them as taglines
+// ("Good for birthday dinners." was rejected as a fragment, 2026-09-15).
+const OCCASION_TAILS_EN: string[] = [
+  "It's a good {spot|place} for {kw}.",
+  "It works well for {kw}.",
+  "I'd pick it for {kw}.",
+  "We've used it for {kw} and it {held up|worked out}.",
+  "It's an easy choice for {kw}.",
+  "I'd keep it in mind for {kw}.",
+  "It suits {kw} without any fuss.",
+];
+// Two or more occasions in one review stack into a wall of one-liners, so
+// they are paired into one sentence; both phrases stay verbatim inside it.
+const OCCASION_PAIR_TAILS_EN: string[] = [
+  "It works for {kw} alike.",
+  "It's a good {spot|place} for {kw}.",
+  "We've used it for {kw} and it {held up|worked out} both times.",
+  "I'd pick it for {kw} without thinking twice.",
+];
 
 /** A quantity frame is exactly the one where {kw} follows "of". */
 const CATEGORY_QUANTITY_FRAME = /\bof \{kw\}/i;
@@ -2945,8 +2984,19 @@ export function buildLocalizedReview(
   // Quantity frames only where the head is plural or a mass noun.
   {
     const catPool = forAudience(CATEGORY_TAILS[locale]);
-    const plural = catKws.filter((k) => takesQuantityFrame(k));
-    const singular = catKws.filter((k) => !takesQuantityFrame(k));
+    const occasions = locale === "en" ? catKws.filter((k) => isOccasion(k)) : [];
+    if (occasions.length >= 2) {
+      // "date nights and group dinners" — one sentence carrying two phrases.
+      const pairs: string[] = [];
+      for (let i = 0; i + 1 < occasions.length; i += 2) pairs.push(`${occasions[i]} and ${occasions[i + 1]}`);
+      weaveDedicated(pairs, OCCASION_PAIR_TAILS_EN, 0x9e14);
+      if (occasions.length % 2 === 1) weaveDedicated([occasions[occasions.length - 1]!], OCCASION_TAILS_EN, 0x9e13);
+    } else if (occasions.length === 1) {
+      weaveDedicated(occasions, OCCASION_TAILS_EN, 0x9e13);
+    }
+    const classes = catKws.filter((k) => !occasions.includes(k));
+    const plural = classes.filter((k) => takesQuantityFrame(k));
+    const singular = classes.filter((k) => !takesQuantityFrame(k));
     if (plural.length) weaveDedicated(plural, catPool, 0x9e11);
     if (singular.length) {
       const noQuantity = catPool.filter((t) => !CATEGORY_QUANTITY_FRAME.test(t));
