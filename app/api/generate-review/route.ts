@@ -55,8 +55,17 @@ const BUDGET_MS = 7500;
 const ATTEMPT_MS = 5500;
 /** Silence before the next model is started alongside (lib/review-ai hedging). */
 const HEDGE_AFTER_MS = 1800;
-/** A rejected draft (opening repeat, thin, banned word) is regenerated with the next move; three tries fit the budget. */
-const MAX_GENERATIONS = 3;
+/**
+ * A rejected draft (opening repeat, thin, banned word) is regenerated with the
+ * next move. Raised from 3 to 5 on 2026-09-15: the filter got stricter the same
+ * day (opens_without_a_person, and no thanking the business), so the reject rate
+ * went from roughly 1 in 8 to 1 in 4, and 3 tries left about 1 guest in 60
+ * falling through to the template. The template is the weaker path on wide
+ * catalogues — the naturalness gate rejects 4 to 7 of 16 on Koi Water Barn and
+ * Noren — so it is worth another 2.6 s of budget to reach it less often. The
+ * BUDGET_MS check below still stops early, so a slow model cannot use all five.
+ */
+const MAX_GENERATIONS = 5;
 const DAILY_CAP = Math.max(50, Number(process.env.AI_REVIEW_DAILY_CAP) || 2000);
 
 function json(body: Record<string, unknown>, status: number, headers?: Record<string, string>) {

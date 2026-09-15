@@ -7,7 +7,7 @@
  * works for any language and any business type.
  *
  * Placeholders:
- *   {store} — business name (verbatim, kept once; see capStoreMentions)
+ *   {store} — business name (verbatim, appears >= twice overall)
  *   {list}  — the joined keyword phrases (verbatim keywords)
  *   {a}{b}  — two keyword sub-lists (dual block)
  *   {kw}    — a single keyword (missing-keyword tail)
@@ -251,29 +251,6 @@ const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
   "bakery", "pharmacy", "market", "supermarket", "workshop", "center", "centre", "office",
   "firm", "dentist", "doctor", "florist", "atelier", "place", "spot", "lounge", "kitchen",
   "bistro", "eatery", "grocer", "perfumery", "parlour", "parlor", "barber",
-  // A profession is a singular countable noun and needs the article as much as
-  // "a dentist" does. "dentist" and "doctor" were here; every other specialism
-  // was not, so "That settled my search for dermatologist in Dubai" shipped on
-  // the live Cooper config (naturalness gate, both runs, 2026-09-15).
-  "dermatologist", "pediatrician", "paediatrician", "physiotherapist", "osteopath",
-  "chiropractor", "gynecologist", "gynaecologist", "cardiologist", "orthodontist",
-  "optometrist", "optician", "podiatrist", "psychologist", "psychiatrist", "surgeon",
-  "specialist", "consultant", "practitioner", "therapist", "dietitian", "dietician",
-  "nutritionist", "midwife", "nurse", "vet", "veterinarian", "pharmacist",
-  "lawyer", "accountant", "notary", "broker", "realtor", "plumber", "electrician",
-  "mechanic", "carpenter", "tailor", "photographer", "stylist", "trainer",
-  "hospital", "polyclinic", "laboratory", "nursery", "butcher", "baker",
-  "jeweller", "jeweler", "cobbler", "laundry", "deli", "diner", "pub",
-  // Trade and venue nouns that are just as countable (audit of all 30 live
-  // stores, 2026-09-15): "steakhouse in DIFC", "izakaya in Dubai", "Japanese
-  // food supplier in Dubai", "koi pond builder in Dubai" all need the article.
-  // Mass nouns stay OUT on purpose: sushi, ramen, coffee, beef, tea, matcha,
-  // udon, pizza, gear, marketing, maintenance take no article and never did.
-  "steakhouse", "izakaya", "ramen-ya", "teahouse", "tearoom", "brasserie",
-  "trattoria", "patisserie", "creperie", "taverna", "grillhouse", "chophouse",
-  "supplier", "wholesaler", "distributor", "importer", "exporter", "builder",
-  "contractor", "installer", "grocery", "roastery", "roaster", "brokerage",
-  "practice", "surgery", "polyclinic", "dispensary", "outlet", "branch",
 ]);
 
 /**
@@ -1062,18 +1039,12 @@ const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
   // "loved", "can't say enough about", "people weren't wrong about" — a
   // patient really does write those about care they received, and stripping
   // them leaves the clinic pools too thin for the diversity gate.
-  // Added 2026-09-15 (Akio read a live Cooper draft): the retail/regular voice
-  // in the BASE pools was never covered here. "I'm adding Cooper Health Clinic
-  // to the rotation.", "Prices felt reasonable for what you walk away with."
-  // Nobody puts a clinic in their rotation, and you do not walk away from a
-  // consultation with goods. stripRegularVoiceLines covers the same words but
-  // only for VISITOR audiences, and a clinic is a local audience.
   // Added 2026-08-09 after the naturalness reader (scripts/read-naturalness)
   // flagged "Loved IV Drip." and "Aesthetics Therapy, so good." on the live
   // Kotobuki config. "Loved" was deliberately kept in an hour earlier on the
   // argument that a patient does write it about care received — a native
   // reader disagreed for a NAMED PROCEDURE, which is the object slot here.
-  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|bringing {people|friends|visitors}|sort out|half the battle|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad|\bthe rotation\b|\busual spots\b|\bregular list\b|\bwalk away with\b|\bshortlist\b|\bfavou?rites? list\b|\bworth a look\b/i,
+  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|bringing {people|friends|visitors}|sort out|half the battle|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad/i,
   ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方|たまたま通りかかって|立ち寄り)/,
   ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
 };
@@ -1698,12 +1669,9 @@ function reviewNoKeywords(
 
 
 /**
- * Real guests name a business once, if at all; our templates could stack it up
- * to 5 (opener + core + filler + closer each carrying {store}), which reads as
- * SEO spam. Keep the FIRST mention, swap the rest for a natural stand-in.
- * Was two until 2026-09-15: Akio read a Cooper Health Clinic draft that opened
- * "I walked past Cooper Health Clinic for weeks" and closed "I'm adding Cooper
- * Health Clinic to the rotation", and twice in seven sentences reads like copy.
+ * Real guests name a business 0-2 times; our templates could stack it up to 5
+ * (opener + core + filler + closer each carrying {store}), which reads as SEO
+ * spam. Keep the first two mentions, swap the rest for a natural stand-in.
  * (If a woven keyword itself contains the store name, that rare case is left
  * alone by running this before keyword tails are appended.)
  */
@@ -1747,7 +1715,7 @@ function capStoreMentions(
     const i = rest.indexOf(name);
     if (i === -1) return out + rest;
     count++;
-    if (count <= 1) {
+    if (count <= 2) {
       out += rest.slice(0, i + name.length);
     } else {
       const before = rest.slice(0, i);
@@ -2144,48 +2112,6 @@ export function classifyKeyword(
  * number-neutral: the same slot takes a plural class and a mass noun, so any
  * "is/was/are" here becomes a visible grammar error on half the stores.
  */
-/**
- * CATEGORY frames are noun-only: "They know their {kw}", "a good variety of
- * {kw}". A phrase that starts with an article, a preposition or a gerund
- * clause comes out broken in them — "They really know their a family dinner.",
- * "I came for with a group and was not disappointed.", "They keep a strong
- * selection of opening a restaurant." (naturalness gate over Rowley's, Maru
- * Udon, Summit Trading and Koi Water Barn, 2026-09-15: 5 to 7 rejects per 16).
- *
- * Owners type occasions as categories and always will, so the engine absorbs
- * it rather than relying on clean data: an unfit phrase leaves the category
- * pool and goes out through the appositive tails, which take ANY shape. Same
- * treatment attribute phrases have had since 2026-07-29.
- */
-const CATEGORY_FRAME_UNFIT =
-  /^(a|an|the|my|our|your|this|that)\s|^(with|for|before|after|during|without|from|by|inside|around)\s|^\w+ing\s+(a|an|the|my|our|your|this|that|to|into|within|from|around|in|at|on|for)\b/i;
-
-function fitsCategoryFrame(phrase: string, locale: ReviewLocale): boolean {
-  if (locale !== "en") return true;
-  return !CATEGORY_FRAME_UNFIT.test(phrase.trim());
-}
-
-/**
- * The three quantity frames ("plenty of X to choose from", "a good variety of
- * X", "a strong selection of X") need a PLURAL or a mass noun. With a singular
- * occasion they read "They have plenty of weekend lunch to pick from."
- */
-const CATEGORY_MASS_HEADS = new Set([
-  "food", "cooking", "cuisine", "coffee", "tea", "sushi", "ramen", "udon", "soba",
-  "beef", "meat", "seafood", "produce", "gear", "equipment", "service", "care",
-  "advice", "support", "maintenance", "wellness", "health", "hospitality", "quality",
-  "choice", "variety", "selection", "seating", "parking", "delivery", "takeaway",
-]);
-
-function takesQuantityFrame(phrase: string): boolean {
-  const head = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
-  if (/[^s]s$/.test(head)) return true; // plural
-  return CATEGORY_MASS_HEADS.has(head);
-}
-
-/** A quantity frame is exactly the one where {kw} follows "of". */
-const CATEGORY_QUANTITY_FRAME = /\bof \{kw\}/i;
-
 const CATEGORY_TAILS: Record<ReviewLocale, string[]> = {
   en: [
     // Pool size is a diversity constraint, not padding: a store with three
@@ -2510,15 +2436,7 @@ export function buildLocalizedReview(
   let cfg = { ...LOCALE_CFG[locale], ...bucket };
   // Geo search phrases are pulled out BEFORE the core/tail machinery: they
   // must never enter a {list} or an ordinary object tail (see isGeoPhrase).
-  const typeOf = (k: string): KeywordType => {
-    const t = classifyKeyword(k, keywordTypes, locale);
-    // An occasion typed as a category ("a family dinner", "with a group",
-    // "restocking the pond") fits neither the noun-only category frames nor an
-    // object slot ("the restocking the pond"). Attribute is the shape that
-    // takes anything: it leaves through the appositive tails.
-    if (t === "category" && !fitsCategoryFrame(k, locale)) return "attribute";
-    return t;
-  };
+  const typeOf = (k: string) => classifyKeyword(k, keywordTypes, locale);
   // Only an EXPLICIT type counts here. classifyKeyword falls back to a guess
   // for an untyped store, and the guess must not be allowed to put an article
   // in front of a proper name.
@@ -2541,9 +2459,6 @@ export function buildLocalizedReview(
   // Categories and services leave the object machinery for the same reason geo
   // phrases do: the {list} slot and the ordinary tails both assume the phrase
   // names one thing you ordered.
-  // An occasion typed as a category ("a family dinner", "with a group",
-  // "opening a restaurant") cannot sit in a noun-only frame. It leaves the
-  // category pool here and goes out through the appositive tails instead.
   const catKws = keywords.filter((k) => typeOf(k) === "category");
   const svcKws = keywords.filter((k) => typeOf(k) === "service");
   const dedicated = new Set([...geoKws, ...catKws, ...svcKws]);
@@ -2942,17 +2857,7 @@ export function buildLocalizedReview(
       text = appendSpread(text, fill(tpl, { kw: shaped }), cfg.glue, tailSpread, locale, name, !!storyText);
     }
   };
-  // Quantity frames only where the head is plural or a mass noun.
-  {
-    const catPool = forAudience(CATEGORY_TAILS[locale]);
-    const plural = catKws.filter((k) => takesQuantityFrame(k));
-    const singular = catKws.filter((k) => !takesQuantityFrame(k));
-    if (plural.length) weaveDedicated(plural, catPool, 0x9e11);
-    if (singular.length) {
-      const noQuantity = catPool.filter((t) => !CATEGORY_QUANTITY_FRAME.test(t));
-      weaveDedicated(singular, noQuantity.length ? noQuantity : catPool, 0x9e12);
-    }
-  }
+  weaveDedicated(catKws, forAudience(CATEGORY_TAILS[locale]), 0x9e11);
   // A service is a countable thing you book ("the AI SEO audit"), unlike a
   // category, which is a mass/plural head ("fresh doughnuts") and stays bare.
   // Without this, every service frame read "They took the time to explain AI
