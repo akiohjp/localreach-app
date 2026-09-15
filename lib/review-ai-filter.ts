@@ -295,6 +295,12 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   if (/^(thanks|thank you|keep it up|keep up the|well done|good job|much appreciated)\b/i.test(closing)) {
     return { ok: false, reason: "addresses_the_business" };
   }
+  // A five-star review does not end by shrugging: "It is just a straightforward
+  // Japanese restaurant in Trade Centre, Dubai." reads as faint praise, and it
+  // was the closing line on a live Bentoya draft (2026-09-16).
+  if (/\b(just|only|simply) (a|an) (straightforward|simple|basic|regular|normal|standard|ordinary|decent|okay|ok)\b/i.test(closing)) {
+    return { ok: false, reason: "faint_praise_close" };
+  }
 
   // The reviewer has to be a person, from the first sentence. The model likes
   // to open with a general truth about a group ("Women need good care so I
@@ -317,6 +323,17 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   // subject a real reviewer writes ("Had a great lunch", "Booked a table",
   // "Finally found somewhere decent"), which is first person with the pronoun
   // left off.
+  // The gerund subject slipped past the first-person test because "me" sits
+  // later in the sentence: "Walking out with a full stomach made me glad I
+  // stopped by Bentoya Kitchen." (Akio, live QR, 2026-09-16). That is the
+  // inverted opening the prompt names outright. A participial lead-in that
+  // hands over to a person ("Looking for lunch, I ended up at...") is fine,
+  // so only a gerund clause that goes on to be the subject is refused.
+  const GERUND_SUBJECT =
+    /^\w+ing\b[^,.!?]*\b(made|left|had|got|brought|put|took|led|turned out|felt|was|is|proved|meant|kept|gave|ended up|became)\b/i;
+  if (GERUND_SUBJECT.test(opening)) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
   const FIRST_PERSON = /\b(i|we|my|our|me|us|mine|ours)\b/i;
   const LEADING_ADVERB =
     /^(finally|honestly|genuinely|definitely|really|just|eventually|recently|yesterday|today|tonight|lately|thankfully|luckily)\b[,\s]+/i;
