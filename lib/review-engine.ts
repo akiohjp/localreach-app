@@ -7,7 +7,7 @@
  * works for any language and any business type.
  *
  * Placeholders:
- *   {store} — business name (verbatim, appears >= twice overall)
+ *   {store} — business name (verbatim, kept once; see capStoreMentions)
  *   {list}  — the joined keyword phrases (verbatim keywords)
  *   {a}{b}  — two keyword sub-lists (dual block)
  *   {kw}    — a single keyword (missing-keyword tail)
@@ -251,6 +251,19 @@ const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
   "bakery", "pharmacy", "market", "supermarket", "workshop", "center", "centre", "office",
   "firm", "dentist", "doctor", "florist", "atelier", "place", "spot", "lounge", "kitchen",
   "bistro", "eatery", "grocer", "perfumery", "parlour", "parlor", "barber",
+  // A profession is a singular countable noun and needs the article as much as
+  // "a dentist" does. "dentist" and "doctor" were here; every other specialism
+  // was not, so "That settled my search for dermatologist in Dubai" shipped on
+  // the live Cooper config (naturalness gate, both runs, 2026-09-15).
+  "dermatologist", "pediatrician", "paediatrician", "physiotherapist", "osteopath",
+  "chiropractor", "gynecologist", "gynaecologist", "cardiologist", "orthodontist",
+  "optometrist", "optician", "podiatrist", "psychologist", "psychiatrist", "surgeon",
+  "specialist", "consultant", "practitioner", "therapist", "dietitian", "dietician",
+  "nutritionist", "midwife", "nurse", "vet", "veterinarian", "pharmacist",
+  "lawyer", "accountant", "notary", "broker", "realtor", "plumber", "electrician",
+  "mechanic", "carpenter", "tailor", "photographer", "stylist", "trainer",
+  "hospital", "polyclinic", "laboratory", "nursery", "butcher", "baker",
+  "jeweller", "jeweler", "cobbler", "laundry", "deli", "diner", "pub",
 ]);
 
 /**
@@ -1675,9 +1688,12 @@ function reviewNoKeywords(
 
 
 /**
- * Real guests name a business 0-2 times; our templates could stack it up to 5
- * (opener + core + filler + closer each carrying {store}), which reads as SEO
- * spam. Keep the first two mentions, swap the rest for a natural stand-in.
+ * Real guests name a business once, if at all; our templates could stack it up
+ * to 5 (opener + core + filler + closer each carrying {store}), which reads as
+ * SEO spam. Keep the FIRST mention, swap the rest for a natural stand-in.
+ * Was two until 2026-09-15: Akio read a Cooper Health Clinic draft that opened
+ * "I walked past Cooper Health Clinic for weeks" and closed "I'm adding Cooper
+ * Health Clinic to the rotation", and twice in seven sentences reads like copy.
  * (If a woven keyword itself contains the store name, that rare case is left
  * alone by running this before keyword tails are appended.)
  */
@@ -1721,7 +1737,7 @@ function capStoreMentions(
     const i = rest.indexOf(name);
     if (i === -1) return out + rest;
     count++;
-    if (count <= 2) {
+    if (count <= 1) {
       out += rest.slice(0, i + name.length);
     } else {
       const before = rest.slice(0, i);
