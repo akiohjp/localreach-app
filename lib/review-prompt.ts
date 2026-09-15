@@ -372,6 +372,13 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     // Padding is the other machine tell. "while I was sitting down for lunch
     // today" for "at lunch today" (Akio, live Maru Udon draft 2026-09-14).
     `- Say it the short way a person would say it out loud: "at lunch today", not "while I was sitting down for lunch today"; "after work", not "once my working day had finished"; "I found it walking past", not "I found it by just walking around outside". Padding a simple action out into a clause is a clear sign a machine wrote it.`,
+    // Every sentence came out explaining itself (Akio, live Bentoya draft
+    // 2026-09-16: "The menu listed many options including udon and soba for
+    // people who wanted noodles. I chose to order one of the donburi bowls
+    // because I was very hungry. I found out it is a Japanese restaurant in
+    // Trade Centre, Dubai during my visit."). People state, they do not justify.
+    `- Do not explain yourself. No reason tacked onto a plain action ("because I was very hungry"), no audience for a fact ("for people who wanted noodles"), no discovery narration ("I found out it is", "during my visit", "I chose to order one of the"). Write "Went for a donburi bowl, was starving." not "I chose to order one of the donburi bowls because I was very hungry." Drop the subject or the object when a person typing would ("Warm, filling." is a sentence here). Most sentences under twelve words; one can run longer.`,
+    `- Where and what the place is goes in as an aside, the way you would mention it to a friend ("It's in Trade Centre", "a Japanese place in Trade Centre"), never as something you learned ("I found out it is a Japanese restaurant in Trade Centre, Dubai").`,
     // A review is read by the next customer, not by the owner. The model kept
     // closing Japanese restaurants with "Thanks for the food." — a note to the
     // staff, not a review (Akio caught it on Maru Udon, 2026-09-14; 2 of 16).
