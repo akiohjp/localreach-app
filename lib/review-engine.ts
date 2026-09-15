@@ -2195,7 +2195,7 @@ function takesQuantityFrame(phrase: string): boolean {
  * the place is GOOD FOR. Detected on the head noun; EN only.
  */
 const OCCASION_HEAD =
-  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?)$/i;
+  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?)$/i;
 
 function isOccasion(phrase: string): boolean {
   const head = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
