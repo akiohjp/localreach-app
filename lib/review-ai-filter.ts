@@ -351,11 +351,27 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   if (THING_SUBJECT.test(opening)) {
     return { ok: false, reason: "opens_without_a_person" };
   }
-  const FIRST_PERSON = /\b(i|we|my|our|me|us|mine|ours)\b/i;
+  // The general form of the inverted opening: a thing gets to its verb before
+  // the reviewer appears. "The Bentoya Special Bento came out quickly and kept
+  // me going", "Udon and soba dishes were the main reason I went", "My chair
+  // feels comfortable while I sit here" (live QR, 2026-09-16). People are
+  // exempt ("The staff were quick when I arrived"). Everything up to the first
+  // I / we is inspected for a finite verb.
   const LEADING_ADVERB =
     /^(finally|honestly|genuinely|definitely|really|just|eventually|recently|yesterday|today|tonight|lately|thankfully|luckily)\b[,\s]+/i;
   const DROPPED_SUBJECT =
     /^(had|went|came|booked|dropped|stopped|popped|tried|ordered|visited|took|brought|grabbed|needed|wanted|walked|called|arrived|found|spent|got|made|used|asked|picked|parked|ended|decided|turned|paid|left|stayed|ate|drove|waited|sat|met)\b/i;
+  const PERSON_SUBJECT =
+    /^(the|our|my|a|an)?\s*(staff|team|waiter|waitress|server|owner|manager|host|hostess|chef|doctor|dentist|nurse|receptionist|guy|lady|girl|man|woman|people|friend|colleague|partner|wife|husband|family|kids|children|mother|father|sister|brother|son|daughter)\b/i;
+  // "me" and "us" count as the reviewer appearing: "The bento came out quickly
+  // and kept me going" has its verb before any of them.
+  const beforePerson = opening.split(/\b(?:I|we|me|us)\b/i)[0] ?? opening;
+  const FINITE_VERB =
+    /\b(is|are|was|were|came|comes|kept|keeps|made|makes|felt|feels|got|gets|had|has|have|turned|turns|arrived|arrives|looked|looks|tasted|tastes|seemed|seems|sounded|sounds|went|goes|did|does|hit|hits|took|takes|brought|brings|led|leads|gave|gives|left|leaves|put|puts|set|sets|ran|runs|worked|works|helped|helps|proved|proves|meant|means|ended|ends|became|becomes|stood|stands|sat|sits|fit|fits|suited|suits|held|holds|stayed|stays|filled|fills|delivered|delivers|lived|lives|beat|beats|won|wins|saved|saves|caught|catches|hit|drew|draws)\b/i;
+  if (beforePerson.trim() !== opening.trim() && !PERSON_SUBJECT.test(opening) && !DROPPED_SUBJECT.test(opening.replace(LEADING_ADVERB, "")) && FINITE_VERB.test(beforePerson)) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
+  const FIRST_PERSON = /\b(i|we|my|our|me|us|mine|ours)\b/i;
   // A terse fragment is a real opener ("Pretty good.", "Solid clinic."), so a
   // very short first sentence is judged together with the one after it. The
   // inverted opening still fails, because "Plates arrived warm. The service was
