@@ -137,7 +137,7 @@ function withArt(phrase: string, typedItem = false): string {
   // the keyword "a thoughtful gift" came out as "the a thoughtful gift" on the
   // live Let It Dough! config (naturalness reader, 2026-08-10).
   if (LEADING_DETERMINER.test(phrase)) return phrase;
-  if (/^[a-z]/.test(phrase)) return `the ${phrase}`;
+  if (/^[a-z0-9]/.test(phrase)) return `the ${phrase}`;
   if (looksSentenceCased(phrase)) return `the ${phrase}`;
   return typedItem ? `the ${phrase}` : phrase;
 }
@@ -288,7 +288,7 @@ const STORY_PREDICATE =
   // enough to talk", "the cooked to order", "the straight out of the oven",
   // "the everything in one place" all shipped as objects (all-store gate,
   // 2026-09-15).
-  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|locally|freshly|newly|proudly|fully|cooked|baked|brewed|grilled|roasted|served|packed|priced|staffed|booked|built|prepared|straight (out|off|from)|right (out|off|from)|everything|anything|all|always|never)\b|^\w+(\s+\w+)?\s+enough\s+(to|for)\b/i;
+  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|locally|freshly|newly|proudly|fully|cooked|baked|brewed|grilled|roasted|served|packed|priced|staffed|booked|built|prepared|straight (out|off|from)|right (out|off|from)|everything|anything|all|always|never)\b|^\w+(\s+\w+)?\s+enough\s+(to|for)\b|^(easy|hard|quick|simple|difficult) to \w+$/i;
 
 /**
  * "Item" pills that name a quality or a service rather than a thing you buy
@@ -2650,7 +2650,7 @@ export function buildLocalizedReview(
       loc: storyArea ?? storyCity,
       allowPlace: placeAllowed,
       objs,
-      ranges: catKws,
+      ranges: locale === "en" ? catKws.filter((k) => !isOccasion(k)) : catKws,
       attrs: attrsNoun,
       preds,
       svcs,
