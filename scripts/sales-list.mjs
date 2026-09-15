@@ -50,14 +50,14 @@ const NOTES = {
   "YUi": { kind: "demo", friend: true, owner: "Peter Ahn", note: "FRAME と同オーナー。d3 Building 7" },
   "Selectshop FRAME": { kind: "demo", friend: true, owner: "Peter Ahn", note: "YUi と同オーナー。FRAME Café（La Cabra）も含む" },
   "Rowley's": { kind: "demo", friend: true, owner: "Daniel Petermann", note: "DIFC Central Park Towers。Daniel は友人" },
-  "Pitfire Pizza": { kind: "demo", note: "JVC" },
-  "Maru Udon": { kind: "demo", note: "Business Bay" },
+  "Pitfire Pizza": { kind: "demo", pitchedBefore: true, note: "JVC" },
+  "Maru Udon": { kind: "demo", pitchedBefore: true, lang: "ja", message: "お世話になっております。ご無沙汰しております。\n\n以前ご紹介させていただいたシステムとは別に、Google レビューに絞った機能を単体でリリースいたしました。\n\nBusiness Bay 店でセットアップまで済ませてありますので、お試しでお使いいただけたら幸いです。\n\nお客様がスマホで QR を読み取り、星とよかった点をいくつかタップすると、30 秒ほどでご本人の言葉のレビューが出来上がります。文章はその場で直していただけますし、投稿されるのはお客様ご自身です。見返りは何もお渡ししないので、Google のルールの中に収まっています。\n\nやることはそれだけです。よかったと思ってくださった方が、思っただけで終わらずに実際に残してくださる。その部分だけを担当します。\n\n料金は月々 AED 298、3 ヶ月分を先にお預かりする形で、これ以外の費用はございません。以前のご提案とは別物で、あの中の 1 機能だけを切り出したものになります。\n\n一度お手元で触っていただいて、率直なところをお聞かせいただけたら嬉しいです。\n{link}", note: "Business Bay" },
   "Kotobuki Clinic": { kind: "demo", note: "Trade Centre" },
-  "1004 Gourmet": { kind: "demo", note: "Deira、Al Ghurair Centre" },
+  "1004 Gourmet": { kind: "demo", pitchedBefore: true, note: "Deira、Al Ghurair Centre" },
   "Ocha Cafe Sakura": { kind: "demo", note: "Abu Dhabi、The Galleria" },
   "Sushidokoro Tsukasa": { kind: "demo", noPrice: true, note: "熊本。日本語店（AI は英語のみ検証済み）" },
   "Sengawa Golf": { kind: "demo", noPrice: true, note: "東京。日本語店（AI は英語のみ検証済み）" },
-  "tashas Aljada": { kind: "demo", note: "営業デモ用の実在店。本物の GBP には向けていない（2026-09-11）" },
+  "tashas Aljada": { kind: "demo", note: "Aljada, Sharjah。Google ボタンは本物のリスティングに向けてある。本番として営業する（Akio 2026-09-14）" },
   "Real Choice Real Estate Brokers": { kind: "demo", note: "Trade Center First。AI Visibility Scorecard 送付済み（2026-09-11）" },
   "The Char'd Club": { kind: "demo", note: "Aljada, Sharjah。デモキット＋ピッチノート済み（2026-09-12）。place_id は契約まで入れない" },
   "Kimura-ya Al Jaddaf": { kind: "demo", note: "Al Jaddaf。デモキット＋ピッチノート済み（2026-09-12）" },
@@ -65,8 +65,12 @@ const NOTES = {
   "Trifid Media": { kind: "demo", friend: true, free: true, owner: "Mahdi", note: "Al Quoz。AED 1,000 前払い済みのため LocalReach は無償。文面は serve の trifid-media-message.html（2026-09-13）" },
   "Marina Estates": { kind: "test", note: "不動産向けの汎用デモ（架空店）。実在の listing には投稿されない" },
   "Demo — Marina Table": { kind: "test", note: "飲食向けの汎用デモ（架空店）。実在の listing には投稿されない" },
-  "Prime Gourmet Dubai Creek Harbour": { kind: "demo", friend: true, owner: "Maria（GM）", shortName: "Prime Gourmet", message: "Hi Maria, how have you been?\n\nThis is my own business, and I have already set it up for the new Creek Harbour store, so I am just sending it over.\n\nA customer opens it on their phone, taps a rating and a few things they liked (the Japanese A5 Wagyu, the Black Angus, the dry aged beef), and about thirty seconds later a full review is written in their own words. They post it themselves on Google. Nothing is offered in exchange, so it stays inside Google's rules.\n\nCreek Harbour has one review on it right now, so it seemed like the right store to try this on. Have a go on your phone:\n{link}\n\nNothing to sign and no rush. Just tell me if it is any good.", note: "UAE 15 店舗。Creek Harbour は新店で星 5.0 / レビュー 1 件。1 店決まれば横展開できる（2026-09-14）" },
-  "Summit Trading": { kind: "demo", friend: true, lang: "ja", owner: "松崎", tapsJa: ["冷凍まぐろ", "鮮魚", "寿司米"], note: "日本食材の卸。Akio の元取引先で、松崎さんが窓口。Dubai Investment Park 2、星 4.2 / 9 件（2026-09-14）" },
+  "Prime Gourmet Dubai Creek Harbour": { kind: "demo", friend: true, owner: "Maria（GM）", shortName: "Prime Gourmet", message: "Hi Maria, how have you been?\n\nThis is my own business, and I have already set it up for the new Creek Harbour store, so I am just sending it over.\n\nA customer scans the QR on their phone, taps a rating and a few things they liked (the Japanese A5 Wagyu, the Black Angus, the dry aged beef), and about thirty seconds later a full review is written in their own words. They post it themselves on Google. Nothing is offered in exchange, so it stays inside Google's rules.\n\nCreek Harbour has one review on it right now, so it seemed like the right store to try this on. Have a go on your phone:\n{link}\n\nNothing to sign and no rush. Just tell me if it is any good.", note: "UAE 15 店舗。Creek Harbour は新店で星 5.0 / レビュー 1 件。1 店決まれば横展開できる（2026-09-14）" },
+  "Summit Hinomaru Shokudo": { kind: "demo", friend: true, lang: "ja", owner: "松村", shortName: "日の丸食堂", message: "お世話になっております。ご無沙汰しております。\n\nこのたび、Google レビューに絞った仕組みを単体でリリースいたしました。\n\n日の丸食堂さんの内容を入れてセットアップまで済ませてありますので、お試しでお使いいただけたら幸いです。QR を印刷してレジや卓上に置いていただくだけで動きます。\n\nお客様がスマホで QR を読み取り、星とよかった点をいくつかタップすると、30 秒ほどでご本人の言葉のレビューが出来上がります。文章はその場で直していただけますし、投稿されるのはお客様ご自身です。見返りは何もお渡ししないので、Google のルールの中に収まっています。\n\nやることはそれだけです。よかったと思ってくださった方が、思っただけで終わらずに実際に残してくださる。その部分だけを担当します。\n\n料金は月々 AED 298、3 ヶ月分を先にお預かりする形で、これ以外の費用はございません。\n\n一度お手元で触っていただいて、率直なところをお聞かせいただけたら嬉しいです。\n{link}", note: "Summit Trading グループの実店舗。アブダビ担当の松村さんに直接連絡（元 Summit の担当者なので話が早い）。Electra Street, Al Markaziya、星 4.7 / 67 件（2026-09-14）" },
+  "Summit Trading": { kind: "demo", friend: true, lang: "ja", owner: "松崎", message: "お世話になっております。ご無沙汰しております。\n\nこのたび、Google レビューに絞った仕組みを単体でリリースいたしました。\n\nサミット・トレーディング様の内容を入れてセットアップまで済ませてありますので、お試しでお使いいただけたら幸いです。\n\nお取引先の方にリンクをお送りいただくと、スマホで星とよかった点をいくつかタップするだけで、30 秒ほどでご本人の言葉のレビューが出来上がります。文章はその場で直していただけますし、投稿されるのはご本人です。見返りは何もお渡ししないので、Google のルールの中に収まっています。\n\nやることはそれだけです。よかったと思ってくださった取引先の方が、思っただけで終わらずに実際に残してくださる。その部分だけを担当します。\n\n料金は月々 AED 298、3 ヶ月分を先にお預かりする形で、これ以外の費用はございません。\n\n一度お手元で触っていただいて、率直なところをお聞かせいただけたら嬉しいです。\n{link}", tapsJa: ["冷凍まぐろ", "鮮魚", "寿司米"], note: "日本食材の卸。Akio の元取引先で、松崎さんが窓口。Dubai Investment Park 2、星 4.2 / 9 件（2026-09-14）" },
+  "Cooper Health Clinic": { kind: "demo", repOwned: "Rima", note: "J3 Mall, Al Wasl Rd, Al Manara。17 診療科、4.7 / 200 件。Rima の営業用に作成（2026-09-15）" },
+  "Bentoya Kitchen Sheikh Zayed Road": { kind: "demo", friend: true, owner: "マナー", shortName: "Bentoya", message: "Hi Mana, Akio here.\n\nThis is my own business. The review system I have been building is working now, and I have set up both Bentoya branches in it.\n\nA guest scans the QR on their phone, taps a rating and a few things they liked (the Bentoya Special Bento, the chirashi sushi, bento boxes), and about thirty seconds later there is a full review written in their own words. They can change any of it, and they post it on Google themselves. Nothing is given in exchange, so it stays inside Google's rules.\n\nThat is all it does. The guests who already liked you actually leave the review, instead of meaning to and forgetting.\n\nSheikh Zayed Road: {link}\nMotor City: https://qr.miraireach.ae/9d58ur\n\nEach branch has its own code so the reviews land on the right listing. Motor City is on 431 reviews and Sheikh Zayed Road is on 1,291, same food and same name, so Motor City has the most to gain.\n\nIt is AED 298 a month per branch, three months up front, and that is the whole cost. Or 498 a month if you also want a reply drafted for every review that comes in.\n\nHave a go on your phone and tell me straight what you think.", note: "Al Kawakeb Block D, Sheikh Zayed Rd。1997 年創業、ドバイ最初の日本食。星 4.5 / 1,291 件。オーナー知り合い。全 5 店（SZR・Motor City・JAFZA・JAFZA One・JLT）（2026-09-15）" },
+  "Bentoya Japanese Restaurant Motor City": { kind: "demo", friend: true, owner: "マナー", shortName: "Bentoya", coveredBy: "Bentoya Kitchen Sheikh Zayed Road", note: "Foxhill 3, Uptown Motor City。星 4.6 / 431 件。SZR と同じオーナー（2026-09-15）" },
   "Noren": { kind: "demo", owner: "Pawel Kazanowski（共同創業者・エグゼクティブシェフ）", friend: true, note: "Pullman Dubai JLT, Cluster T。2026-08 開店、星 4.8 / 26 件。オーナー知り合い（2026-09-14）" },
 };
 
@@ -110,7 +114,7 @@ function contractCell(s) {
  * 送信文（Akio 2026-09-14）。ほぼ全員が知り合いなので、会社名を名乗る営業文にしない。
  * Koi Water Barn と Trifid Media に実際に送った文面と同じ声にしてある:
  *   Akio here → その店の実物を 3 つ → 仕組み 1 文 → Google のルール 1 文 →
- *   「商品はそれだけ」→ 率直な感想を頼む。
+ *   「やることはそれだけ」→ 率直な感想を頼む。
  * 相手の名前が NOTES にない店は {name} を残す。送る前に入れ替える。
  */
 const GUEST_WORD = [
@@ -120,6 +124,11 @@ const GUEST_WORD = [
   [/restaurant|cafe|café|tea house|steakhouse|bar|grill|pizza|ramen|sushi|udon|bistro/i, { en: "guest", ja: "お客さん" }],
   [/store|shop|boutique|retail|grocery|perfume|rug|market/i, { en: "customer", ja: "お客さん" }],
 ];
+/** 店頭に QR を置ける業態か。卸や代理店は客が来ないのでリンクを送る。 */
+function scansQr(cat) {
+  return !/agency|broker|real estate|wholesaler|supplier|media/i.test(cat ?? "");
+}
+
 function guestWord(cat, ja) {
   for (const [re, w] of GUEST_WORD) if (re.test(cat ?? "")) return ja ? w.ja : w.en;
   return ja ? "お客さん" : "guest";
@@ -158,9 +167,9 @@ function messageFor(s, name) {
       "",
       `これは私が自分でやっている事業です。ずっと作っていたレビューの仕組みが動く形になったので、${jaName}の中身を入れて用意しました。`,
       "",
-      `${who}がスマホで開いて、星とよかったところをいくつかタップすると${ex}、30 秒ほどで本人の言葉のレビューが出来上がります。文章はその場で直せて、投稿するのは${who}本人です。見返りは何も渡さないので、Google のルールの中に収まっています。`,
+      `${who}が${scansQr(s.business_category) ? "スマホで QR を読んで" : "スマホでリンクを開いて"}、星とよかったところをいくつかタップすると${ex}、30 秒ほどで本人の言葉のレビューが出来上がります。文章はその場で直せて、投稿するのは${who}本人です。見返りは何も渡さないので、Google のルールの中に収まっています。`,
       "",
-      `商品はそれだけです。よかったと思ってくれた人が、思っただけで終わらずに実際に残してくれる。`,
+      `やることはそれだけです。よかったと思ってくれた人が、思っただけで終わらずに実際に残してくれる。`,
       "",
       NOTES[name]?.free
         ? "前払いをいただいているので、これは私からのぶんです。使っている間、料金はかかりません。"
@@ -168,7 +177,7 @@ function messageFor(s, name) {
         ? null
         : "入れる場合は 1 拠点あたり月 AED 298、3 ヶ月分を先にいただく形で、それで全部です。届いたレビューへの返信まで下書きするなら月 498 です。",
       "",
-      "2 分ほど触ってみて、率直なところを聞かせてください。",
+      "一度触ってみて、率直なところを聞かせてください。",
       short,
     ].filter((x) => x !== null).join("\n").replace(/\n{3,}/g, "\n\n");
   }
@@ -177,7 +186,9 @@ function messageFor(s, name) {
   const hello = `Hi ${first ?? "{name}"}, Akio here.`;
   // 「誰の事業なのか」を先に言う。作っているものの話だけだと、相手は趣味なのか
   // 勤め先の商品なのか判断がつかない（Akio 2026-09-14: 「誰のビジネス?」ってなる）。
-  const lead = friend
+  const lead = NOTES[name]?.pitchedBefore
+    ? `Not the whole system I showed you before. Forget that one for now.\n\nWe have just released the review part of it on its own, and this is only that. It is already set up for ${label}, so there is nothing to prepare and nothing to configure.`
+    : friend
     ? `This is my own business. The review system I have been building is working now, and I have put ${label} into it.`
     : `This is my own business, and it is easier to show it than to describe it. ${label} is already in it.`;
   return [
@@ -185,17 +196,19 @@ function messageFor(s, name) {
     "",
     lead,
     "",
-    `A ${who} opens it on their phone, taps a rating and a few things they liked${ex}, and about thirty seconds later there is a full review written in their own words. They can change any of it, and they post it on Google themselves. Nothing is given in exchange, so it stays inside Google's rules.`,
+    `A ${who} ${scansQr(s.business_category) ? "scans the QR on their phone" : "opens the link on their phone"}, taps a rating and a few things they liked${ex}, and about thirty seconds later there is a full review written in their own words. They can change any of it, and they post it on Google themselves. Nothing is given in exchange, so it stays inside Google's rules.`,
     "",
-    `That is the whole product. The ${who}s who already liked you actually leave the review, instead of meaning to and forgetting.`,
+    `That is all it does. The ${who}s who already liked you actually leave the review, instead of meaning to and forgetting.`,
     "",
     NOTES[name]?.free
       ? "You already paid me up front, so this one is on me. No charge for it, for as long as you use it."
       : NOTES[name]?.noPrice
       ? null
+      : NOTES[name]?.pitchedBefore
+      ? `It is AED 298 a month, three months up front, and that is the whole cost. Nothing like the old proposal, because this is one piece of it rather than the lot.`
       : `If you want it running at ${label}, it is AED 298 a month, three months up front, and that is the whole cost. Or 498 a month if you also want a reply drafted for every review that comes in.`,
     "",
-    "Two minutes on your phone, then tell me straight what you think:",
+    "Have a go on your phone and tell me straight what you think:",
     short,
   ].filter((x) => x !== null).join("\n").replace(/\n{3,}/g, "\n\n");
 }
@@ -219,14 +232,21 @@ function row(r) {
   const ai = s.ai_review_enabled
     ? `<span class="flag green">ON</span>`
     : `<span class="flag grey">OFF</span><div class="tiny">送る前にマスター管理で ON</div>`;
-  const google = s.google_place_id
+  // 投稿先は place_id でも maps.app.goo.gl の共有リンクでも成立する。
+  // place_id だけを見ていたので、リンクが入っている店まで「未設定」と出ていた。
+  const google = s.google_place_id || (s.google_review_url ?? "").trim()
     ? `<span class="tiny muted">Google 投稿リンクあり</span>`
     : `<span class="tiny amber">Google 投稿リンク未設定</span>`;
-  const noSend = {
-    client: "契約中。デモの売り込み文は出していません",
-    own: "自社。送る相手なし",
-    test: "テスト用。送る相手なし",
-  }[kind];
+  // 営業が連れてきた案件は、その営業のもの。Akio の送信リストに文面を出さない。
+  const noSend = NOTES[name]?.repOwned
+    ? `${NOTES[name].repOwned} の案件。Akio からは送りません`
+    : NOTES[name]?.coveredBy
+    ? `同じオーナー。${NOTES[name].coveredBy} の文面に両方のリンクを入れてあります`
+    : {
+        client: "契約中。デモの売り込み文は出していません",
+        own: "自社。送る相手なし",
+        test: "テスト用。送る相手なし",
+      }[kind];
   const sendBlock = noSend
     ? `<span class="muted tiny">${noSend}</span>`
     : short

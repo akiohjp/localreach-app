@@ -1039,12 +1039,18 @@ const MEDICAL_UNFIT: Record<ReviewLocale, RegExp> = {
   // "loved", "can't say enough about", "people weren't wrong about" — a
   // patient really does write those about care they received, and stripping
   // them leaves the clinic pools too thin for the diversity gate.
+  // Added 2026-09-15 (Akio read a live Cooper draft): the retail/regular voice
+  // in the BASE pools was never covered here. "I'm adding Cooper Health Clinic
+  // to the rotation.", "Prices felt reasonable for what you walk away with."
+  // Nobody puts a clinic in their rotation, and you do not walk away from a
+  // consultation with goods. stripRegularVoiceLines covers the same words but
+  // only for VISITOR audiences, and a clinic is a local audience.
   // Added 2026-08-09 after the naturalness reader (scripts/read-naturalness)
   // flagged "Loved IV Drip." and "Aesthetics Therapy, so good." on the live
   // Kotobuki config. "Loved" was deliberately kept in an hour earlier on the
   // argument that a patient does write it about care received — a native
   // reader disagreed for a NAMED PROCEDURE, which is the object slot here.
-  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|bringing {people|friends|visitors}|sort out|half the battle|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad/i,
+  en: /\b(go for|definitely try|don't skip|save room|go hungry|big yes|come for|did not miss)\b|\bask about\b|\byou'll want to ask\b|\bnailed\b|\bstar of the visit\b|\bno contest\b|\bbig fan of\b|\bunderrated\b|\bstarting with\b|\bkeep an eye out for\b|\bmake a fuss about\b|\bloved\b|\bso good\b|\bgo see\b|bringing {people|friends|visitors}|sort out|half the battle|time to spare|hour to kill|popped into|more or less by chance|quick stop|celebration|celebrate|visiting from abroad|\bthe rotation\b|\busual spots\b|\bregular list\b|\bwalk away with\b|\bshortlist\b|\bfavou?rites? list\b|\bworth a look\b/i,
   ja: /(試して|試しに|目当てでぜひ|をどうぞ|頼んで正解|締めて正解|食べ|美味し|お腹|楽しみ方|たまたま通りかかって|立ち寄り)/,
   ar: /(جرّب|اذهب من أجل|لا تفوّت|اترك مساحة|إن احترت، خذ)/,
 };

@@ -284,6 +284,54 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
     return { ok: false, reason: "store_name_repeated" };
   }
 
+  // A review is read by the next customer; it is not a note to the owner. The
+  // model kept closing Japanese restaurants with "Thanks for the food." and
+  // "Thank you." — which reads as a message to the staff, not a review (Akio
+  // caught it on Maru Udon, 2026-09-14; 2 of 16 drafts). Only the CLOSING
+  // sentence is judged: "I wanted to thank the chef" inside the body is a
+  // guest talking ABOUT the place, which is fine.
+  const sentences = t.trim().split(/(?<=[.!?])\s+/);
+  const closing = (sentences[sentences.length - 1] ?? "").trim();
+  if (/^(thanks|thank you|keep it up|keep up the|well done|good job|much appreciated)\b/i.test(closing)) {
+    return { ok: false, reason: "addresses_the_business" };
+  }
+
+  // The reviewer has to be a person, from the first sentence. The model likes
+  // to open with a general truth about a group ("Women need good care so I
+  // went...", "Parents seeking professional care will find..."), or with the
+  // thing as the subject ("The laboratory tests were done quickly.",
+  // "Appointments can feel like a chore."). Both read as copy written about
+  // the business, not as somebody's visit. Akio caught the first kind on
+  // Cooper, 2026-09-15; measured at 4 of 12 drafts. The prompt has forbidden
+  // it since 2026-09-07 and the model does it anyway, so it is enforced here.
+  const opening = (sentences[0] ?? "").trim();
+  // A class of people, stated in general. The give-away is that it is the very
+  // first word: "Women need...", "Families looking for...". Mid-sentence is
+  // fine ("I asked whether families come here").
+  const GENERIC_SUBJECT =
+    /^(women|men|parents|families|people|customers|clients|guests|visitors|patients|locals|diners|shoppers|residents|anyone|everyone|those|kids|children|students|travellers|travelers|tourists|couples|mothers|fathers|professionals|workers|drivers|expats)\b/i;
+  if (GENERIC_SUBJECT.test(opening)) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
+  // No "I" or "we" anywhere in the first sentence. Allowed anyway: the dropped
+  // subject a real reviewer writes ("Had a great lunch", "Booked a table",
+  // "Finally found somewhere decent"), which is first person with the pronoun
+  // left off.
+  const FIRST_PERSON = /\b(i|we|my|our|me|us|mine|ours)\b/i;
+  const LEADING_ADVERB =
+    /^(finally|honestly|genuinely|definitely|really|just|eventually|recently|yesterday|today|tonight|lately|thankfully|luckily)\b[,\s]+/i;
+  const DROPPED_SUBJECT =
+    /^(had|went|came|booked|dropped|stopped|popped|tried|ordered|visited|took|brought|grabbed|needed|wanted|walked|called|arrived|found|spent|got|made|used|asked|picked|parked|ended|decided|turned|paid|left|stayed|ate|drove|waited|sat|met)\b/i;
+  // A terse fragment is a real opener ("Pretty good.", "Solid clinic."), so a
+  // very short first sentence is judged together with the one after it. The
+  // inverted opening still fails, because "Plates arrived warm. The service was
+  // quick." has no person in either.
+  const openingWords = opening.split(/\s+/).filter(Boolean).length;
+  const windowText = openingWords <= 4 ? `${opening} ${sentences[1] ?? ""}`.trim() : opening;
+  if (!FIRST_PERSON.test(windowText) && !DROPPED_SUBJECT.test(windowText.replace(LEADING_ADVERB, ""))) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
+
   // Against this store's recent drafts: the opening must be new, and the body
   // must not be a rephrasing (owner's rule 2026-09-07: fifty reviews of one
   // place must not look like one person wrote them).

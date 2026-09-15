@@ -163,6 +163,8 @@ export const STOCK_CLOSERS: readonly string[] = [
   "these are the ones I would call",
   "this is the place to go",
   "worth a visit",
+  "thanks for the food",
+  "thank you for the meal",
 ];
 
 /**
@@ -365,8 +367,15 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     // "I", "We", "Came here for", "Had the". The recent-openings rule below
     // already stops a page of identical first words, so the person is allowed
     // back and the inverted shape is what gets named and banned instead.
-    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with a thing, a time of day, the weather or a feeling as the subject doing something to you ("Plates arrived warm", "Morning light hit the window", "Tables filled up around us", "Craving breakfast brought me here", "Walking back to my car made me glad"). That inverted opening is the clearest sign a machine wrote it. Beginning with "I" or "We" is normal and often the most natural thing to do; vary the words that follow instead.`,
+    `- Never begin with a stock opener such as ${STOCK_OPENERS.map((s) => `"${s}"`).join(", ")}, with the business name, or with a thing, a time of day, the weather or a feeling as the subject doing something to you ("Plates arrived warm", "Morning light hit the window", "Tables filled up around us", "Craving breakfast brought me here", "Walking back to my car made me glad"). That inverted opening is the clearest sign a machine wrote it. Never open with a class of people either, or with a general truth about them: not "Women need good care so I went...", not "Parents seeking professional care will find...", not "Families looking for somewhere reliable will appreciate...". You are one person writing about your own visit, not advice aimed at a group. Beginning with "I" or "We" is normal and often the most natural thing to do; vary the words that follow instead.`,
     `- Never end with a stock closer such as ${STOCK_CLOSERS.map((s) => `"${s}"`).join(", ")}.`,
+    // Padding is the other machine tell. "while I was sitting down for lunch
+    // today" for "at lunch today" (Akio, live Maru Udon draft 2026-09-14).
+    `- Say it the short way a person would say it out loud: "at lunch today", not "while I was sitting down for lunch today"; "after work", not "once my working day had finished"; "I found it walking past", not "I found it by just walking around outside". Padding a simple action out into a clause is a clear sign a machine wrote it.`,
+    // A review is read by the next customer, not by the owner. The model kept
+    // closing Japanese restaurants with "Thanks for the food." — a note to the
+    // staff, not a review (Akio caught it on Maru Udon, 2026-09-14; 2 of 16).
+    `- Never address the business, and never end by thanking it. The review is written for other customers, not as a note to the owner or the staff. No "thank you" or "thanks" for anything at all: not the meal, not the food, not the service, not the care, not the visit, not the staff. No "keep it up", and no "you" or "your team" aimed at the business. The last sentence in particular must be about the place, not addressed to it.`,
   );
   if (recentOpenings.length) {
     // The newest eight sit side by side on Google: not even their first two
