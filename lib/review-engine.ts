@@ -283,7 +283,11 @@ const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
  * (owner read, RMK demo, 2026-09-06); after a copula they read as intended.
  */
 const STORY_PREDICATE =
-  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|halal|locally|freshly|newly|proudly|fully)\b/i;
+  // Participles, adverbials and "X enough to" are predicates too: "the quiet
+  // enough to talk", "the cooked to order", "the straight out of the oven",
+  // "the everything in one place" all shipped as objects (all-store gate,
+  // 2026-09-15).
+  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|locally|freshly|newly|proudly|fully|cooked|baked|brewed|grilled|roasted|served|packed|priced|staffed|booked|built|prepared|straight|right|everything|anything|all|always|never|easy to|hard to|quick to)\b|^\w+(\s+\w+)?\s+enough\s+(to|for)\b/i;
 
 /**
  * "Item" pills that name a quality or a service rather than a thing you buy
@@ -2195,9 +2199,12 @@ function takesQuantityFrame(phrase: string): boolean {
  * the place is GOOD FOR. Detected on the head noun; EN only.
  */
 const OCCASION_HEAD =
-  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?)$/i;
+  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?|days?|shopping|errands)$/i;
 
 function isOccasion(phrase: string): boolean {
+  // "dinner with friends", "brunch with the family": the company makes it an
+  // occasion whatever the head noun is.
+  if (/\b(with|for)\s+(friends|family|the family|kids|the kids|colleagues|a group|clients|a date|visitors|guests)\b/i.test(phrase)) return true;
   const head = phrase.trim().split(/\s+/).pop()!.toLowerCase().replace(/[^a-z-]/g, "");
   return OCCASION_HEAD.test(head);
 }
