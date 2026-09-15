@@ -2181,7 +2181,7 @@ const CATEGORY_MASS_HEADS = new Set([
   "food", "cooking", "cuisine", "coffee", "tea", "sushi", "ramen", "udon", "soba",
   "beef", "meat", "seafood", "produce", "gear", "equipment", "service", "care",
   "advice", "support", "maintenance", "wellness", "health", "hospitality", "quality",
-  "choice", "variety", "selection", "seating", "parking", "delivery", "takeaway",
+  "choice", "variety", "selection", "seating", "parking",
 ]);
 
 function takesQuantityFrame(phrase: string): boolean {
@@ -2199,7 +2199,7 @@ function takesQuantityFrame(phrase: string): boolean {
  * the place is GOOD FOR. Detected on the head noun; EN only.
  */
 const OCCASION_HEAD =
-  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?|days?|shopping|errands)$/i;
+  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?|days?|shopping|errands|takeaway|takeout|delivery|pickup|collection)$/i;
 
 function isOccasion(phrase: string): boolean {
   // "dinner with friends", "brunch with the family": the company makes it an
