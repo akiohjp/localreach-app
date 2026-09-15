@@ -1328,7 +1328,7 @@ const EN_AGENCY: PoolSet = {
     "We brought {store} in to help customers actually find us, and that's {exactly|precisely|just} what happened.",
     "Signed up with {store} after a recommendation from another {business owner|owner|entrepreneur}, and it {paid off|worked out|proved right}.",
     "I run a small company here in Dubai and {store} has been handling our online side.",
-    "After a {disappointing|frustrating|expensive} experience with a previous provider, {store} was a breath of fresh air.",
+    "After {a disappointing|a frustrating|an expensive} experience with a previous provider, {store} was a breath of fresh air.",
     "We started with their free {audit|scan|check}, and it was useful enough that we hired {store} for the monthly work.",
     "{store} has been looking after our {online presence|Google side|visibility} and the difference is {noticeable|measurable|hard to miss}.",
     "Been with {store} for a while now and they keep {proving the choice right|earning the fee|delivering}.",

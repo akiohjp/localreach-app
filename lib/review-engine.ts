@@ -274,6 +274,7 @@ const COUNT_PLACE_HEADS: ReadonlySet<string> = new Set([
   "supplier", "wholesaler", "distributor", "importer", "exporter", "builder",
   "contractor", "installer", "grocery", "roastery", "roaster", "brokerage",
   "practice", "surgery", "polyclinic", "dispensary", "outlet", "branch",
+  "lunch", "dinner", "brunch", "breakfast", "meal", "coffee-stop", "date-night",
 ]);
 
 /**
@@ -287,7 +288,7 @@ const STORY_PREDICATE =
   // enough to talk", "the cooked to order", "the straight out of the oven",
   // "the everything in one place" all shipped as objects (all-store gate,
   // 2026-09-15).
-  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|locally|freshly|newly|proudly|fully|cooked|baked|brewed|grilled|roasted|served|packed|priced|staffed|booked|built|prepared|straight|right|everything|anything|all|always|never|easy to|hard to|quick to)\b|^\w+(\s+\w+)?\s+enough\s+(to|for)\b/i;
+  /^(made|based|sourced|produced|crafted|designed|inspired|rooted|founded|located|worth|open|available|suitable|family|kid|child|dog|pet|wheelchair|locally|freshly|newly|proudly|fully|cooked|baked|brewed|grilled|roasted|served|packed|priced|staffed|booked|built|prepared|straight (out|off|from)|right (out|off|from)|everything|anything|all|always|never)\b|^\w+(\s+\w+)?\s+enough\s+(to|for)\b/i;
 
 /**
  * "Item" pills that name a quality or a service rather than a thing you buy
@@ -2199,7 +2200,7 @@ function takesQuantityFrame(phrase: string): boolean {
  * the place is GOOD FOR. Detected on the head noun; EN only.
  */
 const OCCASION_HEAD =
-  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?|days?|shopping|errands|takeaway|takeout|delivery|pickup|collection)$/i;
+  /\b(dinners?|lunch(es)?|brunch(es)?|breakfasts?|nights?|meetings?|celebrations?|part(y|ies)|visits?|bites?|treats?|orders?|trips?|dates?|gatherings?|occasions?|get-togethers?|runs|stops|searches|purchases|moves|relocations|openings|bbqs?|weekends?|evenings?|afternoons?|mornings?|breaks?|catch-ups?|outings?|menus?|catering|events?|functions?|days?|shopping|errands|takeaway|takeout|delivery|pickup|collection|launches?|campaigns?|rebrands?|shoots?)$/i;
 
 function isOccasion(phrase: string): boolean {
   // "dinner with friends", "brunch with the family": the company makes it an
@@ -2375,7 +2376,7 @@ const GEO_TAILS: string[] = [
   "Whenever someone asks about {kw}, I {point them here|send them here}.",
   "I stopped {looking|searching} for {kw} once I found this place.",
   "It's worth going to them for {kw}.",
-  "They were {exactly|just} what I needed for {kw}.",
+  "This was {exactly|just} what I needed for {kw}.",
   // "They're the one I recommend" clashed they(plural)/one(singular) — gate
   // reject run B, 2026-09-01, live 1004 Gourmet. "the place" is number-safe.
   "This is the place I recommend for {kw}.",
@@ -3002,8 +3003,11 @@ export function buildLocalizedReview(
       weaveDedicated(occasions, OCCASION_TAILS_EN, 0x9e13);
     }
     const classes = catKws.filter((k) => !occasions.includes(k));
-    const plural = classes.filter((k) => takesQuantityFrame(k));
-    const singular = classes.filter((k) => !takesQuantityFrame(k));
+    // "They carry a good range of paid social ads" is shop talk; a client of an
+    // agency does not browse a range. Non-visit verticals skip the quantity frames.
+    const quantityOk = (k: string) => takesQuantityFrame(k) && !NON_VISIT_VERTICALS.has(vertical);
+    const plural = classes.filter((k) => quantityOk(k));
+    const singular = classes.filter((k) => !quantityOk(k));
     if (plural.length) weaveDedicated(plural, catPool, 0x9e11);
     if (singular.length) {
       const noQuantity = catPool.filter((t) => !CATEGORY_QUANTITY_FRAME.test(t));
