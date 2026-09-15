@@ -334,6 +334,14 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   if (GERUND_SUBJECT.test(opening)) {
     return { ok: false, reason: "opens_without_a_person" };
   }
+  // The verb list above will never be complete ("Stopping by Bentoya Kitchen
+  // WORKED well for my schedule", live QR 2026-09-16). So the general rule: a
+  // sentence that opens on a gerund is refused unless it hands over to a person
+  // after a comma ("Looking for lunch, I ended up at...", "Finding good sushi is
+  // tricky, so I was glad..."). A dropped-subject opener is not a gerund.
+  if (/^\w+ing\b/i.test(opening) && !/,\s*(?:so|and|but|then|which|because|as|since|when|where)?\s*(?:I|we)\b/i.test(opening)) {
+    return { ok: false, reason: "opens_without_a_person" };
+  }
   // A time or a thing doing something to the reviewer: "Today brought me to
   // Bentoya Kitchen", "Lunch today led me to a great spot", "My search for a
   // clinic led me here". Same inverted opening, no gerund. The verb list is the
