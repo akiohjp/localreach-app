@@ -355,7 +355,9 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   // first word: "Women need...", "Families looking for...". Mid-sentence is
   // fine ("I asked whether families come here").
   const GENERIC_SUBJECT =
-    /^(women|men|parents|families|people|customers|clients|guests|visitors|patients|locals|diners|shoppers|residents|anyone|everyone|those|kids|children|students|travellers|travelers|tourists|couples|mothers|fathers|professionals|workers|drivers|expats)\b/i;
+    // "you" is the reader being addressed ("You want a spot that serves good
+    // food fast, so I picked...", live Bentoya 2026-09-16): advice, not a visit.
+    /^(you|women|men|parents|families|people|customers|clients|guests|visitors|patients|locals|diners|shoppers|residents|anyone|everyone|those|kids|children|students|travellers|travelers|tourists|couples|mothers|fathers|professionals|workers|drivers|expats)\b/i;
   if (GENERIC_SUBJECT.test(opening)) {
     return { ok: false, reason: "opens_without_a_person" };
   }
