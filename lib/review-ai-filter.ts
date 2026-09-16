@@ -24,8 +24,11 @@ export const AI_TELL_PHRASES: readonly string[] = [
   // Bentoya drafts 2026-09-16): a purpose clause on a plain action, a
   // consequence sentence that says nothing, an idiom nobody uses.
   "to see what it was like",
+  "to see what it tasted like",
   "to see what they had",
   "to see what was on offer",
+  "to see how it",
+  "to see what they",
   "that made the whole",
   "made the whole experience",
   "hit home",
@@ -306,6 +309,18 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   }
 
   const sentences = t.trim().split(/(?<=[.!?])\s+/);
+  // Sentence length is enforced, not requested. Asked for eight to eleven
+  // short sentences, the lite model still returned six at seventeen words
+  // each (live Bentoya Motor City, 2026-09-16), and that is the draft Akio
+  // reads as roundabout. A person on a phone averages ten to thirteen.
+  {
+    const lens = sentences.map((x) => x.trim().split(/\s+/).filter(Boolean).length).filter((n) => n > 0);
+    const avg = lens.reduce((a, b) => a + b, 0) / Math.max(1, lens.length);
+    const longest = Math.max(0, ...lens);
+    if (ctx.locale === "en" && (avg > 15.5 || longest > 32)) {
+      return { ok: false, reason: `long_sentences:${avg.toFixed(1)}/${longest}` };
+    }
+  }
   const closing = (sentences[sentences.length - 1] ?? "").trim();
   if (/^(thanks|thank you|keep it up|keep up the|well done|good job|much appreciated)\b/i.test(closing)) {
     return { ok: false, reason: "addresses_the_business" };
@@ -315,6 +330,12 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   // was the closing line on a live Bentoya draft (2026-09-16).
   if (/\b(just|only|simply) (a|an) (straightforward|simple|basic|regular|normal|standard|ordinary|decent|okay|ok)\b/i.test(closing)) {
     return { ok: false, reason: "faint_praise_close" };
+  }
+  // The inverted shape lands on the last sentence as often as the first:
+  // "Leaving the place with full stomachs made me glad we picked it." (live
+  // Bentoya Motor City, 2026-09-16). Same test as the opening.
+  if (/^\w+ing\b[^,.!?]*\b(made|left|had|got|brought|put|took|led|turned out|felt|was|is|proved|meant|kept|gave|ended up|became)\b/i.test(closing)) {
+    return { ok: false, reason: "closes_without_a_person" };
   }
 
   // The reviewer has to be a person, from the first sentence. The model likes
