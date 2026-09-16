@@ -29,6 +29,10 @@ export const AI_TELL_PHRASES: readonly string[] = [
   "to see what was on offer",
   "to see how it",
   "to see what they",
+  "when you want a",
+  "when they want a",
+  "for anyone who",
+  "for those who",
   "that made the whole",
   "made the whole experience",
   "hit home",
@@ -416,6 +420,24 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   const windowText = openingWords <= 4 ? `${opening} ${sentences[1] ?? ""}`.trim() : opening;
   if (!FIRST_PERSON.test(windowText) && !DROPPED_SUBJECT.test(windowText.replace(LEADING_ADVERB, ""))) {
     return { ok: false, reason: "opens_without_a_person" };
+  }
+
+  // A general truth about people, anywhere in the body, is how the model
+  // works a search phrase in when the visit did not supply it: "People often
+  // order ramen in Dubai when they want a good soup, and this bowl tasted just
+  // right." (Akio, live Bentoya draft, 2026-09-16; the guest had tapped udon).
+  // Nobody writes that in a review. A person as the subject of a plain past
+  // action ("People working there offered friendly service") is left alone.
+  for (const sentence of sentences) {
+    if (/^(people|anyone|everyone|families|locals|diners|customers|guests|visitors|folks|those|many)\b[^.!?]*\b(often|usually|always|generally|typically|tend to|will|should|can|who want|who need|who are|who like|looking for|searching for|when they)\b/i.test(sentence.trim())) {
+      return { ok: false, reason: "generic_people" };
+    }
+  }
+  // Two reasons in one review is a review explaining itself. "This spot works
+  // well for family dinners because everyone finds something they like on the
+  // menu" (same draft). One "because" is a person; two is a pattern.
+  if ((t.match(/\bbecause\b/gi) ?? []).length >= 2) {
+    return { ok: false, reason: "over_explained" };
   }
 
   // Against this store's recent drafts: the opening must be new, and the body
