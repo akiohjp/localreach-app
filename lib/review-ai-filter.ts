@@ -20,6 +20,15 @@ export type DraftCheck =
  * legitimately have "Hidden Gem" as a pill; that is the owner's call).
  */
 export const AI_TELL_PHRASES: readonly string[] = [
+  // Padding the model reaches for after every concrete detail (Akio, live
+  // Bentoya drafts 2026-09-16): a purpose clause on a plain action, a
+  // consequence sentence that says nothing, an idiom nobody uses.
+  "to see what it was like",
+  "to see what they had",
+  "to see what was on offer",
+  "that made the whole",
+  "made the whole experience",
+  "hit home",
   "hidden gem",
   "nestled",
   "elevate",
@@ -290,6 +299,12 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   // caught it on Maru Udon, 2026-09-14; 2 of 16 drafts). Only the CLOSING
   // sentence is judged: "I wanted to thank the chef" inside the body is a
   // guest talking ABOUT the place, which is fine.
+  // Markup is never a review. A live Noren draft came back starting with
+  // "<div>" (2026-09-16); markdown emphasis and headings are the same tell.
+  if (/<\/?[a-z][^>]*>|\*\*|^#{1,6}\s|`/im.test(t)) {
+    return { ok: false, reason: "markup" };
+  }
+
   const sentences = t.trim().split(/(?<=[.!?])\s+/);
   const closing = (sentences[sentences.length - 1] ?? "").trim();
   if (/^(thanks|thank you|keep it up|keep up the|well done|good job|much appreciated)\b/i.test(closing)) {

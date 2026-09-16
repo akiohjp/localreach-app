@@ -227,9 +227,12 @@ export function lengthRule(locale: SupportedLocale, rating: number): string {
   if (locale === "ja") {
     return happy ? "6〜8 文、230〜340 文字程度" : "5〜7 文、180〜280 文字程度";
   }
+  // Same word budget, more sentences: 6 to 8 sentences over 115 to 155 words
+  // is nineteen words a sentence by construction, and the drafts read as
+  // roundabout (Akio, 2026-09-16). Eight to eleven lands near thirteen.
   return happy
-    ? "6 to 8 sentences, roughly 115 to 155 words"
-    : "5 to 7 sentences, roughly 90 to 125 words";
+    ? "8 to 11 sentences, roughly 115 to 155 words, most sentences short"
+    : "7 to 9 sentences, roughly 90 to 125 words, most sentences short";
 }
 
 /**
