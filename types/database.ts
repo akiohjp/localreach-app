@@ -424,6 +424,60 @@ export type Database = {
           },
         ];
       };
+      /**
+       * One row per guest page open, written by /api/view from the browser.
+       * The open is the only trace a guest who read the page and closed it
+       * leaves; ai_review_drafts starts at the "write my review" tap.
+       * Backed by migration 20260917120000_store_views.sql.
+       */
+      store_views: {
+        Row: {
+          id: number;
+          store_id: string;
+          opened_at: string;
+          entry: "r" | "store";
+          locale: string | null;
+          session_id: string | null;
+          ip_prefix: string | null;
+          ip_hash: string | null;
+          device: "mobile" | "tablet" | "desktop" | "unknown" | null;
+          ua: string | null;
+          referrer_host: string | null;
+        };
+        Insert: {
+          store_id: string;
+          opened_at?: string;
+          entry?: "r" | "store";
+          locale?: string | null;
+          session_id?: string | null;
+          ip_prefix?: string | null;
+          ip_hash?: string | null;
+          device?: "mobile" | "tablet" | "desktop" | "unknown" | null;
+          ua?: string | null;
+          referrer_host?: string | null;
+        };
+        Update: {
+          store_id?: string;
+          opened_at?: string;
+          entry?: "r" | "store";
+          locale?: string | null;
+          session_id?: string | null;
+          ip_prefix?: string | null;
+          ip_hash?: string | null;
+          device?: "mobile" | "tablet" | "desktop" | "unknown" | null;
+          ua?: string | null;
+          referrer_host?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "store_views_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       /**

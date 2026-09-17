@@ -84,6 +84,67 @@ if (!res.ok) {
 }
 const rows = await res.json();
 
+/**
+ * 反応: ページを開いた回数（store_views、2026-09-17 以降）とレビュー生成の回数
+ * （ai_review_drafts）。開封だけあって生成が 0 の店が「開いたけど押さなかった」で、
+ * そこが送り直す相手。store_views がまだ無いデータベースでも一覧は出す。
+ */
+async function loadActivity() {
+  const byStore = new Map();
+  const pull = async (table, timeCol, extra) => {
+    const q = `select=store_id,${timeCol}${extra}&order=${timeCol}.desc&limit=5000`;
+    const r = await fetch(`${url}/rest/v1/${table}?${q}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!r.ok) return [];
+    return r.json();
+  };
+  const [views, drafts] = await Promise.all([
+    pull("store_views", "opened_at", ",ip_hash"),
+    pull("ai_review_drafts", "created_at", ""),
+  ]);
+  const seat = (id) => {
+    if (!byStore.has(id)) byStore.set(id, { opens: 0, devices: new Set(), lastOpen: null, taps: 0, lastTap: null });
+    return byStore.get(id);
+  };
+  for (const v of views) {
+    const a = seat(v.store_id);
+    a.opens++;
+    if (v.ip_hash) a.devices.add(v.ip_hash);
+    if (!a.lastOpen) a.lastOpen = v.opened_at;
+  }
+  for (const d of drafts) {
+    const a = seat(d.store_id);
+    a.taps++;
+    if (!a.lastTap) a.lastTap = d.created_at;
+  }
+  return byStore;
+}
+const activity = await loadActivity();
+
+const stamp = (iso) =>
+  new Date(iso).toLocaleString("ja-JP", {
+    timeZone: "Asia/Dubai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+function activityCell(s) {
+  const a = activity.get(s.id);
+  if (!a) return `<span class="muted tiny">まだなし</span>`;
+  const out = [];
+  if (a.opens) {
+    out.push(`<div><strong>${a.opens}</strong> 回開封 / ${a.devices.size} 台</div>`);
+    out.push(`<div class="tiny muted">最終 ${stamp(a.lastOpen)}</div>`);
+  }
+  if (a.taps) out.push(`<div class="tiny">レビュー生成 ${a.taps} 回</div>`);
+  if (a.opens && !a.taps) out.push(`<div class="tiny"><span class="flag amber">開いたが押していない</span></div>`);
+  if (!a.opens && a.taps) out.push(`<div class="tiny muted">開封は 09-17 から記録</div>`);
+  return out.join("");
+}
+
 const esc = (s) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const now = Date.now();
@@ -260,6 +321,7 @@ function row(r) {
     <td class="name"><strong>${esc(name)}</strong><div class="tiny muted">${esc(s.business_category ?? "")}${area ? " · " + esc(area) : ""}</div>${n.friend ? `<div class="tiny"><span class="flag green">知り合い</span></div>` : ""}${n.owner ? `<div class="tiny">👤 ${esc(n.owner)}</div>` : ""}${n.note ? `<div class="tiny muted">${esc(n.note)}</div>` : ""}</td>
     <td>${contractCell(s)}<div class="tiny muted">${s.keywords?.length ?? 0} pills / ${s.forced_keywords?.length ?? 0} core${s.logo_url ? " / ロゴあり" : ""}</div>${google}</td>
     <td class="center">${ai}</td>
+    <td class="act">${activityCell(s)}</td>
     <td class="link">${short ? `<a href="${short}" target="_blank" rel="noopener">${esc(QR_HOST)}/${esc(s.slug)}</a>
         <div class="btns"><button class="btn ghost" data-copy="${short}">リンクをコピー</button>
         <a class="btn ghost" download="qr-${esc(s.slug)}.png" href="${qr}">QR を保存</a></div>` : ""}
@@ -273,7 +335,7 @@ function row(r) {
 function section(title, list, open = true) {
   if (!list.length) return "";
   return `<details ${open ? "open" : ""}><summary>${title} <span class="count">${list.length}</span></summary>
-  <div class="scroll"><table><thead><tr><th>店</th><th>契約 / 設定</th><th>AI Draft</th><th>短縮リンク</th><th>QR</th><th>送信文</th><th>進捗</th></tr></thead>
+  <div class="scroll"><table><thead><tr><th>店</th><th>契約 / 設定</th><th>AI Draft</th><th>反応</th><th>短縮リンク</th><th>QR</th><th>送信文</th><th>進捗</th></tr></thead>
   <tbody>${list.map(row).join("\n")}</tbody></table></div></details>`;
 }
 
@@ -331,6 +393,7 @@ const html = `<!doctype html>
   <div class="rules">
     <div><strong>送る前に</strong>: その店の <strong>AI Draft が ON</strong> か（OFF なら <a href="${APP}/master-admin" target="_blank" rel="noopener">マスター管理</a> で ON）、<strong>契約終了日</strong>が切れていないか（切れていると QR は Service Inactive に飛ぶ）。</div>
     <div><strong>文面</strong>は知り合いに送る前提で書いてあります（Koi と Trifid に送ったものと同じ声、2026-09-14 改訂）。その店の実物が 3 つ入っているので、1 店ずつ中身が違います。相手の名前が分からない店は <code>{name}</code> のままなので、送る前に入れ替えてください。</div>
+    <div><strong>反応</strong>: 相手がページを<strong>開いた</strong>回数と台数、レビューを<strong>生成した</strong>回数。開封の記録は 2026-09-17 開始なので、それ以前に送った分は生成の回数だけです。開封があって生成 0 は「見たが押さなかった」で、送り直す相手はそこ。</div>
     <div><strong>更新</strong>: クローンで <code>npm run sales:list</code> → <code>~/serve/pin.sh sales-list.html localreach</code>。「送信済み」とメモはこの端末のブラウザにだけ保存されます。</div>
   </div>
 </header>

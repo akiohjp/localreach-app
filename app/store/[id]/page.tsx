@@ -31,5 +31,5 @@ export default async function StorePage({
   if (!store) notFound()
   if (!store.is_active) redirect('/inactive')
 
-  return <StoreReviewPage store={store} lang={lang} />
+  return <StoreReviewPage store={store} lang={lang} entry="store" />
 }

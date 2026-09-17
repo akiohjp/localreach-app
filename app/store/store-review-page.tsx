@@ -7,6 +7,7 @@ import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { isMissingColumnError } from '@/lib/supabase-errors'
 import { SLUG_RE } from '@/lib/store-links'
 import ReviewFlow from './[id]/ReviewFlow'
+import ViewBeacon from './ViewBeacon'
 
 /**
  * The guest review page, shared by its two addresses:
@@ -93,7 +94,16 @@ export function storeMetadata(store: PublicStore | null): Metadata {
   }
 }
 
-export async function StoreReviewPage({ store, lang }: { store: PublicStore; lang?: string }) {
+export async function StoreReviewPage({
+  store,
+  lang,
+  entry,
+}: {
+  store: PublicStore
+  lang?: string
+  /** Which address rendered this page, recorded with the open. */
+  entry: 'r' | 'store'
+}) {
   // Locale resolution: ?lang= override (only if this store offers it) → store default
   const storeLocales = localesForStore(store)
   const locale: SupportedLocale = storeLocales.includes(lang as SupportedLocale)
@@ -114,6 +124,10 @@ export async function StoreReviewPage({ store, lang }: { store: PublicStore; lan
         pb-[calc(3rem+env(safe-area-inset-bottom))]"
     >
       <div className="w-full max-w-sm">
+
+        {/* Records the open itself, so a page that was read and closed is not
+            indistinguishable from a link nobody ever tapped. */}
+        <ViewBeacon storeId={store.id} entry={entry} locale={locale} />
 
         {/* Top meta row: brand + language switcher */}
         <div className="mb-5 px-1 flex items-center justify-between">
