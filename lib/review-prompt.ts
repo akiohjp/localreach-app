@@ -296,7 +296,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   const rules: string[] = [
     `- First person, past tense, one paragraph, ${lengthRule(p.locale, rating)}. ${toneRule(rating)}`,
     "- Sound like a person typing on their phone right after: everyday words, uneven sentence length, no polish. A slightly flat sentence beats a fancy one.",
-    "- Get the length from the tapped phrases: give each one its own sentence or two about what it was actually like (texture, taste, how it felt, how it compared to what they expected) and why it mattered to them, then close with how they felt about the place as a whole or who they would send there. Never from new facts.",
+    "- Get the length from the tapped phrases: give each one its own sentence or two about what it was actually like (texture, taste, how it felt, how it compared to what they expected) and why it mattered to them, then close with how they felt about the place as a whole. Never from new facts, and never close by naming who they would bring or send.",
   ];
   if (keywords.length) {
     rules.push(
@@ -309,7 +309,12 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     );
   }
   rules.push(
-    "- Do not invent specifics: no dishes, products, prices, names, dates, waiting times, occasions or companions beyond what is given above. If all you know is a phrase, stay at the level of that phrase. Several tapped dishes or items simply means they had them; never invent a partner or friend to explain who had what.",
+    "- Do not invent specifics: no dishes, products, prices, names, dates, waiting times, occasions or companions beyond what is given above. If all you know is a phrase, stay at the level of that phrase. Several tapped dishes or items simply means they had them: write about the things themselves, never about who had what. Bring in nobody the guest did not mention, no brother, partner, kids or neighbours, and do not say they were on their own either.",
+  );
+  rules.push(
+    "- A phrase that names a place (\"best pizza in Dubai\", \"clinic in Al Manara\") is how somebody searches, not something on the menu: never make it the thing they ordered, ate, bought or booked.",
+    "- Write their visit, not advice to whoever reads it: no \"you should\", no \"if you are looking for\", no telling anyone to check it out or where to go.",
+    "- A tapped phrase that is a claim (\"best pizza in Dubai\") is the reviewer's own opinion, said in their own voice: \"I would call it the best pizza in Dubai\". Never what other people say, never what it is known for.",
   );
   // What local search and AI answers match on is the name, what the place is
   // and where it is. Both lines used to be permissions — "at most once, or not

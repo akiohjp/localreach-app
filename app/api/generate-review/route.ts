@@ -303,7 +303,7 @@ export async function POST(req: Request) {
       lastCandidate = text;
       continue;
     }
-    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName, recent });
+    const verdict = checkReviewDraft(text, { locale, rating, keywords, storeName, recent, note });
     if (!verdict.ok) {
       lastReason = verdict.reason;
       lastCandidate = text;

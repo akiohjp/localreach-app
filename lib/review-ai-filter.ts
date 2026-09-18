@@ -31,6 +31,7 @@ export const AI_TELL_PHRASES: readonly string[] = [
   "to see what they",
   "when you want a",
   "when they want a",
+  "when you just want",
   "for anyone who",
   "for those who",
   "that made the whole",
@@ -187,6 +188,12 @@ export type DraftContext = {
    * attempts: the model's stock of openers is narrower than its prose.)
    */
   recent?: readonly string[];
+  /**
+   * The guest's own words, when they left any. A person they name themselves
+   * ("came with my sister") is theirs to name; anyone the model brings in is
+   * invented (see invented_person below).
+   */
+  note?: string;
 };
 
 // RegExp() rather than a literal: \p{} is ES2018 syntax and tsconfig targets ES2017.
@@ -283,6 +290,21 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   const lower = t.toLowerCase();
   for (const kw of ctx.keywords) {
     if (kw && !lower.includes(kw.toLowerCase())) return { ok: false, reason: `keyword_missing:${kw}` };
+  }
+
+  // A search phrase is how somebody finds the place, not something on the menu.
+  // "I ordered the best pizza in Dubai and ate every single slice." (live
+  // Pitfire draft, 2026-09-17). Only phrases shaped like a search are checked
+  // — <what> in|near|around <Place> — and only where one lands straight after
+  // a buying verb.
+  for (const kw of ctx.keywords) {
+    if (!/\b(?:in|near|around)\s+[A-Z]/.test(kw)) continue;
+    const esc = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const asDish = new RegExp(
+      `\\b(?:ordered|order|ate|eat|eating|had|having|tried|trying|got|getting|bought|buy|shared|sharing|finished|devoured|tasted)\\s+(?:the|a|an|some|my|our|this|that)?\\s*${esc}\\b`,
+      "i",
+    );
+    if (asDish.test(t)) return { ok: false, reason: `geo_as_dish:${kw}` };
   }
 
   const tapped = ctx.keywords.map((k) => k.toLowerCase());
@@ -435,6 +457,29 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
       return { ok: false, reason: "generic_people" };
     }
   }
+  // The guest never told us who they know. "I would send my brother here next
+  // week" and "I am planning to bring my brother here next week" came back in
+  // 2 of 6 live Pitfire drafts (2026-09-17), and the same brother was in the
+  // draft a guest received on 2026-09-13: left to itself the model reaches for
+  // the same relative every time, so fifty reviews of one place read like one
+  // family. Someone the guest names in their own words is theirs to name;
+  // friends and colleagues stay allowed, being vague enough to be anybody.
+  const INVENTED_PERSON =
+    /\b(?:my|our)\s+(brother|sister|mum|mom|mother|dad|father|parents|wife|husband|son|daughter|kids|children|cousin|uncle|aunt|nephew|niece|grandmother|grandfather|grandma|grandpa|in-laws|partner|girlfriend|boyfriend|neighbours|neighbors|flatmate|roommate)\b/i;
+  const invented = INVENTED_PERSON.exec(t);
+  if (invented && !(ctx.note ?? "").toLowerCase().includes(invented[1].toLowerCase())) {
+    return { ok: false, reason: `invented_person:${invented[1].toLowerCase()}` };
+  }
+
+  // A review is one person's visit, not a recommendation column. "You should
+  // definitely go check it out if you are in the area", "For anyone looking
+  // for pizza delivery in Jumeirah Village Circle, this is the place I'd send
+  // you" (live Pitfire drafts, 2026-09-17). The opening is policed above; this
+  // is the same voice arriving in the body or the closing line.
+  const ADVISES_THE_READER =
+    /\byou should\b|\byou can'?t go wrong\b|\byou(?:'ll| will) (?:find|love|want|need)\b|\bif you(?:'re| are)(?: ever)? (?:looking|after|in the area|around|craving|hungry|in the mood)\b|\bif you need\b|\bfor anyone looking\b|\bgo (?:and )?(?:check|try) (?:it|them) out\b|\bcheck (?:it|them) out if\b|\bI(?:'d| would) send you\b|\banyone (?:asking|who asks|wondering|curious)\b/i;
+  if (ADVISES_THE_READER.test(t)) return { ok: false, reason: "advises_the_reader" };
+
   // Two reasons in one review is a review explaining itself. "This spot works
   // well for family dinners because everyone finds something they like on the
   // menu" (same draft). One "because" is a person; two is a pattern.

@@ -246,7 +246,7 @@ const RESTAURANT: StoryFrame[] = [
 
   // ---- long ----
   { size: "long", text: "{Finally|At last} made it to {store} after {months|weeks} of {friends|people} {telling me|going on} about it, and {it held up|the hype was justified}. We {started with|ordered} {obj1}[, then {obj2}][, and {obj3} {for the table|to share}]; {everything|it all} {came out|arrived} {hot|together} and {nobody|no one} {waited long|had to wait} between courses.[ {aside}][ {attr1} {stood out|was the first thing I noticed}.][ {attr2} {stood out|held up} too.] {Service|The service} was {friendly|warm} without {hovering|being over the top}, {the room|the place} was {busy|full} but {not loud|still easy to talk in}, and the bill {came in|was} {lower than I braced for|fair for what we had}.[ For {geo1}, {this is where I'd send people|I'd start here}.] {We've|I've} {already|since} {booked|planned} {a second visit|the next one}." },
-  { size: "long", text: "This is an overdue review for {store}, {a place|somewhere} we've {been to|eaten at} {a few times|more than a few times} now. {The regular order is|We usually get} {obj1}[ and {obj2}], and {the standard|it} {hasn't slipped once|has stayed the same}.[ {obj3} {joined|got added to} the list {recently|last month}.][ {What keeps us coming back|The reason we keep coming back} is {partly|mostly} {attr1}, but also {that|the fact that} {the staff|the team} {actually remember|remember} {us|regulars} and {don't|never} rush anyone out.][ They've been {reliable|consistent} with {svc1} every time.][ {aside}][ They {know|really know} their {range1}.][ {If you're|For anyone} {looking for|after} {geo1}, {this is|it's} {the place I'd send you|where I'd start}.]" },
+  { size: "long", text: "This is an overdue review for {store}, {a place|somewhere} we've {been to|eaten at} {a few times|more than a few times} now. {The regular order is|We usually get} {obj1}[ and {obj2}], and {the standard|that} {hasn't slipped once|has stayed the same}.[ {obj3} {joined|got added to} the list {recently|last month}.][ {What keeps us coming back|The reason we keep coming back} is {partly|mostly} {attr1}, but also {that|the fact that} {the staff|the team} {actually remember|remember} {us|regulars} and {don't|never} rush anyone out.][ They've been {reliable|consistent} with {svc1} every time.][ {aside}][ They {know|really know} their {range1}.][ {If you're|For anyone} {looking for|after} {geo1}, {this is|it's} {the place I'd send you|where I'd start}.]" },
   { size: "long", text: "First {visit|time} at {store} and {I'm|we're} {converted|impressed}. {I'd|We'd} {planned on|come for} {obj1}[ and {the waiter|our server} {suggested|pointed us to} {obj2} {as well|to go with it}, which {turned out to be|was} the right call][; {obj3} {rounded it off|finished the meal}]. {Everything|Each dish} {came out|arrived} {at a sensible pace|when it should}, {nothing|no dish} {sat around|went cold}, and the {kitchen|pace} {kept up|held} even {on a packed night|when the place filled up}.[ {aside}][ {attr1} {stood out|was obvious} from the {first plate|start}.][ {attr2} {backed it up|matched it}.] {Prices|The prices} {are|were} {fair|reasonable} for what you get, and {the staff|the team} were {genuinely|properly} {friendly|welcoming} {rather than|not just} {polite for the tips|going through the motions}. {We'll|I'll} be back {soon|before long}." },
   { size: "long", text: "{Glad|Happy} to have this kind of {cat} in {loc}; {store} {fills|filled} a gap. We {ordered|had} {obj1}[ and {obj2}] and {it all|everything} {held up|delivered}[, with {obj3} {as the surprise|the surprise of the night}].[ {attr1} {stood out|is the standout}; {you can tell|it's clear} {someone|the kitchen} {takes it seriously|cares about the details}.][ {attr2} {came close|isn't far behind}.][ {aside}] {Service|The service} {kept pace|kept up} {on a busy night|even when it was full}, {nobody|no one} {rushed us|hurried us}, and the bill was {fair|reasonable}. {I've|We've} {already|since} {told|sent} {friends|two friends} {about it|here}." },
   { size: "long", text: "{I'd|We'd} {been looking for|searched around for} {geo1} for {a while|months} and {store} {ended the search|is where it ended}. {Went with|Ordered} {obj1}[ and {obj2}][, plus {obj3} {to share|for the table}], and {everything|all of it} {came out|arrived} {hot|together} and {properly done|done right}.[ {aside}][ {attr1} {stood out|was the detail I noticed}.][ {attr2} {backed it up|matched it}.] {The staff|The team} were {relaxed|friendly} and {quick|on it}, {the place|the room} was {busy|full} but {comfortable|not loud}, and {the prices|prices} were {fair|sensible} for {what we had|the portions}. It's an easy {recommendation|place to recommend}." },
@@ -400,6 +400,21 @@ const SIZE_FALLBACK: Record<StorySize, StorySize[]> = {
 const ASIDE_CHANCE = 0.6;
 
 /**
+ * Asides that assume the guest had the thing itself. A pizza restaurant also
+ * sells wings, and "The base was {thin|light} enough that we finished more
+ * than we meant to." after a review that tapped only Buffalo Chicken Wings is
+ * a sentence about a pizza nobody ordered — the naturalness gate refused that
+ * exact review twice on Pitfire (2026-09-18). Each pair is [matches the aside,
+ * must appear in what the guest tapped].
+ */
+const ASIDE_NEEDS: readonly (readonly [RegExp, RegExp])[] = [
+  [/\b(crust|base|leftovers|blistered|charred)\b/i, /pizza|crust|dough|slice|margherita|pepperoni|calzone/i],
+  [/\b(broth|noodles)\b/i, /noodle|ramen|udon|soba|pho|broth/i],
+  [/\bcoffee\b/i, /coffee|latte|espresso|cappuccino|americano|flat white|cortado|mocha/i],
+  [/\b(doughnuts?|box)\b/i, /dough|donut|box/i],
+];
+
+/**
  * Pick a frame that absorbs (nearly) the most of what the guest tapped, at the
  * requested length, and fill it. Returns null when no frame fits (the engine
  * then falls back to the slot assembly).
@@ -415,7 +430,17 @@ export function buildStory(input: StoryInput): StoryResult | null {
     geos: input.geos.length,
   };
   const placeOk = input.allowPlace && !!input.cat && !!input.loc;
-  const asides = STORY_ASIDES[input.flavor];
+  const tappedText = [
+    ...input.objs,
+    ...input.ranges,
+    ...input.attrs,
+    ...input.preds,
+    ...input.svcs,
+    ...input.geos,
+  ].join(" ");
+  const asides = STORY_ASIDES[input.flavor].filter((a) =>
+    ASIDE_NEEDS.every(([inAside, inTaps]) => !inAside.test(a) || inTaps.test(tappedText)),
+  );
 
   type Cand = { index: number; absorbed: number };
   const candidatesFor = (size: StorySize): Cand[] => {
