@@ -264,9 +264,17 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   const city = (p.city ?? "").trim();
   const noun = (p.categoryNoun ?? "").trim();
   const areaAlreadyTapped = !!area && tappedLower.some((k) => k.includes(area.toLowerCase()));
+  const cityAlreadyTapped = !!city && tappedLower.some((k) => k.includes(city.toLowerCase()));
   let place = "";
   if (!areaAlreadyTapped) {
-    const where = [area, city].filter(Boolean).join(", ");
+    // The city is dropped when a tapped phrase already names it. The area
+    // guard above did not cover the city, so "breakfast near University City
+    // Sharjah" still collected ", Sharjah" from here and the opening came out
+    // as "Today I wanted breakfast near University City Sharjah and stopped by
+    // tashas Aljada, a cafe in Aljada, Sharjah" - the city twice in one
+    // sentence, which reads as stuffing rather than as a person (live tashas
+    // draft, 2026-09-22).
+    const where = [area, cityAlreadyTapped ? "" : city].filter(Boolean).join(", ");
     if (noun && where) place = `${noun} in ${where}`;
     else if (where) place = `in ${where}`;
     else if (noun) place = noun;
