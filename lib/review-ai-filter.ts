@@ -348,6 +348,13 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
     }
   }
   const closing = (sentences[sentences.length - 1] ?? "").trim();
+  // "Why do I keep thinking about how good the food tasted?" "Why do I not
+  // come here more often?" (live tashas drafts, 2026-09-22, 2 of 12). A guest
+  // typing about their own morning does not ask themselves a question at the
+  // end; it is a copywriter's flourish and it is the last thing the reader
+  // sees. The whole draft is checked, not only the closing: the same move
+  // lands mid-paragraph just as easily.
+  if (/\?/.test(t)) return { ok: false, reason: "rhetorical_question" };
   if (/^(thanks|thank you|keep it up|keep up the|well done|good job|much appreciated)\b/i.test(closing)) {
     return { ok: false, reason: "addresses_the_business" };
   }
@@ -480,7 +487,7 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
   // manager reading a demo of their own place knows whether their ceilings are
   // high. Anything the guest actually named stays allowed.
   const INVENTED_FITTING =
-    /\b(high ceilings?|ceilings?|skylights?|windows?|natural light|sunlight|morning sun|afternoon light|chandeliers?|lamps?|lighting|wooden tables?|marble|floorboards?|cushions?|armchairs?|sofas?|artwork|paintings?|playlists?|speakers?|space between the tables)\b/i;
+    /\b(high ceilings?|ceilings?|skylights?|windows?|natural light|sunlight|morning sun|afternoon light|chandeliers?|lamps?|lighting|wooden tables?|marble|floorboards?|cushions?|armchairs?|sofas?|artwork|paintings?|playlists?|speakers?|music|space between the tables)\b/i;
   const fitting = INVENTED_FITTING.exec(t);
   if (fitting) {
     const named = [...(ctx.keywords ?? []), ctx.note ?? ""].join(" ").toLowerCase();
