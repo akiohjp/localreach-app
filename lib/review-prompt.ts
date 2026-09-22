@@ -274,7 +274,12 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     // tashas Aljada, a cafe in Aljada, Sharjah" - the city twice in one
     // sentence, which reads as stuffing rather than as a person (live tashas
     // draft, 2026-09-22).
-    const where = [area, cityAlreadyTapped ? "" : city].filter(Boolean).join(", ");
+    // ...and dropped again when the area name already carries it. Half the
+    // live areas do: "Dubai Creek Harbour, Dubai", "Dubai Design District,
+    // Dubai", "Jumeirah Village Circle" is the exception rather than the rule.
+    // Prime Gourmet got the city three times in one draft this way (2026-09-23).
+    const areaCarriesCity = !!city && !!area && area.toLowerCase().includes(city.toLowerCase());
+    const where = [area, cityAlreadyTapped || areaCarriesCity ? "" : city].filter(Boolean).join(", ");
     if (noun && where) place = `${noun} in ${where}`;
     else if (where) place = `in ${where}`;
     else if (noun) place = noun;
