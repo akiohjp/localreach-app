@@ -56,10 +56,12 @@ const GENERATE_DELAY_MS = 900
 
 /**
  * AI drafts: how long the client waits for /api/generate-review before the
- * template engine answers instead. The route's own budget is 7.5 s, so a
- * normal failure returns well before this; the timeout is for a hung socket.
+ * template engine answers instead. The route's own budget is 11 s, so a normal
+ * failure returns well before this; the timeout is for a hung socket. Raised
+ * with the route's budget on 2026-09-22 — at 9 s the client was hanging up on
+ * drafts the route was still going to return.
  */
-const AI_TIMEOUT_MS = 9000
+const AI_TIMEOUT_MS = 13000
 /** The "crafting" bar's duration while the model writes (typical 2-3 s). */
 const AI_GENERATE_DELAY_MS = 2600
 /** Route calls per guest flow (first draft + rewrites); beyond it, template. */

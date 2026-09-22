@@ -19,6 +19,13 @@
  *      after hedgeAfterMs, the next one starts alongside it, and the first
  *      good text wins while the rest are aborted. The extra call costs a
  *      fraction of a fils and only happens on the slow tail.
+ *
+ *      Those numbers are from 2026-09-11 and have moved. Measured again on
+ *      2026-09-22 over 223 logged drafts: a successful call sat at p50 1.97 s
+ *      and p95 6.65 s through mid-September, and in the last three days at
+ *      p50 4.20 s and p95 7.36 s. The hedge still covers "which model is quick
+ *      today"; what the slowdown broke was the caller's budget, which is why
+ *      generate-review now allows 11 s rather than 7.5 s.
  */
 
 export const DEFAULT_REVIEW_MODELS: readonly string[] = [

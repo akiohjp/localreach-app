@@ -49,10 +49,24 @@ type Body = {
   attempt?: unknown;
 };
 
-/** Total wall-clock budget for the model ladder; the client aborts at 9 s. */
-const BUDGET_MS = 7500;
-/** Per model. The lite model answers in ~1.3 s; past this it is the slow tail. */
-const ATTEMPT_MS = 5500;
+/**
+ * Total wall-clock budget for the model ladder; the client aborts at 13 s.
+ * Raised from 7.5 s on 2026-09-22. Gemini got slower through September: the p50
+ * of a SUCCESSFUL draft went 1.97 s -> 4.20 s and the p95 7.36 s, which is
+ * 150 ms under the old 7.5 s budget. Everything past p95 hit the wall and the
+ * guest got the template, and MAX_GENERATIONS was dead letter because one
+ * attempt ate the whole budget. Measured fallback rate: 0% on 09-12, 40% today.
+ * 11 s leaves a p50 draft room for a second generation and still returns inside
+ * maxDuration with the two Supabase reads.
+ */
+const BUDGET_MS = 11000;
+/**
+ * Per model. Was 5500 while the lite model answered in ~1.3 s; it now needs
+ * more than that at p90 (6.65 s), so the old ceiling was killing attempts that
+ * were about to answer. The hedge below still starts the next model at 1.8 s,
+ * so a hung model never holds the guest on its own.
+ */
+const ATTEMPT_MS = 8000;
 /** Silence before the next model is started alongside (lib/review-ai hedging). */
 const HEDGE_AFTER_MS = 1800;
 /**
