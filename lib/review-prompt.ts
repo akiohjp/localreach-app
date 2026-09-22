@@ -305,6 +305,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
     `- First person, past tense, one paragraph, ${lengthRule(p.locale, rating)}. ${toneRule(rating)}`,
     "- Sound like a person typing on their phone right after: everyday words, uneven sentence length, no polish. A slightly flat sentence beats a fancy one.",
     "- Get the length from the tapped phrases: give each one its own sentence or two about what it was actually like (texture, taste, how it felt, how it compared to what they expected) and why it mattered to them, then close with how they felt about the place as a whole. Never from new facts, and never close by naming who they would bring or send.",
+    "- That elaboration is for food, drink, waiting and how staff behaved, because the guest was there for those. It is never for the building. Do not describe ceilings, windows, skylights, daylight or where the sun falls, lamps or lighting, furniture, materials, floors, plants, artwork or music, and do not say how far apart the tables are or where they sat. You were not there and would be inventing a room the owner can check. A tapped phrase about the space is written as how it felt, calm or easy to talk in, never as what it looks like.",
   ];
   if (keywords.length) {
     rules.push(

@@ -471,6 +471,24 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
     return { ok: false, reason: `invented_person:${invented[1].toLowerCase()}` };
   }
 
+  // The model furnishing a room it never saw. "high ceilings and plenty of
+  // space between the tables", "the morning sun came through the glass", "the
+  // wooden tables caught the afternoon light" (live tashas drafts, 2026-09-22):
+  // 9 of 32 carried a detail of the building that was in no tapped phrase and
+  // in nothing the guest typed. Taste, waiting and service can be elaborated
+  // because the guest was there for those; the architecture is invented, and a
+  // manager reading a demo of their own place knows whether their ceilings are
+  // high. Anything the guest actually named stays allowed.
+  const INVENTED_FITTING =
+    /\b(high ceilings?|ceilings?|skylights?|windows?|natural light|sunlight|morning sun|afternoon light|chandeliers?|lamps?|lighting|wooden tables?|marble|floorboards?|cushions?|armchairs?|sofas?|artwork|paintings?|playlists?|speakers?|space between the tables)\b/i;
+  const fitting = INVENTED_FITTING.exec(t);
+  if (fitting) {
+    const named = [...(ctx.keywords ?? []), ctx.note ?? ""].join(" ").toLowerCase();
+    if (!named.includes(fitting[1].toLowerCase())) {
+      return { ok: false, reason: `invented_fitting:${fitting[1].toLowerCase()}` };
+    }
+  }
+
   // A review is one person's visit, not a recommendation column. "You should
   // definitely go check it out if you are in the area", "For anyone looking
   // for pizza delivery in Jumeirah Village Circle, this is the place I'd send
