@@ -480,6 +480,15 @@ function checkReviewDraftInner(text: string, ctx: DraftContext): DraftCheck {
     /\byou should\b|\byou can'?t go wrong\b|\byou(?:'ll| will) (?:find|love|want|need)\b|\bif you(?:'re| are)(?: ever)? (?:looking|after|in the area|around|craving|hungry|in the mood)\b|\bif you need\b|\bfor anyone looking\b|\bgo (?:and )?(?:check|try) (?:it|them) out\b|\bcheck (?:it|them) out if\b|\bI(?:'d| would) send you\b|\banyone (?:asking|who asks|wondering|curious)\b/i;
   if (ADVISES_THE_READER.test(t)) return { ok: false, reason: "advises_the_reader" };
 
+  // The model counting the phrases it was handed. "I tried three things during
+  // my visit today" (live tashas draft, 2026-09-22), and what followed was a
+  // search phrase, an occasion and one dish, so the three things were never
+  // three things. Nobody opens a review with a tally of their own visit; the
+  // number comes straight from the bullet list in the prompt. "A few" and "a
+  // couple" stay allowed, being how people actually talk.
+  const COUNTS_THE_TAPS = /\b(?:two|three|four|five|six|2|3|4|5|6)\s+things\b/i;
+  if (COUNTS_THE_TAPS.test(t)) return { ok: false, reason: "counts_the_taps" };
+
   // Two reasons in one review is a review explaining itself. "This spot works
   // well for family dinners because everyone finds something they like on the
   // menu" (same draft). One "because" is a person; two is a pattern.

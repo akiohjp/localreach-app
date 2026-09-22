@@ -301,6 +301,7 @@ export function buildReviewPrompt(p: ReviewPromptInput): string {
   if (keywords.length) {
     rules.push(
       `- Every tapped phrase must appear word for word, in that order, inside a natural sentence. Capitalise it the way the sentence needs (names and places keep their capitals). Do not list them, do not put quotation marks or bold around them${keywords.length > 2 ? ", and spread them across the paragraph instead of bunching them into one sentence" : ""}.`,
+      "- Never count them or announce them. No \"I tried three things\", no \"a few highlights\", no \"the first was\". The phrases are what the guest remembers, not a list they are working through, and a number in the opening is the clearest sign a machine wrote it.",
     );
   }
   if (note) {
