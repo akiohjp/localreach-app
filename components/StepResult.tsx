@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Copy, Globe, ExternalLink, RotateCcw, Check, RefreshCw, Loader2 } from "lucide-react";
 import { isValidUuid } from "@/lib/is-valid-uuid";
 import { copyToClipboard, isUsableReviewUrl } from "@/lib/copy-text";
+import { logGuestEvent } from "@/lib/guest-event";
 import type { UiStrings } from "@/lib/ui-strings";
 import { DEFAULT_DIAL_CODE, type ContactChannel, type SupportedLocale } from "@/types/database";
 
@@ -73,6 +74,15 @@ export default function StepResult({
   /** The language button the guest just tapped — it carries the spinner. */
   const [pendingLocale, setPendingLocale] = useState<SupportedLocale | null>(null);
 
+  // One draft_shown per result screen. The ref keeps React's dev double-run
+  // (and a language switch, which re-renders, not remounts) from counting twice.
+  const shownLogged = useRef(false);
+  useEffect(() => {
+    if (shownLogged.current) return;
+    shownLogged.current = true;
+    logGuestEvent(storeId, "draft_shown", reviewLocale);
+  }, [storeId, reviewLocale]);
+
   async function handleLanguageChange(loc: SupportedLocale) {
     if (loc === reviewLocale || rewriting) return;
     setCopied(false);
@@ -120,6 +130,7 @@ export default function StepResult({
 
   async function handleCopy() {
     const ok = await copyToClipboard(text);
+    logGuestEvent(storeId, ok ? "copy" : "copy_blocked", reviewLocale);
     if (!ok) {
       // Both clipboard paths blocked (rare): select the text and tell the guest
       // to copy manually instead of failing silently.
@@ -173,12 +184,14 @@ export default function StepResult({
     // webviews — arrived at Google with nothing to paste and no idea why, on
     // the one screen the whole product exists to reach. Now the manual-copy
     // banner is showing and the text is selected when they come back.
+    logGuestEvent(storeId, "post_click", reviewLocale);
     void copyToClipboard(text).then((ok) => {
       if (ok) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
         return;
       }
+      logGuestEvent(storeId, "copy_blocked", reviewLocale);
       selectReviewText();
       setCopyBlocked(true);
     });
@@ -333,6 +346,105 @@ export default function StepResult({
         )}
       </div>
 
+      {/* The one thing this screen is for, directly under the draft so it is on
+          the first screen of a phone. It used to sit under the WhatsApp and note
+          blocks at ~1,240px of a ~1,560px page: on an 844px phone the guest saw
+          the draft and a phone-number form, and no way on (Let it dough,
+          2026-10-03: 43 drafts, 2 on Google). The tap copies the text too, so
+          the old separate "Copy" step and the how-to list below are gone. */}
+      <div className="flex flex-col gap-2">
+        {hasValidReviewUrl ? (
+          <a
+            href={gbpReviewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handlePostOnGoogle}
+            className="bg-slate-900 text-white font-bold text-base rounded-xl shadow-md
+              hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-4
+              flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={16} />
+            {t.result.postOnGoogle}
+          </a>
+        ) : (
+          // Owner hasn't set the Google review link — never open a blank/404
+          // tab on the money path. Tell the guest what to do instead.
+          <div className="border border-gray-300 bg-gray-50 rounded-xl px-4 py-3 text-xs text-slate-600 text-center leading-relaxed">
+            {reviewLocale === "ja"
+              ? "本文をコピーして、Googleマップでお店を検索し、クチコミに貼り付けてください。"
+              : reviewLocale === "ar"
+                ? "انسخ النص، ثم ابحث عن المتجر في خرائط Google والصقه في المراجعة."
+                : "Copy the review, then find this place on Google Maps and paste it there."}
+          </div>
+        )}
+        {hasValidReviewUrl && (
+          <p className="text-xs text-slate-600 text-center leading-relaxed">{t.result.postHint}</p>
+        )}
+        {/* Manual-copy hint — clipboard blocked (in-app browser); text is pre-selected */}
+        <div className={`transition-all duration-300 overflow-hidden ${copyBlocked ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
+          <div className="flex items-center justify-center gap-2 bg-amber-50 border border-amber-300
+            rounded-xl py-2.5 px-3 text-xs font-semibold text-amber-800 text-center">
+            {reviewLocale === "ja"
+              ? "自動コピーできませんでした。選択された本文を長押しでコピーしてください。"
+              : reviewLocale === "ar"
+                ? "تعذّر النسخ التلقائي. النص محدد — اضغط مطولاً ثم انسخ."
+                : "Couldn't copy automatically. The text is selected — long-press and copy."}
+          </div>
+        </div>
+
+        {/* Copied toast */}
+        <div className={`transition-all duration-300 overflow-hidden ${copied ? "max-h-10 opacity-100" : "max-h-0 opacity-0"}`}>
+          <div className="flex items-center justify-center gap-2 bg-slate-50 border border-gray-300
+            rounded-xl py-2.5 text-xs font-semibold text-slate-700">
+            <Check size={12} className="text-amber-500" />
+            {t.result.copiedToast}
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary actions: another wording, copy only, translate */}
+      <div className="flex flex-col gap-2.5">
+        {onRegenerate && (
+          <button
+            type="button"
+            onClick={handleRegenerateWording}
+            disabled={rewriting}
+            aria-busy={rewriting}
+            className="w-full py-3 rounded-xl font-semibold text-sm border border-dashed border-slate-300 bg-slate-50/80
+              text-slate-700 hover:bg-slate-100 hover:border-slate-400 active:scale-[0.98]
+              transition-all flex items-center justify-center gap-2
+              disabled:opacity-60 disabled:cursor-wait disabled:hover:translate-y-0"
+          >
+            {rewriting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {t.result.tryAnotherWording}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
+            text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
+            transition-all flex items-center justify-center gap-2"
+        >
+          <Copy size={13} />
+          {t.result.copyReview}
+        </button>
+
+        <a
+          href={buildTranslateUrl(text, reviewLocale)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
+            text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
+            transition-all flex items-center justify-center gap-2 text-center block"
+        >
+          <Globe size={13} />
+          {t.result.translate}
+        </a>
+
+      </div>
+
       {/* WhatsApp — full UI on every page; preview simulates Save without DB */}
       {waState === "saved" ? (
         <div className="flex items-start gap-2.5 border border-green-200 bg-green-50 rounded-xl px-4 py-3">
@@ -473,106 +585,6 @@ export default function StepResult({
             </button>
           </>
         )}
-      </div>
-
-      {/* Manual-copy hint — clipboard blocked (in-app browser); text is pre-selected */}
-      <div className={`transition-all duration-300 overflow-hidden ${copyBlocked ? "max-h-16 opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="flex items-center justify-center gap-2 bg-amber-50 border border-amber-300
-          rounded-xl py-2.5 px-3 text-xs font-semibold text-amber-800 text-center">
-          {reviewLocale === "ja"
-            ? "自動コピーできませんでした。選択された本文を長押しでコピーしてください。"
-            : reviewLocale === "ar"
-              ? "تعذّر النسخ التلقائي. النص محدد — اضغط مطولاً ثم انسخ."
-              : "Couldn't copy automatically. The text is selected — long-press and copy."}
-        </div>
-      </div>
-
-      {/* Copied toast */}
-      <div className={`transition-all duration-300 overflow-hidden ${copied ? "max-h-10 opacity-100" : "max-h-0 opacity-0"}`}>
-        <div className="flex items-center justify-center gap-2 bg-slate-50 border border-gray-300
-          rounded-xl py-2.5 text-xs font-semibold text-slate-700">
-          <Check size={12} className="text-amber-500" />
-          {t.result.copiedToast}
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex flex-col gap-2.5">
-        {onRegenerate && (
-          <button
-            type="button"
-            onClick={handleRegenerateWording}
-            disabled={rewriting}
-            aria-busy={rewriting}
-            className="w-full py-3 rounded-xl font-semibold text-sm border border-dashed border-slate-300 bg-slate-50/80
-              text-slate-700 hover:bg-slate-100 hover:border-slate-400 active:scale-[0.98]
-              transition-all flex items-center justify-center gap-2
-              disabled:opacity-60 disabled:cursor-wait disabled:hover:translate-y-0"
-          >
-            {rewriting ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
-            {t.result.tryAnotherWording}
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
-            text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
-            transition-all flex items-center justify-center gap-2"
-        >
-          <Copy size={13} />
-          {t.result.copyReview}
-        </button>
-
-        <a
-          href={buildTranslateUrl(text, reviewLocale)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-3 rounded-xl font-semibold text-sm border border-gray-300 bg-white
-            text-slate-700 hover:border-slate-500 hover:bg-gray-50 active:scale-[0.98]
-            transition-all flex items-center justify-center gap-2 text-center block"
-        >
-          <Globe size={13} />
-          {t.result.translate}
-        </a>
-
-        {hasValidReviewUrl ? (
-          <a
-            href={gbpReviewUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handlePostOnGoogle}
-            className="bg-slate-900 text-white font-semibold rounded-xl shadow-md
-              hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full py-3
-              flex items-center justify-center gap-2"
-          >
-            <ExternalLink size={13} />
-            {t.result.postOnGoogle}
-          </a>
-        ) : (
-          // Owner hasn't set the Google review link — never open a blank/404
-          // tab on the money path. Tell the guest what to do instead.
-          <div className="border border-gray-300 bg-gray-50 rounded-xl px-4 py-3 text-xs text-slate-600 text-center leading-relaxed">
-            {reviewLocale === "ja"
-              ? "本文をコピーして、Googleマップでお店を検索し、クチコミに貼り付けてください。"
-              : reviewLocale === "ar"
-                ? "انسخ النص، ثم ابحث عن المتجر في خرائط Google والصقه في المراجعة."
-                : "Copy the review, then find this place on Google Maps and paste it there."}
-          </div>
-        )}
-      </div>
-
-      {/* How-to guide */}
-      <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-2">
-        <p className="text-[10px] font-bold tracking-widest uppercase text-slate-500">
-          {t.result.howToTitle}
-        </p>
-        <ol className="text-xs text-slate-600 space-y-1 list-decimal list-inside leading-relaxed">
-          {t.result.howToSteps.map((stepText, i) => (
-            <li key={i} className="font-medium text-slate-700">{stepText}</li>
-          ))}
-        </ol>
       </div>
 
       <button

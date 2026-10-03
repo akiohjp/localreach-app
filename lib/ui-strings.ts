@@ -91,9 +91,8 @@ export interface UiStrings {
     copyReview: string;
     translate: string;
     postOnGoogle: string;
-    howToTitle: string;
-    /** Three ordered steps. */
-    howToSteps: string[];
+    /** One line under the Google button: the tap copies, then paste on Google. */
+    postHint: string;
     startOver: string;
   };
   feedback: {
@@ -215,13 +214,8 @@ const en: UiStrings = {
     rewriting: "Rewriting…",
     copyReview: "Copy Review",
     translate: "Translate via Google",
-    postOnGoogle: "Post on Google",
-    howToTitle: "How to post",
-    howToSteps: [
-      "Tap Copy Review",
-      "Tap Post on Google — Maps opens",
-      "Paste and hit Post",
-    ],
+    postOnGoogle: "Copy & post on Google",
+    postHint: "Your review is copied when you tap. On Google, paste it into the box and tap Post.",
     startOver: "Start over",
   },
   feedback: {
@@ -329,13 +323,8 @@ const ja: UiStrings = {
     rewriting: "書き直しています…",
     copyReview: "レビューをコピー",
     translate: "Googleで翻訳",
-    postOnGoogle: "Googleに投稿",
-    howToTitle: "投稿方法",
-    howToSteps: [
-      "「レビューをコピー」をタップ",
-      "「Googleに投稿」をタップ — マップが開きます",
-      "貼り付けて「投稿」を押す",
-    ],
+    postOnGoogle: "コピーしてGoogleに投稿",
+    postHint: "押すと本文がコピーされます。Googleの入力欄に貼り付けて「投稿」を押してください。",
     startOver: "最初からやり直す",
   },
   feedback: {
@@ -441,13 +430,8 @@ const ar: UiStrings = {
     rewriting: "جارٍ إعادة الكتابة…",
     copyReview: "نسخ المراجعة",
     translate: "ترجم عبر Google",
-    postOnGoogle: "انشر على Google",
-    howToTitle: "طريقة النشر",
-    howToSteps: [
-      "اضغط «نسخ المراجعة»",
-      "اضغط «انشر على Google» — تفتح الخرائط",
-      "الصق واضغط «نشر»",
-    ],
+    postOnGoogle: "انسخ وانشر على Google",
+    postHint: "يُنسخ النص عند الضغط. في Google الصقه في خانة المراجعة واضغط «نشر».",
     startOver: "البدء من جديد",
   },
   feedback: {

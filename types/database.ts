@@ -478,6 +478,44 @@ export type Database = {
           },
         ];
       };
+      /**
+       * Guest taps on the review screen (draft shown, Google button, copy),
+       * written by /api/event from the browser. session_id matches store_views.
+       * Backed by migration 20261003120000_guest_events.sql.
+       */
+      guest_events: {
+        Row: {
+          id: number;
+          store_id: string;
+          created_at: string;
+          event: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+          session_id: string | null;
+          locale: string | null;
+          ip_hash: string | null;
+          device: "mobile" | "tablet" | "desktop" | "unknown" | null;
+        };
+        Insert: {
+          store_id: string;
+          created_at?: string;
+          event: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+          session_id?: string | null;
+          locale?: string | null;
+          ip_hash?: string | null;
+          device?: "mobile" | "tablet" | "desktop" | "unknown" | null;
+        };
+        Update: {
+          event?: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+        };
+        Relationships: [
+          {
+            foreignKeyName: "guest_events_store_id_fkey";
+            columns: ["store_id"];
+            isOneToOne: false;
+            referencedRelation: "stores";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       /**
