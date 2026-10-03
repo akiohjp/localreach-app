@@ -35,6 +35,14 @@ function dedupeKeywords(selected: string[]): string[] {
   return out
 }
 
+/** `n` items picked at random from `items`, returned in their original order. */
+function randomSubsetInOrder(items: string[], n: number): string[] {
+  if (items.length <= n) return items
+  const chosen = new Set<number>()
+  while (chosen.size < n) chosen.add(Math.floor(Math.random() * items.length))
+  return items.filter((_, i) => chosen.has(i))
+}
+
 // Steps that show the progress bar
 const POSITIVE_STEPS: Step[] = ['rating', 'keywords', 'generating', 'result']
 
@@ -215,6 +223,10 @@ export default function ReviewFlow({
    * would differ between the server and hydration.
    */
   const [forcedOffered, setForcedOffered] = useState<string[]>([])
+  /** Which of the store's other pills this guest sees (MAX_PILLS in all). */
+  const [guestOffered, setGuestOffered] = useState<string[]>([])
+  /** Pills on the keyword step, core phrases included. */
+  const MAX_PILLS = 8
 
   /** The zero-API draft. One place for the options every call site shares. */
   function templateDraft(kws: string[], loc: SupportedLocale, ratingValue: number): string {
@@ -346,6 +358,13 @@ export default function ReviewFlow({
       picked.push(k)
     }
     setForcedOffered(picked)
+    // The rest of the row: the store's own pills, a random subset when there
+    // are more than fit, kept in the owner's order. Sixteen choices was a wall
+    // to read on a phone (Let it dough, 2026-10-03).
+    const room = Math.max(0, MAX_PILLS - picked.length)
+    const pickedSet = new Set(picked)
+    const rest = guestPills.filter((k) => !pickedSet.has(k))
+    setGuestOffered(randomSubsetInOrder(rest, room))
   }
 
   async function handleKeywords(guestSelected: string[], note: string) {
@@ -372,7 +391,12 @@ export default function ReviewFlow({
   // with four core phrases would otherwise put all four into every review,
   // which reads as a keyword dump and is what a review-spam filter looks for.
   // Rotating spreads the whole set across the corpus instead.
-  const pillKeywords = [...forcedOffered, ...guestPills]
+  const pillKeywords = [...forcedOffered, ...guestOffered]
+  // Core phrases start ticked, except buyer-search geo phrases ("V60 coffee in
+  // Dubai"): read cold on a guest's phone they look planted, so they are
+  // offered like any other pill and the guest ticks them or not.
+  const GEO_PILL_RE = /\b(in|near|around)\s+[A-Z]/
+  const preTicked = forcedOffered.filter((k) => !(/^[\x20-\x7E]+$/.test(k) && GEO_PILL_RE.test(k)))
   const allowGuestKeywordSkip = pillKeywords.length === 0
 
   function reset() {
@@ -412,7 +436,9 @@ export default function ReviewFlow({
             </div>
             {progressIdx > 0 && (
               <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
-                {progressIdx}&nbsp;/&nbsp;{POSITIVE_STEPS.length - 1}
+                {/* Rating is step 1, so the counter reads 2 / 4 on the keyword step,
+                    the same number its "Step 2" heading carries (it used to say 1 / 3). */}
+                {progressIdx + 1}&nbsp;/&nbsp;{POSITIVE_STEPS.length}
               </span>
             )}
           </div>
@@ -454,7 +480,7 @@ export default function ReviewFlow({
               t={t}
               keywords={pillKeywords}
               allowGuestSkip={allowGuestKeywordSkip}
-              initialSelected={forcedOffered}
+              initialSelected={preTicked}
               noteEnabled={aiDrafts}
               onConfirm={handleKeywords}
             />

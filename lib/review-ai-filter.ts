@@ -99,13 +99,14 @@ export const PROMPT_LEAK_PHRASES: readonly string[] = [
 /**
  * Length rails per locale. Words for EN/AR, characters (no spaces) for JA.
  * The floor depends on the rating (a 5 is expected to say more than a 4):
- * a draft under it is regenerated, because "thin" was the owner's reading of
- * a 38-word draft on 2026-09-06.
+ * a draft under it is regenerated.
  */
 export const LENGTH_RAILS: Record<SupportedLocale, { min4: number; min5: number; max: number; unit: "words" | "chars" }> = {
-  en: { min4: 55, min5: 68, max: 170, unit: "words" },
-  ar: { min4: 48, min5: 58, max: 160, unit: "words" },
-  ja: { min4: 120, min5: 150, max: 430, unit: "chars" },
+  // 2026-10-03: drafts cut to two or three sentences (see lengthRule). The
+  // floor only stops a one-liner; the ceiling stops the old long drafts.
+  en: { min4: 22, min5: 26, max: 75, unit: "words" },
+  ar: { min4: 20, min5: 24, max: 70, unit: "words" },
+  ja: { min4: 60, min5: 70, max: 200, unit: "chars" },
 };
 
 /** The guest's optional free-text line: bounded, printable, one line. */

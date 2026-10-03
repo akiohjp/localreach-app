@@ -106,7 +106,9 @@ export default function StepResult({
   const [customerName, setCustomerName] = useState("");
   const [countryCode, setCountryCode] = useState(dialCode);
   const [phone, setPhone] = useState("");
-  const [optIn, setOptIn] = useState(true);
+  // Unticked until the guest ticks it: consent to offers has to be given, not
+  // left in place (it started ticked until 2026-10-03).
+  const [optIn, setOptIn] = useState(false);
   // A private line to the owner, alongside the public draft. Until now the only
   // way to say something directly was to rate under 4 stars, so the store heard
   // from unhappy guests and nobody else.
