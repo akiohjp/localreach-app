@@ -2523,6 +2523,11 @@ export function buildLocalizedReview(
   /** Free text about the business (category, entity label, name) for the story flavour. */
   flavorHint = "",
 ): string {
+  // 2026-10-04 (Akio): English drafts say only what the guest gave us. See
+  // buildPlainReviewEn. JA / AR still use the pools below.
+  if (plainEn(locale)) {
+    return buildPlainReviewEn(store, kws, seed, vertical, rating, entity, keywordTypes);
+  }
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
   const pool = expandPoolChoices(
@@ -3112,4 +3117,128 @@ function layoutParagraphs(text: string, locale: ReviewLocale, rng: () => number,
   // Break near the middle, never orphaning the opening or closing sentence.
   const at = Math.max(2, Math.min(parts.length - 1, Math.round(parts.length / 2)));
   return `${chunk(0, at)}${PARAGRAPH_GAP}${chunk(at, parts.length)}`;
+}
+
+
+/**
+ * 🔑 2026-10-04 (Akio): the English template draft, written only from what the
+ * guest gave us: that they came, what they tapped and how many stars.
+ *
+ * The story frames and pools it replaces invented a visit around the phrases:
+ * a second visit, a friend who recommended it, staff who remembered the
+ * order, a busy Saturday, a laptop, a box that did not survive the drive home.
+ * None of that was the guest's, and they published it under their name. 17%
+ * of the drafts guests received in September came from the template (the AI
+ * draft failed), so this is not a corner case.
+ *
+ * What it says, and nothing else:
+ *   - that they visited (or used, for agencies and other non-visit trades);
+ *   - the menu items / things they tapped, up to three;
+ *   - a plain verdict that follows the star rating;
+ *   - the qualities they tapped, up to two, as "what I liked";
+ *   - one tapped predicate ("made fresh daily");
+ *   - a closing line that follows the star rating.
+ * Category, service and geo phrases are not written in: they only ever fit
+ * as a sentence bolted on for their own sake. The guest edits the draft and
+ * can add anything.
+ */
+/** Not a type guard on purpose: the pool path below still handles "en" when this is off. */
+function plainEn(locale: ReviewLocale): boolean {
+  return locale === "en";
+}
+
+function buildPlainReviewEn(
+  store: string,
+  kws: string[],
+  seed: number,
+  vertical: Vertical,
+  rating: number,
+  entity: ReviewEntity | undefined,
+  keywordTypes: KeywordTypeMap | undefined,
+): string {
+  const r = forkRng(seed, 0x91a1);
+  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+  const five = rating >= 5;
+  const nonVisit = NON_VISIT_VERTICALS.has(vertical);
+  const food = vertical === "restaurant" || vertical === "cafe";
+  const shop = vertical === "retail";
+
+  const typeOf = (k: string) => classifyKeyword(k, keywordTypes, "en");
+  const declared = (k: string) => (keywordTypes?.[k.trim()] ?? "") === "item";
+  const order = shuffle([...kws], forkRng(seed, 0x91a2));
+  const objs = order.filter((k) => typeOf(k) === "item").slice(0, 3).map((k) => withArt(k, declared(k)));
+  const attrs = order.filter((k) => typeOf(k) === "attribute");
+  const likes = attrs.filter((k) => attributeShape(k) === "noun").slice(0, 2).map((k) => withArt(k));
+  // "I liked no artificial colors" says they liked nothing: a negative pill is
+  // something the guest was glad to see, never something they liked.
+  const glad = attrs.find((k) => attributeShape(k) === "negative") ?? null;
+  const pred = attrs.find((k) => attributeShape(k) === "predicate") ?? null;
+  const list = (xs: string[]) =>
+    xs.length <= 1 ? (xs[0] ?? "") : xs.length === 2 ? `${xs[0]} and ${xs[1]}` : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
+  const area = entity?.area?.trim() || entity?.city?.trim() || null;
+  // "Let It Dough!." — a name that already ends a sentence takes no full stop.
+  const end = (t: string) => (/[.!?]$/.test(t) ? t : `${t}.`);
+  const where = area && !store.includes(area) && r() < 0.5 ? ` in ${area}` : "";
+  const out: string[] = [];
+
+  // Who and what, in one or two sentences.
+  const went = nonVisit
+    ? pick(["I used", "I worked with", "I went with"])
+    : pick(["I visited", "I went to", "I stopped by", "I tried"]);
+  const had = nonVisit
+    ? "for"
+    : food
+      ? pick(["had", "ordered", "tried", "went for"].filter((v) => !went.includes(v.split(" ")[0]!)))
+      : shop
+        ? pick(["bought", "picked up", "went for"].filter((v) => !went.includes(v.split(" ")[0]!)))
+        : pick(["went for", "came in for"].filter((v) => !went.includes(v.split(" ")[0]!)));
+  if (objs.length && !nonVisit && r() < 0.5) {
+    out.push(`${went} ${store}${where} and ${had} ${list(objs)}.`);
+  } else if (objs.length && nonVisit) {
+    out.push(`${went} ${store}${where} ${had} ${list(objs)}.`);
+  } else {
+    out.push(end(`${went} ${store}${where}`));
+    if (objs.length) out.push(`I ${had} ${list(objs)}.`);
+  }
+
+  // The verdict, following the stars and the number of things named.
+  const many = objs.length > 1;
+  if (objs.length && !nonVisit) {
+    out.push(
+      five
+        ? pick(many
+            ? ["All of it was really good.", "I enjoyed all of it.", "I was happy with everything I had."]
+            : ["It was really good.", "I really enjoyed it.", "I was very happy with it."])
+        : pick(many ? ["It was all good.", "I liked all of it."] : ["It was good.", "I liked it."]),
+    );
+  } else {
+    out.push(
+      five
+        ? pick(nonVisit
+            ? ["I was very happy with the work.", "It went really well."]
+            : ["I had a really good experience.", "I was very happy with my visit."])
+        : pick(nonVisit ? ["I was happy with the work."] : ["I had a good experience.", "It was a good visit."]),
+    );
+  }
+
+  const saidLiked = /liked/.test(out[out.length - 1]!);
+  if (likes.length) {
+    out.push(
+      saidLiked
+        ? `What I liked ${five ? "most " : ""}was ${list(likes)}.`
+        : five
+          ? pick([`What I liked most was ${list(likes)}.`, `I really liked ${list(likes)}.`, `I liked ${list(likes)}.`])
+          : pick([`I liked ${list(likes)}.`, `What I liked was ${list(likes)}.`]),
+    );
+  }
+  if (glad) out.push(pick([`I was glad to see ${glad}.`, `It was good to see ${glad}.`]));
+  if (pred) out.push(`It's ${pred}.`);
+
+  out.push(
+    five
+      ? pick(nonVisit ? ["I'd recommend them.", "I'd work with them again."] : ["I'd recommend it.", "I'd happily go back.", "I'll be back."])
+      : pick(nonVisit ? ["I'd use them again."] : ["I'd go back.", "It's worth a visit."]),
+  );
+  return out.join(" ");
 }
