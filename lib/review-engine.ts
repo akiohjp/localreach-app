@@ -2531,6 +2531,9 @@ export function buildLocalizedReview(
   if (plainJa(locale)) {
     return buildPlainReviewJa(store, kws, seed, vertical, rating, entity, keywordTypes);
   }
+  if (plainAr(locale)) {
+    return buildPlainReviewAr(store, kws, seed, vertical, rating, entity, keywordTypes);
+  }
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
   const pool = expandPoolChoices(
@@ -3323,4 +3326,78 @@ function buildPlainReviewJa(
       : pick(nonVisit ? ["機会があればまたお願いしたいです。"] : ["また行きたいと思います。", "機会があればまた寄ります。"]),
   );
   return out.join("");
+}
+
+
+function plainAr(locale: ReviewLocale): boolean {
+  return locale === "ar";
+}
+
+/**
+ * The Arabic counterpart of buildPlainReviewEn (Akio, 2026-10-04): nothing the
+ * guest did not give us. Modern Standard Arabic, first person.
+ *
+ * Arabic adjectives and pronouns agree in gender and number with what they
+ * describe, and a pill can be anything ("Boston Cream", "خدمة سريعة"), so no
+ * sentence here agrees with a pill: the verdict is about the visit
+ * (التجربة / استمتعت), the qualities follow "أكثر ما أعجبني", and the
+ * closing line is about the place (masculine المكان). Not yet read by a
+ * native speaker.
+ */
+function buildPlainReviewAr(
+  store: string,
+  kws: string[],
+  seed: number,
+  vertical: Vertical,
+  rating: number,
+  entity: ReviewEntity | undefined,
+  keywordTypes: KeywordTypeMap | undefined,
+): string {
+  const r = forkRng(seed, 0x91c1);
+  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+  const five = rating >= 5;
+  const nonVisit = NON_VISIT_VERTICALS.has(vertical);
+  const food = vertical === "restaurant" || vertical === "cafe";
+  const shop = vertical === "retail";
+
+  const typeOf = (k: string) => classifyKeyword(k, keywordTypes, "ar");
+  const order = shuffle([...kws], forkRng(seed, 0x91c2));
+  const objs = order.filter((k) => typeOf(k) === "item").slice(0, 3);
+  const likes = order.filter((k) => typeOf(k) === "attribute").slice(0, 2);
+  // و joins the next word in Arabic script; before a Latin name it stands apart.
+  const and = (w: string) => (/^[\u0600-\u06FF]/.test(w) ? `و${w}` : `و ${w}`);
+  const list = (xs: string[]) =>
+    xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join("، ")} ${and(xs[xs.length - 1]!)}`;
+
+  const area = readableLocation(entity?.area?.trim() || null, "ar") ?? readableLocation(entity?.city?.trim() || null, "ar");
+  const where = area && !store.includes(area) && r() < 0.5 ? ` في ${area}` : "";
+  const out: string[] = [];
+
+  out.push(nonVisit ? `تعاملت مع ${store}${where}.` : pick([`زرت ${store}${where}.`, `مررت على ${store}${where}.`]));
+  if (objs.length) {
+    out.push(
+      nonVisit
+        ? `استعنت بهم في ${list(objs)}.`
+        : food
+          ? `${pick(["طلبت", "جرّبت"])} ${list(objs)}.`
+          : shop
+            ? `${pick(["اشتريت", "اخترت"])} ${list(objs)}.`
+            : `جئت من أجل ${list(objs)}.`,
+    );
+  }
+
+  out.push(
+    five
+      ? pick(nonVisit ? ["كانت التجربة ممتازة.", "كانت النتيجة ممتازة."] : ["كانت التجربة ممتازة.", "استمتعت كثيرًا.", "كانت زيارة رائعة."])
+      : pick(nonVisit ? ["كانت التجربة جيدة."] : ["كانت التجربة جيدة.", "استمتعت بالزيارة."]),
+  );
+
+  if (likes.length) out.push(`أكثر ما أعجبني ${list(likes)}.`);
+
+  out.push(
+    five
+      ? pick(nonVisit ? ["أنصح بالتعامل معهم.", "سأتعامل معهم مرة أخرى."] : ["أنصح به بشدة.", "سأعود مرة أخرى بالتأكيد.", "أنصح بزيارته."])
+      : pick(nonVisit ? ["قد أتعامل معهم مرة أخرى."] : ["سأعود مرة أخرى.", "أنصح به."]),
+  );
+  return out.join(" ");
 }
