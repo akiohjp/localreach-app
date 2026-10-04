@@ -481,7 +481,11 @@ export default function ReviewFlow({
               keywords={pillKeywords}
               allowGuestSkip={allowGuestKeywordSkip}
               initialSelected={preTicked}
-              noteEnabled={aiDrafts}
+              // 2026-10-04: no own-words box before the draft. A Let it dough
+              // guest's "the cookie ... marshmallows and chocolate" came back
+              // as Brulee Me Away filled with marshmallows and chocolate. The
+              // guest adds their own words by editing the draft instead.
+              noteEnabled={false}
               onConfirm={handleKeywords}
             />
           )}

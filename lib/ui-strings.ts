@@ -182,7 +182,7 @@ const en: UiStrings = {
   result: {
     stepLabel: "Step 4 — Your Review",
     title: "Ready to post",
-    subtitle: "Edit freely before submitting.",
+    subtitle: "Change anything you like, or add something of your own.",
     reviewAria: "Your review text",
     noteHeading: "Anything just for the team?",
     noteNote: "Optional, private — this one is not posted anywhere.",
@@ -290,7 +290,7 @@ const ja: UiStrings = {
   result: {
     stepLabel: "ステップ 4 — レビュー",
     title: "投稿の準備ができました",
-    subtitle: "投稿前に自由に編集できます。",
+    subtitle: "好きなように直したり、自分の言葉を足したりできます。",
     reviewAria: "レビュー本文",
     noteHeading: "お店の方にだけ伝えたいことはありますか？",
     noteNote: "任意・非公開です。どこにも掲載されません。",
