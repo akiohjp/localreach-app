@@ -857,6 +857,17 @@ function pickFreshFiller(
 const ADDITIVE_OPEN =
   /^(also\b|and\b|plus\b|another\b|on top of that|one more thing|worth (noting|adding|flagging)|(handy|useful) too|(nice|good) to see|in the plus column|counts for something|not nothing|file this under|small detail|a (detail|point) in their favou?r|one thing i did not expect)/i;
 
+/**
+ * 🔑 2026-10-04 (Akio): no sentence whose only job is to carry one more tapped
+ * phrase. The tails below ("I also have to mention the clean space.", "I
+ * couldn't fault their third-wave coffee.", "It's a good spot for office
+ * treats.") read as bolted on, so a phrase the skeleton (story frame or {list}
+ * sentence) does not hold naturally is now left out of the draft. The guest
+ * can still add it when they edit. This replaces the old rule that every
+ * tapped phrase must appear verbatim. Flip to true to get the tails back.
+ */
+const BOLT_ON_SENTENCES = false;
+
 const ATTRIBUTE_TAILS: Record<ReviewLocale | "enNegative" | "enPredicate" | "enOffering", string[]> = {
   // Single-sentence ONLY. Two-sentence templates ("{kw}。この点は大きいと思い
   // ます。") split at the terminator, and each half became its own repeated
@@ -2917,7 +2928,7 @@ export function buildLocalizedReview(
   // adjacent in one review (owner read-through 2026-08-07). Remember what has
   // been used and skip it.
   const usedTails = new Set<string>();
-  for (const slot of slots) {
+  for (const slot of BOLT_ON_SENTENCES ? slots : []) {
     // Noun tails additionally drop taste voice when this phrase is not something
     // you eat ("気さくな大将はぜひ試してほしいです" — caught 2026-07-30; the EN
     // equivalent "nailed the friendly team" — 2026-07-31).
@@ -2955,7 +2966,7 @@ export function buildLocalizedReview(
   // Geo search phrases: one dedicated sentence each, rotated frames, never
   // merged and never article'd. The verbatim guarantee holds — they join the
   // protect list below so the length tuner cannot trim them.
-  if (geoKws.length > 0) {
+  if (BOLT_ON_SENTENCES && geoKws.length > 0) {
     const geoChoiceRng = forkRng(seed, 0x9e01);
     const geoOrder = shuffle(
       forAudience(GEO_TAILS).map((t) => expandChoices(t, geoChoiceRng)),
@@ -2977,7 +2988,7 @@ export function buildLocalizedReview(
     salt: number,
     shape: ((kw: string) => string) | undefined = undefined,
   ) => {
-    if (phrases.length === 0) return;
+    if (!BOLT_ON_SENTENCES || phrases.length === 0) return;
     const choiceRng = forkRng(seed, salt);
     const order = shuffle(pool.map((t) => expandChoices(t, choiceRng)), forkRng(seed, salt + 1));
     let i = 0;

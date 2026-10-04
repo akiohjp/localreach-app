@@ -23,13 +23,13 @@ import { resolveVertical } from "@/lib/review-pools";
 const SETS = {
   cafe: {
     en: ["friendly staff", "quick service", "fresh taste", "good coffee",
-         "fair prices", "relaxed atmosphere", "clean space", "nice presentation"],
+         "good value", "relaxed atmosphere", "clean space", "nice presentation"],
     ja: ["親切なスタッフ", "提供の早さ", "できたての味", "おいしいコーヒー",
          "手頃な価格", "落ち着いた雰囲気", "清潔な店内", "見た目のきれいさ"],
   },
   restaurant: {
     en: ["friendly staff", "attentive service", "fresh taste", "generous portions",
-         "fair prices", "relaxed atmosphere", "clean space", "nice presentation"],
+         "good value", "relaxed atmosphere", "clean space", "nice presentation"],
     ja: ["親切なスタッフ", "丁寧な接客", "できたての味", "ボリューム",
          "手頃な価格", "落ち着いた雰囲気", "清潔な店内", "見た目のきれいさ"],
   },
