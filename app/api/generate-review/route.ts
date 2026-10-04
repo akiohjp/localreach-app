@@ -10,6 +10,7 @@ import {
   splitSoftTerms,
   stripBannedSentencesIn,
 } from "@/lib/banned-terms";
+import { generalPillsFor, withGeneralTypes } from "@/lib/general-pills";
 import { buildReviewPrompt, CLOSINGS, OPENINGS } from "@/lib/review-prompt";
 import { checkReviewDraft, cleanReviewDraft, isSoftRejection, sanitizeGuestNote } from "@/lib/review-ai-filter";
 import { generateWithLadder, reviewModelsFromEnv } from "@/lib/review-ai";
@@ -191,8 +192,10 @@ export async function POST(req: Request) {
 
   // Only phrases the guest could actually have been shown. Anything else is
   // either a stale client or someone probing the endpoint.
+  const general = generalPillsFor(store.business_category, store.default_language);
   const configured = new Set(
-    [...(store.forced_keywords ?? []), ...(store.keywords ?? [])].map((k) => String(k).trim()).filter(Boolean),
+    [...(store.forced_keywords ?? []), ...(store.keywords ?? []), ...general]
+      .map((k) => String(k).trim()).filter(Boolean),
   );
   const keywords = requested.filter((k) => configured.has(k));
   if (keywords.length === 0 && !note) return json({ error: "nothing_to_write" }, 400);
@@ -277,7 +280,7 @@ export async function POST(req: Request) {
       locale,
       rating,
       keywords,
-      keywordTypes: (store.keyword_types as Record<string, string> | null) ?? null,
+      keywordTypes: withGeneralTypes(general, store.keyword_types as Record<string, string> | null),
       note,
       categoryNoun,
       area: store.entity_area,

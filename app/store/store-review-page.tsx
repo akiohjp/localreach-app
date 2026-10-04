@@ -6,6 +6,7 @@ import { localesForStore } from '@/lib/guest-locales'
 import { resolveStoreLogoForViewer } from '@/lib/resolve-store-logo-url'
 import { isMissingColumnError } from '@/lib/supabase-errors'
 import { SLUG_RE } from '@/lib/store-links'
+import { generalPillsFor } from '@/lib/general-pills'
 import ReviewFlow from './[id]/ReviewFlow'
 import ViewBeacon from './ViewBeacon'
 
@@ -174,6 +175,7 @@ export async function StoreReviewPage({
           contactChannel={store.contact_channel ?? 'whatsapp'}
           contactDialCode={store.contact_dial_code ?? null}
           aiDrafts={Boolean(store.ai_review_enabled)}
+          generalPills={generalPillsFor(store.business_category, store.default_language)}
         />
 
         <p className="text-center text-[10px] text-slate-400 mt-5 tracking-widest uppercase">

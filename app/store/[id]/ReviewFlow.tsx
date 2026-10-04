@@ -13,6 +13,7 @@ import type { Step } from '@/lib/config'
 import type { ContactChannel, SupportedLocale } from '@/types/database'
 import { getUiStrings, feedbackTopicsFor } from '@/lib/ui-strings'
 import { useFlowPersistence } from '@/lib/use-flow-persistence'
+import { withGeneralTypes } from '@/lib/general-pills'
 
 /**
  * Trim + de-duplicate the guest's selection, preserving order.
@@ -114,6 +115,12 @@ type Props = {
    * store with this on never loses the instant path. Master-admin switch.
    */
   aiDrafts?: boolean
+  /**
+   * lib/general-pills generalPillsFor(): plain café / restaurant phrases that
+   * fill the keyword row after the menu items. Empty for every other store,
+   * which keeps drawing from its own pills.
+   */
+  generalPills?: string[]
 }
 
 export default function ReviewFlow({
@@ -137,7 +144,9 @@ export default function ReviewFlow({
   keywordTypes,
   guestAudience,
   aiDrafts = false,
+  generalPills = [],
 }: Props) {
+  const pillTypes = withGeneralTypes(generalPills, keywordTypes)
   const entity = {
     area: entityArea ?? null,
     city: entityCity ?? null,
@@ -227,6 +236,8 @@ export default function ReviewFlow({
   const [guestOffered, setGuestOffered] = useState<string[]>([])
   /** Pills on the keyword step, core phrases included. */
   const MAX_PILLS = 8
+  /** Menu items always shown, up to this many. */
+  const MAX_ITEMS = 6
 
   /** The zero-API draft. One place for the options every call site shares. */
   function templateDraft(kws: string[], loc: SupportedLocale, ratingValue: number): string {
@@ -238,7 +249,7 @@ export default function ReviewFlow({
       audience: guestAudience ?? null,
       rating: ratingValue,
       entity,
-      keywordTypes,
+      keywordTypes: pillTypes,
     })
   }
 
@@ -358,13 +369,22 @@ export default function ReviewFlow({
       picked.push(k)
     }
     setForcedOffered(picked)
-    // The rest of the row: the store's own pills, a random subset when there
-    // are more than fit, kept in the owner's order. Sixteen choices was a wall
-    // to read on a phone (Let it dough, 2026-10-03).
-    const room = Math.max(0, MAX_PILLS - picked.length)
+    // Then every menu item the owner declared, so a guest can always find what
+    // they ate (2026-10-04: a guest who had a cookie could not see it and the
+    // draft went wrong). More than MAX_ITEMS: a random few, in owner order.
     const pickedSet = new Set(picked)
-    const rest = guestPills.filter((k) => !pickedSet.has(k))
-    setGuestOffered(randomSubsetInOrder(rest, room))
+    const own = guestPills.filter((k) => !pickedSet.has(k))
+    const items = randomSubsetInOrder(own.filter((k) => keywordTypes?.[k] === 'item'), MAX_ITEMS)
+    // The rest of the row: plain café / restaurant phrases where the store has
+    // them (lib/general-pills), otherwise the store's other pills. A random
+    // subset, kept in order. Sixteen choices was a wall to read on a phone
+    // (Let it dough, 2026-10-03).
+    const taken = new Set([...picked, ...items])
+    const others = generalPills.length
+      ? generalPills.filter((k) => !taken.has(k))
+      : own.filter((k) => !taken.has(k))
+    const room = Math.max(0, MAX_PILLS - picked.length - items.length)
+    setGuestOffered([...items, ...randomSubsetInOrder(others, room)])
   }
 
   async function handleKeywords(guestSelected: string[], note: string) {
