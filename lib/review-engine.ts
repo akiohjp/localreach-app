@@ -2528,6 +2528,9 @@ export function buildLocalizedReview(
   if (plainEn(locale)) {
     return buildPlainReviewEn(store, kws, seed, vertical, rating, entity, keywordTypes);
   }
+  if (plainJa(locale)) {
+    return buildPlainReviewJa(store, kws, seed, vertical, rating, entity, keywordTypes);
+  }
   // Choice groups resolve once per review with their own fork, so the same
   // template lands with different surface wording from review to review.
   const pool = expandPoolChoices(
@@ -3241,4 +3244,83 @@ function buildPlainReviewEn(
       : pick(nonVisit ? ["I'd use them again."] : ["I'd go back.", "It's worth a visit."]),
   );
   return out.join(" ");
+}
+
+
+function plainJa(locale: ReviewLocale): boolean {
+  return locale === "ja";
+}
+
+/**
+ * The Japanese counterpart of buildPlainReviewEn (Akio, 2026-10-04): the same
+ * rule, nothing the guest did not give us. Polite plain form (です・ます).
+ *
+ * Qualities go in as 「〜という点が良かったです」: the old attribute tails
+ * showed that this is the one frame every pill shape survives, a noun
+ * (清潔な店内), a noun of degree (ボリューム) or a whole clause
+ * (子連れでも入りやすい). The area is used only when it is written in a
+ * script that reads in Japanese, which also ends 「DubaiのDubai Marina」.
+ */
+function buildPlainReviewJa(
+  store: string,
+  kws: string[],
+  seed: number,
+  vertical: Vertical,
+  rating: number,
+  entity: ReviewEntity | undefined,
+  keywordTypes: KeywordTypeMap | undefined,
+): string {
+  const r = forkRng(seed, 0x91b1);
+  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+  const five = rating >= 5;
+  const nonVisit = NON_VISIT_VERTICALS.has(vertical);
+  const food = vertical === "restaurant" || vertical === "cafe";
+  const shop = vertical === "retail";
+
+  const typeOf = (k: string) => classifyKeyword(k, keywordTypes, "ja");
+  const order = shuffle([...kws], forkRng(seed, 0x91b2));
+  const objs = order.filter((k) => typeOf(k) === "item").slice(0, 3);
+  const likes = order.filter((k) => typeOf(k) === "attribute").slice(0, 2);
+  const list = (xs: string[]) => (xs.length <= 2 ? xs.join("と") : `${xs.slice(0, -1).join("、")}と${xs[xs.length - 1]}`);
+
+  const area = readableLocation(entity?.area?.trim() || null, "ja") ?? readableLocation(entity?.city?.trim() || null, "ja");
+  const at = area && !store.includes(area) && r() < 0.5 ? `${area}の` : "";
+  const out: string[] = [];
+
+  const verb = nonVisit
+    ? "お願いしました"
+    : food
+      ? pick(["いただきました", "注文しました", "頼みました"])
+      : shop
+        ? pick(["買いました", "購入しました"])
+        : pick(["お願いしました", "利用しました"]);
+  if (objs.length && r() < 0.5) {
+    out.push(`${at}${store}で${list(objs)}を${verb}。`);
+  } else {
+    out.push(nonVisit ? `${at}${store}を利用しました。` : food || shop ? pick([`${at}${store}に行きました。`, `${at}${store}に寄りました。`]) : `${at}${store}に行きました。`);
+    if (objs.length) out.push(`${list(objs)}を${verb}。`);
+  }
+
+  const many = objs.length > 1;
+  if (objs.length && food) {
+    out.push(five ? pick(many ? ["どれもとてもおいしかったです。", "どれも大満足でした。", "どれも期待以上でした。"] : ["とてもおいしかったです。", "大満足でした。", "期待以上でした。"])
+                  : pick(many ? ["どれもおいしかったです。"] : ["おいしかったです。", "満足しています。"]));
+  } else {
+    out.push(five ? pick(["とても満足しています。", "大満足でした。", "期待以上でした。"]) : "満足しています。");
+  }
+
+  // A noun phrase (親切なスタッフ, ボリューム) takes が; a clause pill
+  // (子連れでも入りやすい) is nominalised with の first.
+  const isClause = (k: string) => /[いるただすく]$/.test(k);
+  const nouns = likes.filter((k) => !isClause(k));
+  const clauses = likes.filter(isClause);
+  if (nouns.length) out.push(`${five ? "特に" : ""}${list(nouns)}が良かったです。`);
+  for (const c of clauses) out.push(`${c}のも${nouns.length ? "うれしいです" : "良かったです"}。`);
+
+  out.push(
+    five
+      ? pick(nonVisit ? ["またお願いしたいです。", "おすすめです。"] : ["また行きたいです。", "おすすめです。", "また寄りたいと思います。", "また伺います。"])
+      : pick(nonVisit ? ["機会があればまたお願いしたいです。"] : ["また行きたいと思います。", "機会があればまた寄ります。"]),
+  );
+  return out.join("");
 }
