@@ -488,23 +488,25 @@ export type Database = {
           id: number;
           store_id: string;
           created_at: string;
-          event: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+          event: "draft_shown" | "post_click" | "copy" | "copy_blocked" | "rated" | "google_shown";
           session_id: string | null;
           locale: string | null;
           ip_hash: string | null;
           device: "mobile" | "tablet" | "desktop" | "unknown" | null;
+          rating: number | null;
         };
         Insert: {
           store_id: string;
           created_at?: string;
-          event: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+          event: "draft_shown" | "post_click" | "copy" | "copy_blocked" | "rated" | "google_shown";
           session_id?: string | null;
           locale?: string | null;
           ip_hash?: string | null;
           device?: "mobile" | "tablet" | "desktop" | "unknown" | null;
+          rating?: number | null;
         };
         Update: {
-          event?: "draft_shown" | "post_click" | "copy" | "copy_blocked";
+          event?: "draft_shown" | "post_click" | "copy" | "copy_blocked" | "rated" | "google_shown";
         };
         Relationships: [
           {

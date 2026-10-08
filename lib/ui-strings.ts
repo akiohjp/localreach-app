@@ -146,6 +146,18 @@ export interface UiStrings {
     /** The public path stays open after sending privately — never a dead end. */
     alsoOnGoogle: string;
   };
+  /**
+   * Rating-only stores (lib/review-mode): after the stars, straight to Google.
+   * Nothing is written for the guest, so nothing here mentions a draft.
+   */
+  google: {
+    title: string;
+    /** "{store}" is replaced with the store name. */
+    body: string;
+    /** Google's own form asks for the stars again; said so it is not a surprise. */
+    starsAgain: string;
+    button: string;
+  };
 }
 
 const en: UiStrings = {
@@ -252,6 +264,12 @@ const en: UiStrings = {
     closing: "We hope to welcome you back and give you a better experience.",
     backToStart: "Back to start",
     alsoOnGoogle: "You're also welcome to post your review publicly on Google.",
+  },
+  google: {
+    title: "Thank you!",
+    body: "Could you leave a short review of {store} on Google? It helps other people find it.",
+    starsAgain: "Google will ask you to tap the stars again on its own page.",
+    button: "Write a review on Google",
   },
 };
 
@@ -363,6 +381,12 @@ const ja: UiStrings = {
     backToStart: "最初に戻る",
     alsoOnGoogle: "Googleに公開のクチコミとして投稿していただくこともできます。",
   },
+  google: {
+    title: "ありがとうございます",
+    body: "よろしければ Google に{store}のクチコミを書いていただけますか。お店を探している方の参考になります。",
+    starsAgain: "Google の画面でも、もう一度星を選ぶ欄があります。",
+    button: "Google にクチコミを書く",
+  },
 };
 
 const ar: UiStrings = {
@@ -468,6 +492,12 @@ const ar: UiStrings = {
     closing: "نتطلّع إلى الترحيب بك مجددًا وتقديم تجربة أفضل.",
     backToStart: "العودة إلى البداية",
     alsoOnGoogle: "يمكنك أيضًا نشر مراجعتك علنًا على Google.",
+  },
+  google: {
+    title: "شكرًا لك!",
+    body: "هل يمكنك كتابة مراجعة قصيرة عن {store} على Google؟ هذا يساعد الآخرين في العثور عليه.",
+    starsAgain: "سيطلب منك Google اختيار النجوم مرة أخرى في صفحته.",
+    button: "اكتب مراجعة على Google",
   },
 };
 

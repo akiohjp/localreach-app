@@ -9,6 +9,9 @@ import StepGenerating from '@/components/StepGenerating'
 import StepResult from '@/components/StepResult'
 import StepFeedback from '@/components/StepFeedback'
 import StepFeedbackSent from '@/components/StepFeedbackSent'
+import StepGoogle from '@/components/StepGoogle'
+import { isRatingOnly } from '@/lib/review-mode'
+import { logGuestEvent } from '@/lib/guest-event'
 import type { Step } from '@/lib/config'
 import type { ContactChannel, SupportedLocale } from '@/types/database'
 import { getUiStrings, feedbackTopicsFor } from '@/lib/ui-strings'
@@ -46,6 +49,8 @@ function randomSubsetInOrder(items: string[], n: number): string[] {
 
 // Steps that show the progress bar
 const POSITIVE_STEPS: Step[] = ['rating', 'keywords', 'generating', 'result']
+// Rating-only stores (lib/review-mode): the stars, then Google.
+const RATING_ONLY_STEPS: Step[] = ['rating', 'google']
 
 // Native language names for the guest's review-language picker (self-referential,
 // so they read correctly whatever the surrounding UI language is).
@@ -146,6 +151,7 @@ export default function ReviewFlow({
   aiDrafts = false,
   generalPills = [],
 }: Props) {
+  const ratingOnly = isRatingOnly(storeId)
   const pillTypes = withGeneralTypes(generalPills, keywordTypes)
   const entity = {
     area: entityArea ?? null,
@@ -187,6 +193,9 @@ export default function ReviewFlow({
     storeId,
     { step, rating, reviewText, selectedKeywords, reviewLocale },
     (s) => {
+      // A rating-only store never shows a draft. A snapshot saved before the
+      // store was switched (30-minute TTL) could still hold one; drop it.
+      if (ratingOnly && !['google', 'feedback', 'feedback_sent'].includes(s.step)) return
       setStep(s.step as Step)
       setRating(s.rating)
       setReviewText(s.reviewText)
@@ -210,7 +219,8 @@ export default function ReviewFlow({
     document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
   }, [locale])
 
-  const progressIdx = POSITIVE_STEPS.indexOf(step)
+  const flowSteps = ratingOnly ? RATING_ONLY_STEPS : POSITIVE_STEPS
+  const progressIdx = flowSteps.indexOf(step)
 
   function hasAnyConfiguredKeywords(): boolean {
     return (
@@ -326,6 +336,10 @@ export default function ReviewFlow({
 
   function handleRating(value: number) {
     setRating(value)
+    if (ratingOnly) {
+      // The stars are the only thing recorded here; no draft is ever made.
+      logGuestEvent(storeId, 'rated', locale, value)
+    }
     if (value < 4) {
       // Not a gate: the feedback step offers the SAME Google review link a happy
       // guest gets, side by side with the private option, and keeps offering it
@@ -335,6 +349,10 @@ export default function ReviewFlow({
       // Routing low raters to a private-only path would be "selectively solicit
       // positive reviews" (support.google.com/business/answer/7400114).
       setStep('feedback')
+      return
+    }
+    if (ratingOnly) {
+      setStep('google')
       return
     }
     if (!hasAnyConfiguredKeywords()) {
@@ -458,7 +476,7 @@ export default function ReviewFlow({
               <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
                 {/* Rating is step 1, so the counter reads 2 / 4 on the keyword step,
                     the same number its "Step 2" heading carries (it used to say 1 / 3). */}
-                {progressIdx + 1}&nbsp;/&nbsp;{POSITIVE_STEPS.length}
+                {progressIdx + 1}&nbsp;/&nbsp;{flowSteps.length}
               </span>
             )}
           </div>
@@ -466,7 +484,7 @@ export default function ReviewFlow({
           {/* Progress bar — filled segments use brandColor */}
           {progressIdx > 0 && (
             <div className="flex gap-1 mt-4">
-              {POSITIVE_STEPS.map((_, i) => (
+              {flowSteps.map((_, i) => (
                 <div
                   key={i}
                   className="h-1 flex-1 rounded-full transition-all duration-500"
@@ -495,7 +513,7 @@ export default function ReviewFlow({
             />
           )}
 
-          {step === 'keywords' && (
+          {!ratingOnly && step === 'keywords' && (
             <StepKeywords
               t={t}
               keywords={pillKeywords}
@@ -510,7 +528,7 @@ export default function ReviewFlow({
             />
           )}
 
-          {step === 'generating' && (
+          {!ratingOnly && step === 'generating' && (
             <StepGenerating
               t={t}
               brandColor={brandColor}
@@ -520,7 +538,7 @@ export default function ReviewFlow({
             />
           )}
 
-          {step === 'result' && (
+          {!ratingOnly && step === 'result' && (
             <StepResult
               t={t}
               reviewText={reviewText}
@@ -535,6 +553,18 @@ export default function ReviewFlow({
               contactChannel={contactChannel}
               contactDialCode={contactDialCode ?? undefined}
               onRegenerate={() => draftFor(selectedKeywords, reviewLocale, rating, guestNote)}
+            />
+          )}
+
+          {step === 'google' && (
+            <StepGoogle
+              t={t}
+              storeId={storeId}
+              storeName={storeName}
+              googleReviewUrl={googleReviewUrl}
+              brandColor={brandColor}
+              locale={locale}
+              onReset={reset}
             />
           )}
 

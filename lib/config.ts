@@ -40,4 +40,5 @@ export type Step =
   | "generating"
   | "result"
   | "feedback"
-  | "feedback_sent";
+  | "feedback_sent"
+  | "google";

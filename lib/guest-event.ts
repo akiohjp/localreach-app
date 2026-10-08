@@ -1,6 +1,14 @@
 import { isValidUuid } from "@/lib/is-valid-uuid";
 
-export type GuestEvent = "draft_shown" | "post_click" | "copy" | "copy_blocked";
+export type GuestEvent =
+  | "draft_shown"
+  | "post_click"
+  | "copy"
+  | "copy_blocked"
+  /** Stars chosen (rating-only stores, lib/review-mode). Carries the rating. */
+  | "rated"
+  /** The Google screen appeared (rating-only stores). */
+  | "google_shown";
 
 /**
  * Record one tap on the guest review screen (POST /api/event). Uses the same
@@ -10,7 +18,12 @@ export type GuestEvent = "draft_shown" | "post_click" | "copy" | "copy_blocked";
  * a failed beacon must never reach the guest. Preview pages (no real store
  * row) send nothing.
  */
-export function logGuestEvent(storeId: string, event: GuestEvent, locale?: string) {
+export function logGuestEvent(
+  storeId: string,
+  event: GuestEvent,
+  locale?: string,
+  rating?: number,
+) {
   if (!isValidUuid(storeId)) return;
   let sessionId: string | null = null;
   try {
@@ -21,7 +34,7 @@ export function logGuestEvent(storeId: string, event: GuestEvent, locale?: strin
   void fetch("/api/event", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ storeId, event, sessionId, locale: locale ?? null }),
+    body: JSON.stringify({ storeId, event, sessionId, locale: locale ?? null, rating: rating ?? null }),
     keepalive: true,
   }).catch(() => {});
 }
