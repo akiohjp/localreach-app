@@ -216,6 +216,9 @@ t("prompt: a tapped phrase containing an AI-tell word is still allowed", () => {
 t("banned terms: origin words are hard, carpet is soft and licensed only by a tapped phrase", () => {
   assert.ok(!bannedTermsFor("Cinar Rugs Dubai").includes("carpet"));
   assert.ok(bannedTermsFor("Cinar Rugs Dubai").includes("persian"));
+  assert.ok(bannedTermsFor("RMK Perfumes").includes("best"));
+  assert.ok(!bannedTermsFor("Let It Dough!").includes("best"));
+  assert.equal(findBannedTermIn(bannedTermsFor("RMK Perfumes"), "Found the best luxury perfume in Dubai here."), "best");
   assert.deepEqual(softBannedTermsFor("Cinar Rugs Dubai"), ["carpet"]);
   assert.deepEqual(splitSoftTerms("Cinar Rugs Dubai", ["premium carpets in Dubai"]), { allowed: ["carpet"], forbidden: [] });
   assert.deepEqual(splitSoftTerms("Cinar Rugs Dubai", ["hand-knotted wool rugs"]), { allowed: [], forbidden: ["carpet"] });

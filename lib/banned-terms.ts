@@ -32,6 +32,10 @@ export const BANNED_TERMS: Record<string, readonly string[]> = {
     "persian", "iranian", "oriental", "kashmir", "afghan", "moroccan",
     "tabriz", "isfahan", "qom", "nuruosmaniye", "antalya",
   ],
+  // RMK never claims to be the best (2026-10-29 owner direction; the live
+  // model still wrote "the best luxury perfume in Dubai" in 2 of 20 drafts on
+  // 2026-11-10). Google also removes reviews that read like advertising.
+  "RMK Perfumes": ["best"],
 };
 
 export const SOFT_BANNED_TERMS: Record<string, readonly string[]> = {
